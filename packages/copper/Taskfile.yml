@@ -20,3 +20,7 @@ tasks:
       - task: cargo:watch-serve-doc
         vars:
           CARGO_DOC_ARGS: --features full
+
+  doc:
+    cmds:
+      - cargo doc --features full

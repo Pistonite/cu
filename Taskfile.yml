@@ -2,9 +2,9 @@ version: '3'
 
 includes:
   common:
-    taskfile: ../mono-dev/task/common.yaml
+    taskfile: ./packages/mono-dev/task/common.yaml
+    flatten: true
     optional: true
-    internal: true
 
   cu: {taskfile: ./packages/copper, dir: ./packages/copper, internal: true}
 

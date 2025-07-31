@@ -1,0 +1,33 @@
+name: pages
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          mono-dev: packages
+          rust: stable
+      - run: task exec -- cu:doc
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc/cu
+          retention-days: 3
+  deploy-pages:
+    needs:
+      - build
+    if: github.event_name != 'pull_request'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
