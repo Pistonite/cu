@@ -1,0 +1,25 @@
+version: '3'
+
+includes:
+  common:
+    taskfile: ../mono-dev/task/common.yaml
+    optional: true
+    internal: true
+
+  cu: {taskfile: ./packages/copper, dir: ./packages/copper, internal: true}
+
+tasks:
+  install-cargo-extra-tools:
+    aliases: [icets]
+    cmds:
+      - task: common:cargo-binstall
+        vars:
+          PACKAGES: cargo-watch live-server
+
+  install:
+    cmds:
+      - task: common:setup-mono-dev-at-packages
+
+  check:
+    cmds:
+      - task: cu:check
