@@ -23,3 +23,14 @@ tasks:
   check:
     cmds:
       - task: cu:check
+
+  doc:
+    cmds:
+      - cargo doc --no-deps --all-features
+      - cmd: >
+          echo "Generating index redirect";
+          echo "<!DOCTYPE html>" > target/doc/index.html;
+          echo "<html><head>" >> target/doc/index.html;
+          echo '<meta http-equiv="refresh" content="0;url=https://pistonight.github.io/cu/cu/">' >> target/doc/index.html;
+          echo "</head><body></body></html>" >> target/doc/index.html;
+        silent: true

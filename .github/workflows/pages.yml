@@ -11,10 +11,10 @@ jobs:
         with:
           mono-dev: packages
           rust: stable
-      - run: task exec -- cu:doc
+      - run: task exec -- doc
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: target/doc/cu
+          path: target/doc
           retention-days: 3
   deploy-pages:
     needs:
