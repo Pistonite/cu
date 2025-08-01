@@ -80,6 +80,10 @@
 //! }
 //! ```
 //!
+//! [`progress_unbounded`] and [`progress_unbounded_lowp`] are variants
+//! that doesn't display the total steps. Use `_` as the step placeholder
+//! when updating the bar.
+//!
 //! # Prompting
 //! With the `prompt` feature, additional CLI args are available:
 //! - `--yes/-y`: Automatically answer `y` to all yes/no prompts (regular prompts are still shown)
@@ -99,6 +103,8 @@ pub use anyhow::{Context, Result, bail, ensure};
 // pub use env_var::*;
 // mod parse;
 // pub use parse::*;
+//
+mod monitor;
 
 mod clap;
 pub use clap::{CliFlags, cli_wrapper};
@@ -116,13 +122,32 @@ pub use path::PathExtension;
 mod print;
 
 pub use print::{
-    ColorLevel, PrintLevel, ProgressBarHandle, PromptLevel, color_enabled, init_print_options,
+    ColorLevel, PrintLevel, ProgressBar, PromptLevel, color_enabled, init_print_options,
     progress_bar, progress_bar_lowp, set_thread_print_name,
+    progress_unbounded, progress_unbounded_lowp,
 };
+
+/// Level for message/events
+pub mod lv {
+    /// Error
+    pub const E: crate::__priv::Lv = crate::__priv::Lv::Error;
+    /// Hint
+    pub const H: crate::__priv::Lv = crate::__priv::Lv::Hint;
+    /// Print
+    pub const P: crate::__priv::Lv = crate::__priv::Lv::Print;
+    /// Warn
+    pub const W: crate::__priv::Lv = crate::__priv::Lv::Warn;
+    /// Info
+    pub const I: crate::__priv::Lv = crate::__priv::Lv::Info;
+    /// Debug
+    pub const D: crate::__priv::Lv = crate::__priv::Lv::Debug;
+    /// Trace
+    pub const T: crate::__priv::Lv = crate::__priv::Lv::Trace;
+}
 
 #[doc(hidden)]
 pub mod __priv {
-    pub use super::print::{__PrintType, __print_with_type, __prompt, __prompt_yesno};
+    pub use crate::print::{Lv, __print_with_level, __prompt, __prompt_yesno};
 }
 
 /// Prelude imports

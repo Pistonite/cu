@@ -19,4 +19,4 @@ tasks:
     cmds:
       - task: cargo:watch-serve-doc
         vars:
-          CARGO_DOC_ARGS: --features full
+          CARGO_DOC_ARGS: --no-deps --features full

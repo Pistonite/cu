@@ -6,6 +6,7 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0.98"
+atomic = { path = "../atomic" }
 clap = { version = "4.5.41", features = ["derive"] }
 dunce = "1.0.5"
 env_filter = "0.1.3"
@@ -13,6 +14,7 @@ log = "0.4.27"
 oneshot = "0.1.11"
 pathdiff = "0.2.3"
 terminal_size = "0.4.2"
+tokio = { version = "1.47.0", features = ["io-std", "macros", "rt", "sync", "time"] }
 unicode-width = { version = "0.2.1", features = ["cjk"] }
 
 

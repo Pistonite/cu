@@ -1,0 +1,8 @@
+[package]
+name = "atomic"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Generic atomic types that uses std atomic and conversion traits"
+
+[dependencies]
