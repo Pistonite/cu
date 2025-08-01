@@ -1,5 +1,36 @@
 use super::ansi;
 
+/// Format and invoke a print macro
+///
+/// # Example
+/// ```rust
+/// let x = cu::fmtand!(error!("found {} errors", 3));
+/// assert_eq!(x, "found 3 errors");
+/// ```
+#[macro_export]
+macro_rules! fmtand {
+    ($mac:ident !( $($fmt_args:tt)* )) => {{
+        let s = format!($($fmt_args)*);
+        $crate::$mac!("{s}");
+        s
+    }}
+}
+/// Invoke a print macro, then bail with the same message
+///
+/// # Example
+/// ```rust,no_run
+/// let x = cu::bailand!(error!("found {} errors", 3));
+/// let x = cu::bailand!(warn!("warning!"));
+/// ```
+#[macro_export]
+macro_rules! bailand {
+    ($mac:ident !( $($fmt_args:tt)* )) => {{
+        let s = format!($($fmt_args)*);
+        $crate::$mac!("{s}");
+        $crate::bail!(s);
+    }}
+}
+
 pub(crate) fn term_width_or_max() -> usize {
     term_width().unwrap_or(400)
 }
@@ -9,8 +40,7 @@ pub(crate) fn term_width() -> Option<usize> {
 }
 pub(crate) fn term_width_height() -> Option<(usize, usize)> {
     use terminal_size::*;
-    terminal_size().map(
-        |(Width(w), Height(h))| ((w as usize).min(400), (h as usize).min(400)))
+    terminal_size().map(|(Width(w), Height(h))| ((w as usize).min(400), (h as usize).min(400)))
 }
 
 pub(crate) struct FormatBuffer {
@@ -81,5 +111,3 @@ impl FormatBuffer {
         self.curr = 3;
     }
 }
-
-

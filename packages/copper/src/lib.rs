@@ -123,8 +123,8 @@ mod print;
 
 pub use print::{
     ColorLevel, PrintLevel, ProgressBar, PromptLevel, color_enabled, init_print_options,
-    progress_bar, progress_bar_lowp, set_thread_print_name,
-    progress_unbounded, progress_unbounded_lowp,
+    progress_bar, progress_bar_lowp, progress_unbounded, progress_unbounded_lowp,
+    set_thread_print_name,
 };
 
 /// Level for message/events
@@ -147,7 +147,7 @@ pub mod lv {
 
 #[doc(hidden)]
 pub mod __priv {
-    pub use crate::print::{Lv, __print_with_level, __prompt, __prompt_yesno};
+    pub use crate::print::{__print_with_level, __prompt, __prompt_yesno, Lv};
 }
 
 /// Prelude imports

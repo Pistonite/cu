@@ -13,7 +13,7 @@ impl std::fmt::Display for ColorLevel {
         match self {
             ColorLevel::Always => write!(f, "always"),
             ColorLevel::Never => write!(f, "never"),
-            ColorLevel::Auto => write!(f, "auto")
+            ColorLevel::Auto => write!(f, "auto"),
         }
     }
 }
@@ -110,9 +110,7 @@ impl Lv {
     /// Check if the current print level can print this message level
     pub fn can_print(self, level: PrintLevel) -> bool {
         match self {
-            Lv::Error | Lv::Hint | Lv::Print => {
-                level != PrintLevel::QuietQuiet
-            }
+            Lv::Error | Lv::Hint | Lv::Print => level != PrintLevel::QuietQuiet,
             Lv::Warn | Lv::Info => level > PrintLevel::Quiet,
             Lv::Debug => level > PrintLevel::Normal,
             Lv::Trace => level == PrintLevel::VerboseVerbose,

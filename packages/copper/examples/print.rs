@@ -21,7 +21,7 @@ fn main() -> cu::Result<()> {
 
     {
         let bar2 = cu::progress_bar(20, "This takes 5 seconds");
-        let bar = cu::progress_unbounded( "This is unbounded");
+        let bar = cu::progress_unbounded("This is unbounded");
         for i in 0..10 {
             cu::progress!(bar, (), "step {i}");
             cu::progress!(bar2, i, "step {i}");
@@ -30,7 +30,7 @@ fn main() -> cu::Result<()> {
         }
         drop(bar);
         for i in 0..10 {
-            cu::progress!(bar2, i+10, "step {}", i+10);
+            cu::progress!(bar2, i + 10, "step {}", i + 10);
             std::thread::sleep(Duration::from_millis(250));
             cu::print!("doing stuff");
         }

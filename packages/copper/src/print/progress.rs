@@ -64,11 +64,11 @@ pub fn progress_unbounded_lowp(message: impl Into<String>) -> Arc<ProgressBar> {
     progress_bar_lowp(0, message)
 }
 
-/// Handle for a progress bar. 
+/// Handle for a progress bar.
 ///
 /// The [`progress`](crate::progress) macro is used to update
 /// the bar using a handle
-pub struct ProgressBar{
+pub struct ProgressBar {
     print_done: bool,
     inner: Mutex<ProgressBarState>,
 }
@@ -76,10 +76,7 @@ impl Drop for ProgressBar {
     fn drop(&mut self) {
         let (total, message) = {
             match self.inner.lock() {
-                Ok(mut bar) => (
-                    bar.total,
-                    std::mem::take(&mut bar.prefix),
-                ),
+                Ok(mut bar) => (bar.total, std::mem::take(&mut bar.prefix)),
                 Err(_) => (0, String::new()),
             }
         };
@@ -100,7 +97,7 @@ impl ProgressBar {
     pub fn new(print_done: bool, total: usize, prefix: String) -> Self {
         Self {
             print_done,
-            inner: Mutex::new(ProgressBarState::new(total, prefix))
+            inner: Mutex::new(ProgressBarState::new(total, prefix)),
         }
     }
     pub fn set(self: &Arc<Self>, current: usize, message: Option<String>) {
@@ -165,7 +162,13 @@ impl ProgressBarState {
     }
     /// Format the progress bar, adding at most `width` bytes to the buffer,
     /// not including a newline
-    pub(crate) fn format(&self, mut width: usize, now: Instant, out: &mut String, temp: &mut String) {
+    pub(crate) fn format(
+        &self,
+        mut width: usize,
+        now: Instant,
+        out: &mut String,
+        temp: &mut String,
+    ) {
         use std::fmt::Write;
         // format: [current/total] prefix: DD.DD% ETA SS.SSs message
         match width {
@@ -282,9 +285,8 @@ impl ProgressBarState {
 
 fn format_bar_done(total: usize, message: &str) -> String {
     if total == 0 {
-            format!("\u{283f}] {message}: done")
+        format!("\u{283f}] {message}: done")
     } else {
-        
-            format!("\u{283f}][{total}/{total}] {message}: done")
+        format!("\u{283f}][{total}/{total}] {message}: done")
     }
 }

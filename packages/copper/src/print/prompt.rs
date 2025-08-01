@@ -2,7 +2,7 @@ use atomic::AtomicU8;
 
 use crate::Context as _;
 
-use super::{PromptLevel};
+use super::PromptLevel;
 /// Show a Yes/No prompt
 ///
 /// Return `true` if the answer is Yes. Return an error if prompt is not allowed
@@ -26,7 +26,8 @@ macro_rules! prompt {
         $crate::__priv::__prompt(format_args!($($fmt_args)*))
     }}
 }
-pub(crate) static PROMPT_LEVEL: AtomicU8<PromptLevel> = AtomicU8::new(PromptLevel::Interactive as u8);
+pub(crate) static PROMPT_LEVEL: AtomicU8<PromptLevel> =
+    AtomicU8::new(PromptLevel::Interactive as u8);
 
 pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     match PROMPT_LEVEL.get() {
@@ -83,8 +84,7 @@ pub fn __prompt(message: std::fmt::Arguments<'_>) -> crate::Result<String> {
             };
             printer.show_prompt(&message)
         };
-        recv
-            .recv()
+        recv.recv()
             .with_context(|| format!("recv error while showing the prompt: {message}"))?
     };
 
@@ -95,7 +95,6 @@ struct PromptJoinScope;
 impl Drop for PromptJoinScope {
     fn drop(&mut self) {
         let handle = {
-
             let Ok(mut printer) = super::PRINTER.lock() else {
                 return;
             };

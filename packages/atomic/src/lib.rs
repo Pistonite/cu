@@ -1,12 +1,23 @@
-
 macro_rules! make {
     ($Atomic:ident, $Storage:ident) => {
-pub struct $Atomic<T>(std::sync::atomic::$Atomic, std::marker::PhantomData<T>) where T: From<$Storage> + Into<$Storage>;
-impl<T: From<$Storage> + Into<$Storage>> $Atomic<T> {
-    pub const fn new(value: $Storage) -> Self { Self(std::sync::atomic::$Atomic::new(value), std::marker::PhantomData) }
-    pub fn get(&self) -> T { self.0.load(std::sync::atomic::Ordering::Acquire).into() }
-    pub fn set(&self, value: T) { self.0.store(value.into(), std::sync::atomic::Ordering::Release) }
-}
+        pub struct $Atomic<T>(std::sync::atomic::$Atomic, std::marker::PhantomData<T>)
+        where
+            T: From<$Storage> + Into<$Storage>;
+        impl<T: From<$Storage> + Into<$Storage>> $Atomic<T> {
+            pub const fn new(value: $Storage) -> Self {
+                Self(
+                    std::sync::atomic::$Atomic::new(value),
+                    std::marker::PhantomData,
+                )
+            }
+            pub fn get(&self) -> T {
+                self.0.load(std::sync::atomic::Ordering::Acquire).into()
+            }
+            pub fn set(&self, value: T) {
+                self.0
+                    .store(value.into(), std::sync::atomic::Ordering::Release)
+            }
+        }
     };
 }
 

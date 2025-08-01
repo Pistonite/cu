@@ -2,9 +2,11 @@ use std::collections::VecDeque;
 use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::time::Duration;
 
+use atomic::AtomicU8;
+
 use crate::monitor::JoinHandle;
 
-use super::{ProgressBar, FormatBuffer, PrintLevel, Lv, ansi};
+use super::{FormatBuffer, Lv, PrintLevel, ProgressBar, ansi};
 
 /// Print something
 ///
@@ -25,7 +27,7 @@ macro_rules! hint {
 
 /// Internal print function for macros
 pub fn __print_with_level(lv: Lv, message: std::fmt::Arguments<'_>) {
-    if !lv.can_print(super::PRINT_LEVEL.get()) {
+    if !lv.can_print(PRINT_LEVEL.get()) {
         return;
     }
     let message = format!("{message}");
@@ -34,7 +36,9 @@ pub fn __print_with_level(lv: Lv, message: std::fmt::Arguments<'_>) {
     }
 }
 
-pub(crate) static PRINTER: LazyLock<Mutex<Printer>> = LazyLock::new(|| Mutex::new(Printer::default()));
+pub(crate) static PRINT_LEVEL: AtomicU8<PrintLevel> = AtomicU8::new(PrintLevel::Normal as u8);
+pub(crate) static PRINTER: LazyLock<Mutex<Printer>> =
+    LazyLock::new(|| Mutex::new(Printer::default()));
 
 /// Global printer state
 pub(crate) struct Printer {
@@ -48,7 +52,6 @@ pub(crate) struct Printer {
     controls: ansi::Controls,
 
     // printing
-
     /// Handle for the printing task, None means
     /// either no printing task is running, or, the printing
     /// task is terminating
@@ -82,8 +85,10 @@ impl Default for Printer {
         let controls = ansi::controls(is_terminal);
 
         Self {
-            stdout,stderr
-            ,colors,controls,
+            stdout,
+            stderr,
+            colors,
+            controls,
             print_task: Default::default(),
             bar_target,
             bars: Default::default(),
@@ -92,7 +97,7 @@ impl Default for Printer {
             pending_prompts: Default::default(),
 
             format_buffer: FormatBuffer::new(),
-            buffered: String::new()
+            buffered: String::new(),
         }
     }
 }
@@ -101,7 +106,10 @@ impl Printer {
         self.colors = ansi::colors(use_color);
     }
 
-    pub(crate) fn show_prompt(&mut self, prompt: &str) -> oneshot::Receiver<std::io::Result<String>> {
+    pub(crate) fn show_prompt(
+        &mut self,
+        prompt: &str,
+    ) -> oneshot::Receiver<std::io::Result<String>> {
         // format the prompt
         let mut lines = prompt.lines();
         self.format_buffer.reset(self.colors.gray, self.colors.cyan);
@@ -147,7 +155,7 @@ impl Printer {
 
     /// Spawn a progress bar, starting a print task if not already
     pub(crate) fn add_progress_bar(&mut self, bar: &Arc<ProgressBar>) {
-        if super::PRINT_LEVEL.get() < PrintLevel::Normal {
+        if PRINT_LEVEL.get() < PrintLevel::Normal {
             return;
         }
         if self.bar_target.is_none() {
@@ -170,7 +178,7 @@ impl Printer {
         }
     }
 
-    /// Format and print the message 
+    /// Format and print the message
     pub(crate) fn print_message(&mut self, lv: Lv, message: &str) {
         let mut lines = message.lines();
         let text_color = match lv {
@@ -245,10 +253,11 @@ impl Printer {
 
     /// Format and print a progress bar done message
     pub(crate) fn print_bar_done(&mut self, message: &str) {
-        if super::PRINT_LEVEL.get() >= PrintLevel::Normal {
+        if PRINT_LEVEL.get() >= PrintLevel::Normal {
             return;
         }
-        self.format_buffer.reset(self.colors.gray, self.colors.green);
+        self.format_buffer
+            .reset(self.colors.gray, self.colors.green);
         self.format_buffer.push_control(self.colors.green);
         self.format_buffer.push_str(message);
         self.format_buffer.end();
@@ -305,7 +314,9 @@ impl Printer {
             None
         }
     }
-    pub(crate) fn take_prompt_task_if_should_join(&mut self) -> Option<std::thread::JoinHandle<()>> {
+    pub(crate) fn take_prompt_task_if_should_join(
+        &mut self,
+    ) -> Option<std::thread::JoinHandle<()>> {
         if self.prompt_task.needs_join {
             return self.prompt_task.take();
         }
@@ -347,12 +358,11 @@ impl<T: TaskHandle> Default for Task<T> {
     fn default() -> Self {
         Self {
             needs_join: false,
-            handle: None
+            handle: None,
         }
     }
 }
 impl<T: TaskHandle> Task<T> {
-
     /// Take the handle for joining
     fn take(&mut self) -> Option<T> {
         self.needs_join = false;
@@ -503,7 +513,9 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
 
 // note that for interactive io, it's recommended to use blocking io directly
 // on a thread instead of tokio
-fn prompt_task(first_send: oneshot::Sender<std::io::Result<String>>) -> std::thread::JoinHandle<()> {
+fn prompt_task(
+    first_send: oneshot::Sender<std::io::Result<String>>,
+) -> std::thread::JoinHandle<()> {
     use std::io::Write;
     let mut stdout = std::io::stdout();
     std::thread::spawn(move || {

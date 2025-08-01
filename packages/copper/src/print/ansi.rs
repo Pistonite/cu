@@ -1,4 +1,3 @@
-
 /// Color code definition
 #[derive(Clone, Copy)]
 pub(crate) struct Colors {
@@ -33,11 +32,7 @@ static COLOR: Colors = Colors {
 
 #[inline]
 pub(crate) const fn colors(use_color: bool) -> Colors {
-    if use_color {
-        COLOR
-    } else {
-        NOCOLOR
-    }
+    if use_color { COLOR } else { NOCOLOR }
 }
 
 /// Control codes definition
@@ -56,11 +51,7 @@ static CONTROL: Controls = Controls {
 
 #[inline]
 pub(crate) const fn controls(use_controls: bool) -> Controls {
-    if use_controls {
-        CONTROL
-    } else {
-        NOCONTROL
-    }
+    if use_controls { CONTROL } else { NOCONTROL }
 }
 
 /// Iterator of (char, width)
