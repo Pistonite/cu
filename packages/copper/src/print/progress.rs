@@ -89,7 +89,7 @@ impl Drop for ProgressBar {
             None
         };
         if let Some(x) = handle {
-            let _: Option<_> = x.join();
+            let _: Result<(), _> = x.join();
         }
     }
 }

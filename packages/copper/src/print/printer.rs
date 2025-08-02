@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use atomic::AtomicU8;
 
-use crate::monitor::JoinHandle;
+use crate::AsyncHandle;
 
 use super::{FormatBuffer, Lv, PrintLevel, ProgressBar, ansi};
 
@@ -55,7 +55,7 @@ pub(crate) struct Printer {
     /// Handle for the printing task, None means
     /// either no printing task is running, or, the printing
     /// task is terminating
-    print_task: Task<JoinHandle<()>>,
+    print_task: Task<AsyncHandle<()>>,
     bar_target: Option<Target>,
     bars: Vec<Weak<ProgressBar>>,
 
@@ -302,7 +302,7 @@ impl Printer {
         }
     }
 
-    pub(crate) fn take_print_task_if_should_join(&mut self) -> Option<JoinHandle<()>> {
+    pub(crate) fn take_print_task_if_should_join(&mut self) -> Option<AsyncHandle<()>> {
         if self.print_task.needs_join {
             return self.print_task.take();
         }
@@ -339,10 +339,10 @@ enum Target {
 trait TaskHandle {
     fn join_task(self);
 }
-impl TaskHandle for JoinHandle<()> {
+impl TaskHandle for AsyncHandle<()> {
     fn join_task(self) {
         // ignore the join error
-        let _: Option<_> = self.join();
+        let _: Result<(), _> = self.join();
     }
 }
 impl TaskHandle for std::thread::JoinHandle<()> {
@@ -394,10 +394,10 @@ impl<T: TaskHandle> Task<T> {
     }
 }
 
-fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
+fn print_task(original_width: usize, max_bars: i32) -> AsyncHandle<()> {
     use std::fmt::Write as _;
 
-    crate::monitor::spawn(async move {
+    crate::spawn(async move {
         // This won't cause race condition where
         // the return value of start_print_task is put
         // into the handle after the task is ended,

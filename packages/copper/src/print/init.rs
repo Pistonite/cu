@@ -57,7 +57,7 @@ pub fn init_print_options(color: ColorLevel, level: PrintLevel, prompt: Option<P
                 }
             }
         };
-        PROMPT_LEVEL.set(prompt)
+        super::PROMPT_LEVEL.set(prompt)
     }
     #[cfg(not(feature = "prompt"))]
     {

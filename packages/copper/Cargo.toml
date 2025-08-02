@@ -14,17 +14,19 @@ log = "0.4.27"
 oneshot = "0.1.11"
 pathdiff = "0.2.3"
 terminal_size = "0.4.2"
-tokio = { version = "1.47.0", features = ["io-std", "macros", "rt", "sync", "time"] }
+tokio = { version = "1.47.0", features = ["io-std", "macros", "process", "rt", "sync", "time"] }
 unicode-width = { version = "0.2.1", features = ["cjk"] }
+which = "8.0.0"
 
 
 [features]
-default = []
+default = ["full"]
 full = [
-    "prompt"
+    "prompt","heavy"
 ]
 # Utils to show prompt, as well as CLI flags
 prompt = []
+heavy = ["tokio/rt-multi-thread"]
 
 [[example]]
 name = "print"

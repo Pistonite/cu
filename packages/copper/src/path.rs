@@ -45,6 +45,9 @@ pub trait PathExtension {
 
     /// Try converting self to a relative path from a base path
     fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path>;
+
+    /// Start building a child process with the path as the executable
+    fn command(&self) -> crate::process::CommandBuilder;
 }
 
 impl PathExtension for Path {
@@ -124,6 +127,10 @@ impl PathExtension for Path {
             Some(x) => Cow::Owned(x),
         }
     }
+
+    fn command(&self) -> crate::CommandBuilder {
+        crate::CommandBuilder::new(self)
+    }
 }
 
 /// Normalize a path that failed to canonicalize
@@ -177,6 +184,9 @@ macro_rules! impl_for_as_ref_path {
             }
             fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path> {
                 AsRef::<Path>::as_ref(self).try_to_rel_from(path)
+            }
+            fn command(&self) -> crate::CommandBuilder {
+                AsRef::<Path>::as_ref(self).command()
             }
         }
     };

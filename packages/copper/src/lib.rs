@@ -96,8 +96,6 @@
 //! You can call them from multiple threads, and they will be queued to prompt the user one after
 //! the other.
 
-// anyhow re-exports
-pub use anyhow::{Context, Result, bail, ensure};
 
 // mod env_var;
 // pub use env_var::*;
@@ -106,10 +104,17 @@ pub use anyhow::{Context, Result, bail, ensure};
 //
 mod monitor;
 
-mod clap;
-pub use clap::{CliFlags, cli_wrapper};
+mod async_;
+pub use async_::{AsyncHandle, BoxedFuture, Pool, spawn, run};
+#[cfg(feature="heavy")]
+pub use async_::run_heavy;
 
-pub use log::{debug, error, info, trace, warn};
+
+mod process;
+pub use process::CommandBuilder;
+
+/// Binary path registry
+pub mod bin;
 
 /// File System utils
 pub mod fs;
@@ -118,7 +123,10 @@ pub mod fs;
 mod path;
 pub use path::PathExtension;
 
-/// Printing utils
+/// Integration with clap
+mod clap;
+pub use clap::{CliFlags, cli_wrapper};
+/// Printing utils, integration with log and clap
 mod print;
 
 pub use print::{
@@ -127,7 +135,7 @@ pub use print::{
     set_thread_print_name,
 };
 
-/// Level for message/events
+/// Level shorthand for message/events
 pub mod lv {
     /// Error
     pub const E: crate::__priv::Lv = crate::__priv::Lv::Error;
@@ -145,8 +153,13 @@ pub mod lv {
     pub const T: crate::__priv::Lv = crate::__priv::Lv::Trace;
 }
 
+// re-exports from libraries
+pub use anyhow::{Context, Result, bail, ensure};
+pub use log::{debug, error, info, trace, warn};
+
 #[doc(hidden)]
 pub mod __priv {
+    pub use crate::process::__ConfigFn;
     pub use crate::print::{__print_with_level, __prompt, __prompt_yesno, Lv};
 }
 

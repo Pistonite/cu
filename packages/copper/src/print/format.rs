@@ -30,6 +30,20 @@ macro_rules! bailand {
         $crate::bail!(s);
     }}
 }
+/// Invoke a print macro, then panic with the same message
+///
+/// # Example
+/// ```rust,no_run
+/// let x = cu::panicand!(error!("found {} errors", 3));
+/// ```
+#[macro_export]
+macro_rules! panicand {
+    ($mac:ident !( $($fmt_args:tt)* )) => {{
+        let s = format!($($fmt_args)*);
+        $crate::$mac!("{s}");
+        panic!("{s}");
+    }}
+}
 
 pub(crate) fn term_width_or_max() -> usize {
     term_width().unwrap_or(400)
