@@ -105,13 +105,13 @@
 mod monitor;
 
 mod async_;
-pub use async_::{AsyncHandle, BoxedFuture, Pool, spawn, run};
+pub use async_::{AsyncHandle, BoxedFuture, Pool, spawn, run, join, join_collect};
 #[cfg(feature="heavy")]
 pub use async_::run_heavy;
 
 
 mod process;
-pub use process::CommandBuilder;
+pub use process::{cio, CommandBuilder, CommandBuilderDefault};
 
 /// Binary path registry
 pub mod bin;
@@ -132,7 +132,8 @@ mod print;
 pub use print::{
     ColorLevel, PrintLevel, ProgressBar, PromptLevel, color_enabled, init_print_options,
     progress_bar, progress_bar_lowp, progress_unbounded, progress_unbounded_lowp,
-    set_thread_print_name,
+    set_thread_print_name, log_enabled,
+    term_width, term_width_or_max, term_width_height
 };
 
 /// Level shorthand for message/events

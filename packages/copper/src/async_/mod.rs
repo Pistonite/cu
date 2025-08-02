@@ -26,4 +26,13 @@ impl<T> AsyncHandle<T> {
         use crate::Context as _;
         self.recv.recv().context("failed to join an async handle")
     }
+
+    pub fn try_join(&self) -> crate::Result<Option<T>> {
+        use crate::Context as _;
+        match self.recv.try_recv() {
+            Ok(x) => Ok(Some(x)),
+            Err(oneshot::TryRecvError::Empty) => Ok(None),
+            Err(e) => Err(e).context("failed to join an async handle")
+        }
+    }
 }

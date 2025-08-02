@@ -36,6 +36,11 @@ pub fn __print_with_level(lv: Lv, message: std::fmt::Arguments<'_>) {
     }
 }
 
+/// Check if the logging level is enabled
+pub fn log_enabled(lv: Lv) -> bool {
+    lv.can_print(PRINT_LEVEL.get())
+}
+
 pub(crate) static PRINT_LEVEL: AtomicU8<PrintLevel> = AtomicU8::new(PrintLevel::Normal as u8);
 pub(crate) static PRINTER: LazyLock<Mutex<Printer>> =
     LazyLock::new(|| Mutex::new(Printer::default()));
@@ -182,6 +187,7 @@ impl Printer {
     pub(crate) fn print_message(&mut self, lv: Lv, message: &str) {
         let mut lines = message.lines();
         let text_color = match lv {
+            Lv::Off => return,
             Lv::Error => self.colors.red,
             Lv::Hint => self.colors.yellow,
             Lv::Print => self.colors.reset,
@@ -192,6 +198,7 @@ impl Printer {
         };
         self.format_buffer.reset(self.colors.gray, text_color);
         match lv {
+            Lv::Off => unreachable!(),
             Lv::Error => {
                 self.format_buffer.push_control(self.colors.red);
                 self.format_buffer.push('E', 1);

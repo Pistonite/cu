@@ -1,12 +1,13 @@
 mod init;
 pub use init::*;
-mod ansi;
+pub(crate) mod ansi;
+pub(crate) mod utf8;
 mod level;
 pub use level::*;
 mod printer;
 pub use printer::*;
 mod format;
-use format::*;
+pub use format::*;
 mod progress;
 pub use progress::*;
 

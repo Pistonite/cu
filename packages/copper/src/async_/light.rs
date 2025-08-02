@@ -111,3 +111,52 @@ where
 {
     RUNTIME.block_on(future)
 }
+
+/// Join a bunch of async handles by round-robin polling them. 
+/// Results are discarded
+pub fn join<T: Send + 'static>(handles: Vec<AsyncHandle<T>>) {
+    run(async move {
+        let mut handles = handles;
+        while !handles.is_empty() {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            handles.retain(|x| {
+                matches!(x.try_join(), Ok(None))
+            });
+        }
+    })
+}
+
+/// Join a bunch of async handles by round-robin polling them.
+/// The result may have `None` if join failed
+pub fn join_collect<T: Send + 'static>(handles: Vec<AsyncHandle<T>>) -> Vec<Option<T>> {
+    run(async move {
+        let mut joined = Vec::with_capacity(handles.len());
+        let mut out = Vec::with_capacity(handles.len());
+        for _ in 0..handles.len() {
+            joined.push(false);
+            out.push(None);
+        }
+        let mut join_count = 0;
+        while join_count < handles.len() {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            for i in 0..handles.len() {
+                if !joined[i] {
+                    match handles[i].try_join() {
+                        Ok(Some(x)) => {
+                            join_count += 1;
+                            joined[i] = true;
+                            out[i] = Some(x)
+                        }
+                        Err(e) => {
+                            join_count += 1;
+                            crate::debug!("[{i}] join fail: {e}");
+                            joined[i] = true;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        out
+    })
+}

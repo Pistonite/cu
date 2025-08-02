@@ -22,6 +22,9 @@ pub trait PathExtension {
     /// UNC, and the drive letter is also normalized to upper case
     fn normalize(&self) -> crate::Result<PathBuf>;
 
+    /// Normalize the path and ensure it exists
+    fn normalize_exists(&self) -> crate::Result<PathBuf>;
+
     /// Get the parent path as an absolute path
     ///
     /// Path navigation is very complex and that's why we are paying a little performance
@@ -47,7 +50,7 @@ pub trait PathExtension {
     fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path>;
 
     /// Start building a child process with the path as the executable
-    fn command(&self) -> crate::process::CommandBuilder;
+    fn command(&self) -> crate::CommandBuilderDefault;
 }
 
 impl PathExtension for Path {
@@ -62,6 +65,14 @@ impl PathExtension for Path {
             crate::bail!("file name is not valid UTF-8: {}", self.display());
         };
         Ok(file_name)
+    }
+
+    fn normalize_exists(&self) -> crate::Result<PathBuf> {
+        let r = self.normalize()?;
+        if !r.exists() {
+            crate::bail!("path '{}' does not exist.", r.display());
+        }
+        Ok(r)
     }
 
     fn normalize(&self) -> crate::Result<PathBuf> {
@@ -128,7 +139,7 @@ impl PathExtension for Path {
         }
     }
 
-    fn command(&self) -> crate::CommandBuilder {
+    fn command(&self) -> crate::CommandBuilderDefault {
         crate::CommandBuilder::new(self)
     }
 }
@@ -179,13 +190,16 @@ macro_rules! impl_for_as_ref_path {
             fn normalize(&self) -> crate::Result<PathBuf> {
                 AsRef::<Path>::as_ref(self).normalize()
             }
+            fn normalize_exists(&self) -> crate::Result<PathBuf> {
+                AsRef::<Path>::as_ref(self).normalize_exists()
+            }
             fn parent_abs_times(&self, x: usize) -> crate::Result<PathBuf> {
                 AsRef::<Path>::as_ref(self).parent_abs_times(x)
             }
             fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path> {
                 AsRef::<Path>::as_ref(self).try_to_rel_from(path)
             }
-            fn command(&self) -> crate::CommandBuilder {
+            fn command(&self) -> crate::CommandBuilderDefault {
                 AsRef::<Path>::as_ref(self).command()
             }
         }

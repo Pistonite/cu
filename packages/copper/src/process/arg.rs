@@ -55,3 +55,63 @@ macro_rules! envs {
         })
     };
 }
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct ColorFlag(bool);
+impl ColorFlag {
+    #[inline(always)]
+    pub fn use_eq_sign(self) -> bool {
+        self.0
+    }
+}
+impl std::fmt::Display for ColorFlag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let flag = if crate::color_enabled() {
+            "always"
+        } else {
+            "none"
+        };
+        if self.use_eq_sign() {
+            write!(f, "--color={flag}")
+        } else {
+            write!(f, "--color {flag}")
+        }
+    }
+}
+impl Config for ColorFlag {
+    fn configure(self, command: &mut Command) {
+        let flag = if crate::color_enabled() {
+            "always"
+        } else {
+            "none"
+        };
+        if self.use_eq_sign() {
+            command.arg(format!("--color={flag}"));
+        } else {
+            command.args(["--color", flag]);
+        }
+    }
+}
+
+/// Create a `--color always|never` flag that can be added to a command,
+/// based on if color is enabled for the current process using
+/// this crate's cli flags
+///
+/// # Example
+/// ```rust,no_run
+/// cu::bin::which("git").unwrap()
+///   .command()
+///   .add(cu::color_flag());
+/// ```
+#[inline(always)]
+pub fn color_flag() -> ColorFlag {
+    ColorFlag(false)
+}
+/// Create a `--color=always|never` flag that can be added to a command,
+/// based on if color is enabled for the current process using
+/// this crate's cli flags
+#[inline(always)]
+pub fn color_flag_eq() -> ColorFlag {
+    ColorFlag(true)
+}

@@ -180,13 +180,7 @@ fn find_bin_internal(name: &str, strategy: impl FnOnce(&str) -> crate::Result<Pa
 fn env_strategy(name: &str, env: &str) -> crate::Result<PathBuf> {
     crate::trace!("finding executable '{name}' using environment variable '{env}'");
     match std::env::var(env) {
-        Ok(x) if !x.is_empty() => {
-            let path = Path::new(&x).normalize()?;
-            if !path.exists() {
-                crate::bail!("cannot use executable '{name}' at '{}' because it doesn't exist", path.display());
-            }
-            Ok(path)
-        }
+        Ok(x) if !x.is_empty() => Path::new(&x).normalize_exists(),
         _ => crate::bail!("environment variable '{env}' not found"),
     }
 }
@@ -194,6 +188,7 @@ fn env_strategy(name: &str, env: &str) -> crate::Result<PathBuf> {
 fn which_strategy(name: &str) -> crate::Result<PathBuf> {
     crate::trace!("finding executable '{name}' in PATH");
     match which::which(name) {
+        // which already canonicalize it, which ensures it exists
         Ok(x) => x.normalize(),
         Err(e) => Err(e)?
     }
@@ -201,9 +196,5 @@ fn which_strategy(name: &str) -> crate::Result<PathBuf> {
 
 fn direct_strategy(name: &str, path: &Path) -> crate::Result<PathBuf> {
     crate::trace!("finding executable '{name}' at '{}'", path.display());
-    let path = path.normalize()?;
-    if !path.exists() {
-        crate::bail!("cannot use executable '{name}' at '{}' because it doesn't exist", path.display());
-    }
-    Ok(path)
+    path.normalize_exists()
 }

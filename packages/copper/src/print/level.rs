@@ -96,7 +96,8 @@ impl From<PromptLevel> for u8 {
 /// Level of a message/print event.
 ///
 /// Shortcuts available at `cu::lv`, e.g. `cu::lv::E` is `Error`
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum Lv {
     Error,
     Hint,
@@ -105,11 +106,14 @@ pub enum Lv {
     Info,
     Debug,
     Trace,
+
+    Off
 }
 impl Lv {
     /// Check if the current print level can print this message level
     pub fn can_print(self, level: PrintLevel) -> bool {
         match self {
+            Lv::Off => false,
             Lv::Error | Lv::Hint | Lv::Print => level != PrintLevel::QuietQuiet,
             Lv::Warn | Lv::Info => level > PrintLevel::Quiet,
             Lv::Debug => level > PrintLevel::Normal,
@@ -126,5 +130,24 @@ impl From<log::Level> for Lv {
             log::Level::Debug => Self::Debug,
             log::Level::Trace => Self::Trace,
         }
+    }
+}
+impl From<u8> for Lv {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Lv::Error,
+            1 => Lv::Hint,
+            2 => Lv::Print,
+            3 => Lv::Warn,
+            4 => Lv::Info,
+            5 => Lv::Debug,
+            6 => Lv::Trace,
+            _ => Lv::Off
+        }
+    }
+}
+impl From<Lv> for u8 {
+    fn from(value: Lv) -> Self {
+        value as u8
     }
 }
