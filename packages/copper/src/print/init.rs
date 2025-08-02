@@ -16,8 +16,6 @@ static USE_COLOR: AtomicBool = AtomicBool::new(true);
 /// If prompt option is `None`, it will be `Interactive` unless env var `CI` is `true` or `1`, in which case it becomes `No`.
 /// Prompt option is ignored unless `prompt` feature is enabled
 pub fn init_print_options(color: ColorLevel, level: PrintLevel, prompt: Option<PromptLevel>) {
-    use std::io::IsTerminal;
-
     let log_level = if let Ok(value) = std::env::var("RUST_LOG")
         && !value.is_empty()
     {
@@ -30,11 +28,7 @@ pub fn init_print_options(color: ColorLevel, level: PrintLevel, prompt: Option<P
         level.into()
     };
     log::set_max_level(log_level);
-    let use_color = match color {
-        ColorLevel::Always => true,
-        ColorLevel::Never => false,
-        ColorLevel::Auto => std::io::stdout().is_terminal(),
-    };
+    let use_color = color.is_colored_for_stdout();
     USE_COLOR.store(use_color, Ordering::Release);
     if let Ok(mut printer) = super::PRINTER.lock() {
         printer.set_colors(use_color);

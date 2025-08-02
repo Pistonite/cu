@@ -17,6 +17,17 @@ impl std::fmt::Display for ColorLevel {
         }
     }
 }
+impl ColorLevel {
+    /// Get if color should be used. If `Auto`, returns if stdout is terminal.
+    pub fn is_colored_for_stdout(self) -> bool {
+    use std::io::IsTerminal;
+        match self {
+            ColorLevel::Always => true,
+            ColorLevel::Never => false,
+            ColorLevel::Auto => std::io::stdout().is_terminal(),
+        }
+    }
+}
 
 /// Print level settable with `-v` and `-q` flags
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

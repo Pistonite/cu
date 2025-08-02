@@ -18,16 +18,17 @@ impl ChildOutConfig for Lv {
     }
 
     fn set_name(&mut self, name: &str) {
+        todo!()
         
     }
 
-    fn take(self, child: &mut Child) -> Self::Output {
+    fn take(self, child: &mut Child, _: bool) -> Self::Output {
         todo!()
     }
 
 }
 
-struct PrintTask {
+pub struct PrintTask {
     lv: Lv,
     prefix: String,
     out: Option<ChildStdout>,

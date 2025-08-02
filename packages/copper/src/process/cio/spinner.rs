@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::process::{ChildStderr, ChildStdout};
 
-use crate::{print::Lv, BoxedFuture, ProgressBar};
+use crate::{print::Lv, BoxedFuture, ProgressBar, Atomic};
 
 use super::{ChildOutConfig, ChildTask, Command, Child, Driver, DriverOutput};
 
@@ -28,7 +28,7 @@ impl Spinner {
     pub fn trace(self) -> Self { self.1.lv.set(crate::lv::T); self }
 }
 struct SpinnerConfig {
-    lv: atomic::AtomicU8<Lv>,
+    lv: Atomic<u8, Lv>,
     out: AtomicBool,
     err: AtomicBool,
 }
@@ -42,7 +42,7 @@ pub struct SpinnerTask {
 }
 pub fn spinner(name: impl Into<String>) -> Spinner { 
     Spinner(name.into(), Arc::new(SpinnerConfig { 
-        lv: atomic::AtomicU8::new(Lv::Off as u8),
+        lv: Atomic::new_u8(Lv::Off as u8),
         out: AtomicBool::new(false), err: AtomicBool::new(false) 
     }))
 }

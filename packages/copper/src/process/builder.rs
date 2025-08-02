@@ -221,26 +221,28 @@ impl<Out: cio::ChildOutConfig, Err: cio::ChildOutConfig, In: cio::ChildInConfig>
             "failed to spawn command"
         })?;
 
-        let stdout = self.stdout.take(&mut child);
-        let stderr = self.stderr.take(&mut child);
-        let stdin = self.stdin.take(&mut child);
+        todo!()
 
-        use cio::ChildTask as _;
-        let (stdout_future, stdout) = stdout.run();
-        let (stderr_future, stderr) = stderr.run();
-        let (stdin_future, stdin) = stdin.run();
-
-        let wait_task = crate::spawn(async move {
-            child.wait().await
-        });
-        let stdout_task = stdout_future.map(crate::spawn);
-        let stderr_task = stderr_future.map(crate::spawn);
-        let stdin_task = stdin_future.map(crate::spawn);
-
-        let child = super::spawned_child::Child {
-            wait_task, stdin, stdout, stderr,
-            stdin_task, stdout_task, stderr_task
-        };
-        Ok(child)
+        // let stdout = self.stdout.take(&mut child);
+        // let stderr = self.stderr.take(&mut child);
+        // let stdin = self.stdin.take(&mut child);
+        //
+        // use cio::ChildTask as _;
+        // let (stdout_future, stdout) = stdout.run();
+        // let (stderr_future, stderr) = stderr.run();
+        // let (stdin_future, stdin) = stdin.run();
+        //
+        // let wait_task = crate::spawn(async move {
+        //     child.wait().await
+        // });
+        // let stdout_task = stdout_future.map(crate::spawn);
+        // let stderr_task = stderr_future.map(crate::spawn);
+        // let stdin_task = stdin_future.map(crate::spawn);
+        //
+        // let child = super::spawned_child::Child {
+        //     wait_task, stdin, stdout, stderr,
+        //     stdin_task, stdout_task, stderr_task
+        // };
+        // Ok(child)
     }
 }

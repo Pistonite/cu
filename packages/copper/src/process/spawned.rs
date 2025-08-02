@@ -1,22 +1,22 @@
 use std::process::ExitStatus;
 
-use crate::{AsyncHandle, Context as _};
+use crate::{co,Context as _};
 
 use super::cio;
 
-/// A spawned child
-pub struct Child<I: cio::ChildTask, O: cio::ChildTask, E: cio::ChildTask> {
-    pub(crate) wait_task: AsyncHandle<std::io::Result<ExitStatus>>,
+/// A spawned child, where the IO are drived by the light-weight thread
+pub struct LwChild<I: cio::ChildTask, O: cio::ChildTask, E: cio::ChildTask> {
+    pub(crate) wait_task: co::LwHandle<std::io::Result<ExitStatus>>,
     pub(crate) stdin: I::Output,
-    pub(crate) stdin_task: Option<AsyncHandle<()>>,
+    pub(crate) stdin_task: Option<co::LwHandle<()>>,
     pub(crate) stdout: O::Output,
-    pub(crate) stdout_task: Option<AsyncHandle<()>>,
+    pub(crate) stdout_task: Option<co::LwHandle<()>>,
     pub(crate) stderr: E::Output,
-    pub(crate) stderr_task: Option<AsyncHandle<()>>,
+    pub(crate) stderr_task: Option<co::LwHandle<()>>,
 }
 
 impl <I: cio::ChildTask, O: cio::ChildTask, E: cio::ChildTask> 
-Child<I,O,E> {
+LwChild<I,O,E> {
     /// Access the stdin handle of the child
     pub fn stdin(&self) -> &I::Output {
         &self.stdin
@@ -62,7 +62,7 @@ Child<I,O,E> {
         if let Some(x) = self.stderr_task {
             handles.push(x);
         }
-        crate::join(handles);
+        co::join(handles);
         let exit_result = self.wait_task.join()?;
         exit_result.context("io error while joining a child process")
     }

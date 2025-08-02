@@ -1,6 +1,4 @@
-use atomic::AtomicU8;
-
-use crate::Context as _;
+use crate::{Atomic, Context as _};
 
 use super::PromptLevel;
 /// Show a Yes/No prompt
@@ -26,8 +24,8 @@ macro_rules! prompt {
         $crate::__priv::__prompt(format_args!($($fmt_args)*))
     }}
 }
-pub(crate) static PROMPT_LEVEL: AtomicU8<PromptLevel> =
-    AtomicU8::new(PromptLevel::Interactive as u8);
+pub(crate) static PROMPT_LEVEL: Atomic<u8, PromptLevel> =
+    Atomic::new_u8(PromptLevel::Interactive as u8);
 
 pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     match PROMPT_LEVEL.get() {

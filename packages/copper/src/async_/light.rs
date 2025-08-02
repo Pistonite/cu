@@ -1,18 +1,52 @@
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Sender, TryRecvError};
 use std::sync::{Arc, LazyLock, atomic::AtomicUsize};
+use std::thread::ThreadId;
 use std::time::Duration;
 
 use tokio::runtime::{Builder, Runtime};
 
-use super::{BoxedFuture, AsyncHandle};
+use super::BoxedFuture;
+
+struct LwThread {
+    spawn: Sender<BoxedFuture<()>>,
+    id: ThreadId
+}
+
+/// Handle for an async task running on the light-weight async thread
+pub struct LwHandle<T> {
+    recv: oneshot::Receiver<T>,
+}
+
+impl<T> LwHandle<T> {
+    /// Block the current thread on joining the handle from light-weight thread.
+    /// Calling this from the light weight thread will panic.
+    pub fn join(self) -> crate::Result<T> {
+        if std::thread::current().id() == THREAD.id {
+            panic!("cannot join light-weight handle from light-weight thread itself, consider using a co_* function to spawn the task instead.");
+        }
+
+        use crate::Context as _;
+        self.recv.recv().context("failed to join an async handle")
+    }
+
+    pub fn try_join(&self) -> crate::Result<Option<T>> {
+        // no need to check thread here because this is non-blocking
+        use crate::Context as _;
+        match self.recv.try_recv() {
+            Ok(x) => Ok(Some(x)),
+            Err(oneshot::TryRecvError::Empty) => Ok(None),
+            Err(e) => Err(e).context("failed to join an async handle")
+        }
+    }
+}
 
 /// A light weight worker thread that handles async tasks
 /// using a single-threaded tokio runtime
-static SPAWNER: LazyLock<Sender<BoxedFuture<()>>> = LazyLock::new(|| {
+static THREAD: LazyLock<LwThread> = LazyLock::new(|| {
     // we only need one thread since the tasks are lightweight
     let (send, recv) = mpsc::channel();
-    std::thread::spawn(move || {
+    let handle = std::thread::spawn(move || {
         let runtime = Builder::new_current_thread()
             .enable_all()
             .build()
@@ -60,7 +94,7 @@ static SPAWNER: LazyLock<Sender<BoxedFuture<()>>> = LazyLock::new(|| {
             }
         });
     });
-    send
+    LwThread { spawn: send, id: handle.thread().id() }
 });
 
 /// Entry point from sync context to run a light weight async job.
@@ -75,16 +109,19 @@ static SPAWNER: LazyLock<Sender<BoxedFuture<()>>> = LazyLock::new(|| {
 /// is done.
 ///
 /// If you want to run a job and wait for it synchonously, use [`run`]
-pub fn spawn<F>(future: F) -> AsyncHandle<F::Output>
+pub fn spawn<F>(future: F) -> LwHandle<F::Output>
 where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
+    if std::thread::current().id() == THREAD.id {
+        panic!("cannot spawn light-weight task from light-weight thread itself, use one of co_* function to spawn in current async context, or use tokio::spawn directly.");
+    }
     let (send, recv) = oneshot::channel();
-    let _ = SPAWNER.send(Box::pin(async move {
+    THREAD.spawn.send(Box::pin(async move {
         let _: Result<_, _> = send.send(future.await);
-    }));
-    AsyncHandle { recv }
+    })).expect("light-weight thread should never be lost because tokio handles panic. This is a bug");
+    LwHandle { recv }
 }
 
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
@@ -109,12 +146,16 @@ where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
+    if std::thread::current().id() == THREAD.id {
+        panic!("cannot run blocking task on light-weight thread itself, use one of co_* function to spawn in current async context, or use tokio::spawn directly.");
+    }
     RUNTIME.block_on(future)
 }
 
 /// Join a bunch of async handles by round-robin polling them. 
 /// Results are discarded
-pub fn join<T: Send + 'static>(handles: Vec<AsyncHandle<T>>) {
+pub fn join<T: Send + 'static>(handles: Vec<LwHandle<T>>) {
+    // run checks thread internally
     run(async move {
         let mut handles = handles;
         while !handles.is_empty() {
@@ -128,7 +169,8 @@ pub fn join<T: Send + 'static>(handles: Vec<AsyncHandle<T>>) {
 
 /// Join a bunch of async handles by round-robin polling them.
 /// The result may have `None` if join failed
-pub fn join_collect<T: Send + 'static>(handles: Vec<AsyncHandle<T>>) -> Vec<Option<T>> {
+pub fn join_collect<T: Send + 'static>(handles: Vec<LwHandle<T>>) -> Vec<Option<T>> {
+    // run checks thread internally
     run(async move {
         let mut joined = Vec::with_capacity(handles.len());
         let mut out = Vec::with_capacity(handles.len());

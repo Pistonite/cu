@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::Semaphore;
 
-use super::AsyncHandle;
+use super::{JoinHandle, LwHandle};
 
 
 /// A pool for limiting async tasks
@@ -36,13 +36,27 @@ impl Pool {
 
     /// Spawn a task, which will only start being executed when the pool
     /// has availability (permits)
-    pub fn spawn<F>(&self, future: F) -> AsyncHandle<F::Output>
+    pub fn spawn<F>(&self, future: F) -> LwHandle<F::Output>
 where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
         let sem = Arc::clone(&self.0);
-        crate::spawn(async move {
+        crate::co::spawn(async move {
+            let _permit = sem.0.acquire().await.ok();
+            let result  =future.await;
+            drop(_permit);
+            result
+        })
+    }
+
+    pub fn co_spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let sem = Arc::clone(&self.0);
+        tokio::spawn(async move {
             let _permit = sem.0.acquire().await.ok();
             let result  =future.await;
             drop(_permit);

@@ -1,18 +1,17 @@
 use std::time::Duration;
 
 /// Run with cargo run --example print --features prompt
-fn main() -> cu::Result<()> {
-    cu::init_print_options(cu::ColorLevel::Auto, cu::PrintLevel::Normal, None);
-    // cu::set_thread_print_name("main");
+#[cu::cli]
+fn main(_: cu::cli::Flags) -> cu::Result<()> {
     cu::print!("today's weather is {}", "good");
     cu::hint!("today's weather is {}", "ok");
     cu::info!(
         "this is an info messagenmultilineaa 你好 sldkfjals🤖kdjflkasjdflkjasldkfjaklsdjflkjasldkfjlaksjdflkajsdklfjlaksjdfkljasldkfjlasldkjflaskdjflaksjdlfkajsldkfjkasjdlfkjaskldjflajsdlkfjlaskjdfklajsdf"
     );
     cu::warn!("this is a warn message\n");
-    cu::error!("this is error message\n");
-    cu::debug!("this is debug message\n");
-    cu::trace!("this is trace message\n");
+    cu::error!("this is error message\n\n");
+    cu::debug!("this is debug message\n2\n\n");
+    cu::trace!("this is trace message\n\n2\n");
     if !cu::yesno!("continue?")? {
         cu::warn!("you chose to not continue!");
         return Ok(());
@@ -38,22 +37,28 @@ fn main() -> cu::Result<()> {
 
     let thread1 = std::thread::spawn(|| {
         cu::set_thread_print_name("t1");
-        let answer = cu::prompt!("from thread 1").unwrap();
+        let answer = cu::prompt!("from thread 1")?;
         cu::info!("you entered: {answer}");
+        cu::Ok(())
     });
     let thread2 = std::thread::spawn(|| {
         cu::set_thread_print_name("t2");
-        let answer = cu::prompt!("from thread 2").unwrap();
+        let answer = cu::prompt!("from thread 2")?;
         cu::info!("you entered: {answer}");
+        cu::Ok(())
     });
     let thread3 = std::thread::spawn(|| {
         cu::set_thread_print_name("t3");
-        let answer = cu::prompt!("from thread 3").unwrap();
+        let answer = cu::prompt!("from thread 3")?;
         cu::info!("you entered: {answer}");
+        cu::Ok(())
     });
-    let _ = thread1.join();
-    let _ = thread2.join();
-    let _ = thread3.join();
+    let r1 = thread1.join().unwrap();
+    let r2 = thread2.join().unwrap();
+    let r3 = thread3.join().unwrap();
+    r1?;
+    r2?;
+    r3?;
     cu::info!("all threads joined ok");
 
     Ok(())

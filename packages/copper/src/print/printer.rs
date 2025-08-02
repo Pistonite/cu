@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, LazyLock, Mutex, Weak};
+use std::thread::JoinHandle;
 use std::time::Duration;
 
-use atomic::AtomicU8;
-
-use crate::AsyncHandle;
+// use crate::AsyncHandle;
+use crate::Atomic;
 
 use super::{FormatBuffer, Lv, PrintLevel, ProgressBar, ansi};
 
@@ -41,7 +41,7 @@ pub fn log_enabled(lv: Lv) -> bool {
     lv.can_print(PRINT_LEVEL.get())
 }
 
-pub(crate) static PRINT_LEVEL: AtomicU8<PrintLevel> = AtomicU8::new(PrintLevel::Normal as u8);
+pub(crate) static PRINT_LEVEL: Atomic<u8, PrintLevel> = Atomic::new_u8(PrintLevel::Normal as u8);
 pub(crate) static PRINTER: LazyLock<Mutex<Printer>> =
     LazyLock::new(|| Mutex::new(Printer::default()));
 
@@ -60,11 +60,11 @@ pub(crate) struct Printer {
     /// Handle for the printing task, None means
     /// either no printing task is running, or, the printing
     /// task is terminating
-    print_task: Task<AsyncHandle<()>>,
+    print_task: PrintThread,
     bar_target: Option<Target>,
     bars: Vec<Weak<ProgressBar>>,
 
-    prompt_task: Task<std::thread::JoinHandle<()>>,
+    prompt_task: PrintThread,
     pending_prompts: VecDeque<(oneshot::Sender<std::io::Result<String>>, String)>,
 
     /// Buffer for automatically do certain formatting
@@ -309,7 +309,7 @@ impl Printer {
         }
     }
 
-    pub(crate) fn take_print_task_if_should_join(&mut self) -> Option<AsyncHandle<()>> {
+    pub(crate) fn take_print_task_if_should_join(&mut self) -> Option<JoinHandle<()>> {
         if self.print_task.needs_join {
             return self.print_task.take();
         }
@@ -323,7 +323,7 @@ impl Printer {
     }
     pub(crate) fn take_prompt_task_if_should_join(
         &mut self,
-    ) -> Option<std::thread::JoinHandle<()>> {
+    ) -> Option<JoinHandle<()>> {
         if self.prompt_task.needs_join {
             return self.prompt_task.take();
         }
@@ -343,35 +343,14 @@ enum Target {
     /// Print to Stderr
     Stderr,
 }
-trait TaskHandle {
-    fn join_task(self);
-}
-impl TaskHandle for AsyncHandle<()> {
-    fn join_task(self) {
-        // ignore the join error
-        let _: Result<(), _> = self.join();
-    }
-}
-impl TaskHandle for std::thread::JoinHandle<()> {
-    fn join_task(self) {
-        let _: Result<(), _> = self.join();
-    }
-}
-struct Task<T: TaskHandle> {
+#[derive(Default)]
+struct PrintThread {
     needs_join: bool,
-    handle: Option<T>,
+    handle: Option<JoinHandle<()>>,
 }
-impl<T: TaskHandle> Default for Task<T> {
-    fn default() -> Self {
-        Self {
-            needs_join: false,
-            handle: None,
-        }
-    }
-}
-impl<T: TaskHandle> Task<T> {
+impl PrintThread {
     /// Take the handle for joining
-    fn take(&mut self) -> Option<T> {
+    fn take(&mut self) -> Option<JoinHandle<()>> {
         self.needs_join = false;
         self.handle.take()
     }
@@ -390,42 +369,49 @@ impl<T: TaskHandle> Task<T> {
     fn join(&mut self) {
         self.needs_join = false;
         if let Some(handle) = self.handle.take() {
-            handle.join_task();
+            let _: Result<_, _> = handle.join();
         }
     }
 
     /// Assign a new handle
-    fn assign(&mut self, handle: T) {
+    fn assign(&mut self, handle: JoinHandle<()>) {
         self.needs_join = false;
         self.handle = Some(handle);
     }
 }
 
-fn print_task(original_width: usize, max_bars: i32) -> AsyncHandle<()> {
+fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
     use std::fmt::Write as _;
 
-    crate::spawn(async move {
+    // 50ms between each cycle
+    const INTERVAL: Duration = Duration::from_millis(50);
+    const CHARS: [char; 6] = [
+        '\u{280b}', '\u{2819}', '\u{2838}', '\u{2834}', '\u{2826}', '\u{2807}',
+    ];
+
+    // main printer loop, also serves as RAII for printer lock
+    // there are some issues with scope analysis and I am unsure
+    // if drop() is working to prevent holding the lock during sleep
+    #[inline(always)]
+    fn print_loop(
+        original_width: usize, 
+        max_bars: i32,
+        tick: usize,
+        buffer: &mut String, 
+        temp: &mut String,
+        lines: &mut i32
+    ) -> std::ops::ControlFlow<()> {
         // This won't cause race condition where
         // the return value of start_print_task is put
         // into the handle after the task is ended,
         // because when calling start_print_task,
         // we have a lock on the printer, so this task
         // will wait until that lock is release to start
+        #[inline(always)]
         fn on_task_end(printer: &mut Printer) {
             printer.print_task.mark_join();
         }
-        // 50ms between each cycle
-        const INTERVAL: Duration = Duration::from_millis(50);
-        const CHARS: [char; 6] = [
-            '\u{280b}', '\u{2819}', '\u{2838}', '\u{2834}', '\u{2826}', '\u{2807}',
-        ];
-        // animation state
-        let mut tick = 0;
-        // buffer to avoid reallocation
-        let mut temp = String::new();
-        let mut buffer = String::new();
-        // how many bars were printed
-        let mut lines = 0;
+        #[inline(always)]
         fn clear(b: &mut String, lines: i32) {
             b.clear();
             b.push_str("\r\x1b[K"); // erase the last spacing line (... and X more)
@@ -433,87 +419,102 @@ fn print_task(original_width: usize, max_bars: i32) -> AsyncHandle<()> {
                 b.push_str("\x1b[1A\x1b[K"); // move up one line and erase it
             }
         }
-        let mut next = tokio::time::Instant::now();
-        loop {
-            tokio::time::sleep_until(next).await;
-            clear(&mut buffer, lines);
-            let now = tokio::time::Instant::now();
-            next = now + INTERVAL;
-            // scope for locking the printer
-            let Ok(mut printer) = PRINTER.lock() else {
-                break;
+            // std::thread::sleep(INTERVAL);
+        clear(buffer, *lines);
+        // scope for locking the printer
+        let Ok(mut printer) = PRINTER.lock() else {
+            return std::ops::ControlFlow::Break(());
+        };
+        if printer.bar_target.is_none() {
+            on_task_end(&mut printer);
+            return std::ops::ControlFlow::Break(());
+        }
+
+        if printer.prompt_task.active() {
+            // don't do anything when there's a prompt,
+            // since that will cause cursor to change position
+            return std::ops::ControlFlow::Continue(());
+        }
+        let now = std::time::Instant::now();
+
+        // remeasure terminal width on every cycle
+        let width = super::term_width().unwrap_or(original_width);
+
+        if printer.bar_target == Some(Target::Stdout) {
+            // add the buffered messages
+            printer.take_buffered(buffer);
+        } else {
+            printer.print_buffered();
+        }
+        // print the bars
+        let mut more_bars = -max_bars;
+        buffer.push_str(printer.colors.yellow);
+        *lines = 0;
+        let anime = CHARS[tick % 6];
+        printer.bars.retain(|bar| {
+            let Some(bar) = bar.upgrade() else {
+                return false;
             };
-            if printer.bar_target.is_none() {
-                on_task_end(&mut printer);
-                break;
-            }
-
-            if printer.prompt_task.active() {
-                // don't do anything when there's a prompt,
-                // since that will cause cursor to change position
-                continue;
-            }
-
-            // remeasure terminal width on every cycle
-            let width = super::term_width().unwrap_or(original_width);
-
-            if printer.bar_target == Some(Target::Stdout) {
-                // add the buffered messages
-                printer.take_buffered(&mut buffer);
-            } else {
-                printer.print_buffered();
-            }
-            // print the bars
-            let mut more_bars = -max_bars;
-            buffer += printer.colors.yellow;
-            lines = 0;
-            let anime = CHARS[tick % 6];
-            printer.bars.retain(|bar| {
-                let Some(bar) = bar.upgrade() else {
-                    return false;
-                };
-                if more_bars < 0 {
-                    if width >= 2 {
-                        buffer.push(anime);
-                        buffer.push(']');
-                        bar.format(width - 2, now.into_std(), &mut buffer, &mut temp);
-                    }
-                    buffer.push('\n');
-                    lines += 1;
+            if more_bars < 0 {
+                if width >= 2 {
+                    buffer.push(anime);
+                    buffer.push(']');
+                    bar.format(width - 2, now, buffer, temp);
                 }
-                more_bars += 1;
+                buffer.push('\n');
+                *lines += 1;
+            }
+            more_bars += 1;
 
-                true
-            });
+            true
+        });
 
-            if more_bars > 0 {
+        if more_bars > 0 {
+            temp.clear();
+            if write!(temp, "  ... and {more_bars} more").is_err() {
                 temp.clear();
-                if write!(&mut temp, "  ... and {more_bars} more").is_err() {
-                    temp.clear();
-                }
-                if width >= temp.len() {
-                    buffer.push_str(&temp);
-                    buffer.push_str(printer.colors.reset);
-                    buffer.push('\r');
-                }
-            } else {
+            }
+            if width >= temp.len() {
+                buffer.push_str(&temp);
                 buffer.push_str(printer.colors.reset);
+                buffer.push('\r');
             }
+        } else {
+            buffer.push_str(printer.colors.reset);
+        }
 
+        printer.print_to_bar_target(&buffer);
+
+        // check exit
+        if printer.bars.is_empty() {
+            on_task_end(&mut printer);
+            // erase the bars
+            clear(buffer, *lines);
+            // we know the printer buffer is empty
+            // because we just printed all of it while having
+            // the lock on the printer
             printer.print_to_bar_target(&buffer);
+            std::ops::ControlFlow::Break(())
+        } else {
+            std::ops::ControlFlow::Continue(())
+        }
+    }
 
-            // check exit
-            if printer.bars.is_empty() {
-                on_task_end(&mut printer);
-                // erase the bars
-                clear(&mut buffer, lines);
-                // we know the printer buffer is empty
-                // because we just printed all of it while having
-                // the lock on the printer
-                printer.print_to_bar_target(&buffer);
-                break;
-            }
-            tick += 1;
+    std::thread::spawn(move || {
+        // animation state
+        let mut tick = 0;
+        // buffer to avoid reallocation
+        let mut temp = String::new();
+        let mut buffer = String::new();
+        // how many bars were printed
+        let mut lines = 0;
+        loop {
+            match print_loop(original_width, max_bars, tick, &mut buffer, &mut temp, &mut lines) {
+                std::ops::ControlFlow::Break(_) => break,
+                _ => {}
+            };
+            std::thread::sleep(INTERVAL);
+            tick = tick.wrapping_add(1);
         }
     })
 }
@@ -522,7 +523,7 @@ fn print_task(original_width: usize, max_bars: i32) -> AsyncHandle<()> {
 // on a thread instead of tokio
 fn prompt_task(
     first_send: oneshot::Sender<std::io::Result<String>>,
-) -> std::thread::JoinHandle<()> {
+) -> JoinHandle<()> {
     use std::io::Write;
     let mut stdout = std::io::stdout();
     std::thread::spawn(move || {

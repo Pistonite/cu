@@ -1,22 +1,32 @@
 //! Batteries-included common utils
 //!
+//! # Import Guide
+//! `cu` tries to be as short as possible with imports. Common and misc
+//! utilities are exported directly by the crate and should be used
+//! as `cu::xxx` directly. Sub-functionalities are bundled when makes
+//! sense, and should be called from submodules directly, like `cu::fs::xxx`
+//! or `cu::co::xxx`. The submodules are usually 2-4 characters.
+//!
+//! To bring all common traits from `cu`, import the prelude `use cu::pre::*`,
+//! which imports traits like [`Context`], [`PathExtension`] into scope.
+//!
 //! # Basic Guide
-//! ```rust,ignore
+//! ```rust,no_run
 //! // prelude import should be used to automatically bring traits into scope
-//! use cu::prelude::*;
+//! use cu::pre::*;
 //!
 //! // types, macros, and most functions should just use `cu::` prefix
 //! // to avoid bloating the imports
 //! fn main() -> std::process::ExitCode {
 //!     // cli_wrapper will set up everything for you.
 //!     // All you need is a type that implements clap::Parser
-//!     cu::cli_wrapper(main_internal)
+//!     cu::cli::run(main_internal)
 //! }
 //!
 //! #[derive(clap::Parser)]
 //! struct MyArgs {
 //!     #[clap(flatten)]
-//!     common: cu::CliFlags
+//!     common: cu::cli::Flags
 //! }
 //! impl AsRef<cu::CliFlags> for MyArgs {
 //!     fn as_ref(&self) -> cu::CliFlags {
@@ -96,21 +106,23 @@
 //! You can call them from multiple threads, and they will be queued to prompt the user one after
 //! the other.
 
+#![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_auto_cfg))]
 
 // mod env_var;
 // pub use env_var::*;
 // mod parse;
 // pub use parse::*;
 //
-mod monitor;
+// mod monitor;
 
 mod async_;
-pub use async_::{AsyncHandle, BoxedFuture, Pool, spawn, run, join, join_collect};
-#[cfg(feature="heavy")]
-pub use async_::run_heavy;
+pub use async_::BoxedFuture;
+#[cfg(feature="coroutine")]
+pub mod co;
 
-
+#[cfg(feature="process")]
 mod process;
+#[cfg(feature="process")]
 pub use process::{cio, CommandBuilder, CommandBuilderDefault};
 
 /// Binary path registry
@@ -123,12 +135,11 @@ pub mod fs;
 mod path;
 pub use path::PathExtension;
 
-/// Integration with clap
-mod clap;
-pub use clap::{CliFlags, cli_wrapper};
-/// Printing utils, integration with log and clap
-mod print;
+pub mod cli;
+pub use copper_proc_macros::cli;
 
+/// Low level printing utils and integration with log and clap
+mod print;
 pub use print::{
     ColorLevel, PrintLevel, ProgressBar, PromptLevel, color_enabled, init_print_options,
     progress_bar, progress_bar_lowp, progress_unbounded, progress_unbounded_lowp,
@@ -154,8 +165,12 @@ pub mod lv {
     pub const T: crate::__priv::Lv = crate::__priv::Lv::Trace;
 }
 
+// Atomic helpers
+mod atomic;
+pub use atomic::*;
+
 // re-exports from libraries
-pub use anyhow::{Context, Result, bail, ensure};
+pub use anyhow::{Context, Result, bail, ensure, Ok};
 pub use log::{debug, error, info, trace, warn};
 
 #[doc(hidden)]
@@ -165,7 +180,7 @@ pub mod __priv {
 }
 
 /// Prelude imports
-pub mod prelude {
+pub mod pre {
     pub use crate::Context as _;
     pub use crate::PathExtension as _;
 }

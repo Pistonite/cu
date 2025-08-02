@@ -1,6 +1,6 @@
 use std::{io::Cursor, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 
-use crate::{print::Lv, AsyncHandle, BoxedFuture, ProgressBar};
+use crate::{print::Lv, BoxedFuture, ProgressBar};
 
 use super::{Command, Child};
 
@@ -13,7 +13,7 @@ use print_driver::*;
 
 macro_rules! ConfiguredChild {
     ($In:ident, $Out:ident, $Err:ident) => {
-        $crate::process::spawned_child::Child<
+        $crate::process::spawned::LwChild<
             <$In as $crate::process::cio::ChildInConfig>::Output,
             <$Out as $crate::process::cio::ChildOutConfig>::Output,
             <$Err as $crate::process::cio::ChildOutConfig>::Output
@@ -69,7 +69,7 @@ impl ChildInConfig for Inherit {
     fn configure_stdin(&mut self, command: &mut Command) -> Self::Output {
         command.stdin(std::process::Stdio::inherit());
     }
-    fn take(self, _: &mut Child, _: bool) {}
+    fn take(self, _: &mut Child) {}
 }
 #[derive(Clone, Copy)]
 #[doc(hidden)]
@@ -85,7 +85,7 @@ impl ChildOutConfig for Null {
         command.stderr(std::process::Stdio::null());
     }
     fn set_name(&mut self, _: &str) {}
-    fn take(self, _: &mut Child) {}
+    fn take(self, _: &mut Child, _: bool) {}
 }
 impl ChildInConfig for Null {
     type Output = ();
