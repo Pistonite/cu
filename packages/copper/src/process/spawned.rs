@@ -2,10 +2,10 @@ use std::process::ExitStatus;
 
 use crate::{co,Context as _};
 
-use super::cio;
+use super::pio;
 
 /// A spawned child, where the IO are drived by the light-weight thread
-pub struct LwChild<I: cio::ChildTask, O: cio::ChildTask, E: cio::ChildTask> {
+pub struct LwChild<I: pio::ChildTask, O: pio::ChildTask, E: pio::ChildTask> {
     pub(crate) wait_task: co::LwHandle<std::io::Result<ExitStatus>>,
     pub(crate) stdin: I::Output,
     pub(crate) stdin_task: Option<co::LwHandle<()>>,
@@ -15,7 +15,7 @@ pub struct LwChild<I: cio::ChildTask, O: cio::ChildTask, E: cio::ChildTask> {
     pub(crate) stderr_task: Option<co::LwHandle<()>>,
 }
 
-impl <I: cio::ChildTask, O: cio::ChildTask, E: cio::ChildTask> 
+impl <I: pio::ChildTask, O: pio::ChildTask, E: pio::ChildTask> 
 LwChild<I,O,E> {
     /// Access the stdin handle of the child
     pub fn stdin(&self) -> &I::Output {

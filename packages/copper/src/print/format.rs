@@ -18,9 +18,17 @@ macro_rules! fmtand {
 /// Invoke a print macro, then bail with the same message
 ///
 /// # Example
-/// ```rust,no_run
-/// let x = cu::bailand!(error!("found {} errors", 3));
-/// let x = cu::bailand!(warn!("warning!"));
+/// ```rust
+/// # fn main() {
+/// fn fn_1() -> cu::Result<()> {
+///     cu::bailand!(error!("found {} errors", 3));
+/// }
+/// fn fn_2() -> cu::Result<()> {
+///     cu::bailand!(warn!("warning!"));
+/// }
+/// assert!(fn_1().is_err()); // will also log error "found 3 errors"
+/// assert!(fn_2().is_err()); // will also log warning "warning!"
+/// # }
 /// ```
 #[macro_export]
 macro_rules! bailand {
@@ -34,7 +42,7 @@ macro_rules! bailand {
 ///
 /// # Example
 /// ```rust,no_run
-/// let x = cu::panicand!(error!("found {} errors", 3));
+/// cu::panicand!(error!("found {} errors", 3));
 /// ```
 #[macro_export]
 macro_rules! panicand {

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::ffi::OsStr;
 
-use super::{Command, Config, cio} ;
+use super::{Command, Config, pio} ;
 
 use crate::{Context as _, PathExtension as _};
 
@@ -108,7 +108,7 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
     }
 
     /// Configure child's standard output stream
-    pub fn stdout<T: cio::ChildOutConfig>(self, config: T) -> CommandBuilder<T, Err, In> {
+    pub fn stdout<T: pio::ChildOutConfig>(self, config: T) -> CommandBuilder<T, Err, In> {
         CommandBuilder {
             command: self.command,
             current_dir: self.current_dir,
@@ -120,7 +120,7 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
     }
 
     /// Configure child's standard error stream
-    pub fn stderr<T: cio::ChildOutConfig>(self, config: T) -> CommandBuilder<Out, T, In> {
+    pub fn stderr<T: pio::ChildOutConfig>(self, config: T) -> CommandBuilder<Out, T, In> {
         CommandBuilder {
             command: self.command,
             current_dir: self.current_dir,
@@ -132,7 +132,7 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
     }
 
     /// Configure child's both standard output and standard error with the same config
-    pub fn stdboth<T: cio::ChildOutConfig + Clone>(self, config: T) -> CommandBuilder<T, T, In> {
+    pub fn stdboth<T: pio::ChildOutConfig + Clone>(self, config: T) -> CommandBuilder<T, T, In> {
         CommandBuilder {
             command: self.command,
             current_dir: self.current_dir,
@@ -144,7 +144,7 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
     }
 
     /// Configure child's standard input stream
-    pub fn stdin<T: cio::ChildInConfig>(self, config:T) -> CommandBuilder<Out, Err, T> {
+    pub fn stdin<T: pio::ChildInConfig>(self, config:T) -> CommandBuilder<Out, Err, T> {
         CommandBuilder {
             command: self.command,
             current_dir: self.current_dir,
@@ -164,13 +164,13 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
 }
 
 // can only finish building once all IO are configured
-impl<Out: cio::ChildOutConfig, Err: cio::ChildOutConfig, In: cio::ChildInConfig> CommandBuilder<Out, Err, In> {
+impl<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig> CommandBuilder<Out, Err, In> {
 
     /// Spawn the child, and use the worker thread to monitor the child's IO.
     /// Returns a handle that can be used to wait for the child to be finished,
     /// or start to access the child's output on the current thread,
     /// as they come in
-    pub fn spawn(mut self) -> crate::Result<cio::ConfiguredChild![In, Out, Err]> {
+    pub fn spawn(mut self) -> crate::Result<pio::ConfiguredChild![In, Out, Err]> {
         use std::fmt::Write as _;
         let mut trace = String::new();
         let log_enabled = crate::log_enabled(crate::lv::D);

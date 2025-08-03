@@ -27,7 +27,44 @@ impl ColorLevel {
             ColorLevel::Auto => std::io::stdout().is_terminal(),
         }
     }
+
+    /// Return the first `--color <COLOR>` or `--color=<COLOR>`
+    /// found in os args
+    pub fn from_os_args() -> Self {
+        // for efficiency, we always return the first one
+        let mut found_color = false;
+        for x in std::env::args() {
+            if found_color {
+                if x == "always" {
+                    return Self::Always
+                }
+                if x == "never" {
+                    return Self::Never
+                }
+                if x == "auto" {
+                    return Self::Auto
+                }
+                found_color = false;
+                continue;
+            }
+            if x == "--color" {
+                found_color = true;
+                continue;
+            }
+            if x == "--color=always" {
+                return Self::Always
+            }
+            if x == "--color=never" {
+                return Self::Never
+            }
+            if x == "--color=auto" {
+                return Self::Auto
+            }
+        }
+        Self::Auto
+    }
 }
+
 
 /// Print level settable with `-v` and `-q` flags
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

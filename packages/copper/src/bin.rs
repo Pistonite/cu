@@ -1,24 +1,81 @@
+//! Binary path registry
+//!
+//! This util to provide a unified way of getting the path of a program to run,
+//! for example, let's say you are making a build script for a project, and
+//! you want to find the compiler program `gcc` in the following manner:
+//! - Most users would use the project-provided toolchain at `./toolchain/compiler/gcc`
+//! - If the user want to use the compiler on their system instead, we would first try
+//!   to finding `gcc` in `PATH`, then fallback to the toolchain.
+//! - Or some user may want to specify a particular path on their system with the `CC` environment
+//!   variable. We would try this first
+//!
+//! With `cu::bin`, you can register this logic once, then just use [`cu::which`](function@which)
+//! whenever you need to get the resolved path:
+//! ```rust,no_run
+//! use std::path::PathBuf;
+//! use cu::pre::*;
+//!
+//! fn find_gcc(use_system: bool) -> cu::Result<PathBuf> {
+//!     let provided = cu::bin::location("./toolchain/compiler/gcc".as_ref());
+//!     if use_system {
+//!         cu::bin::find("gcc", [
+//!             cu::bin::from_env("CC"),
+//!             cu::bin::in_PATH(),
+//!             provided
+//!         ])
+//!     } else {
+//!         cu::bin::find("gcc", [
+//!             cu::bin::from_env("CC"),
+//!             provided
+//!         ])
+//!     }
+//! }
+//!
+//! # fn main() -> cu::Result<()> {
+//! // would use clap in a real program, here, just an example
+//! let use_system = std::env::args().any(|x| x == "--use-system-compiler");
+//! // register the path with the logic in find_gcc
+//! let _: PathBuf = find_gcc(use_system).context("cannot find gcc")?;
+//!
+//! // ... later in the progam
+//! cu::which("gcc")?.command()
+//!     //... configure the command
+//! #        ;
+//! # Ok(())
+//! # }
+//!
+//! ```
+//!
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, RwLock};
 
-use crate::{Context as _, PathExtension as _};
+use crate::PathExtension as _;
 
 static BIN_PATHS: LazyLock<RwLock<BTreeMap<String, PathBuf>>> = LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
 /// Check and set bin name to the specified path. Return the absolute path that is set.
 ///
-/// This is different from the other `bin::` functions, as it will overwrite
+/// This is different from the other functions in the module, as it will overwrite
 /// the existing cache entry.
+///
+/// See [`cu::bin`](self) module-level documentation for more info.
 ///
 /// # Example
 /// ```rust,no_run
-/// cu::bin::set("ninja", "/my/path/to/ninja").unwrap();
-/// assert_eq!(cu::bin::which("ninja").unwrap(), PathBuf::new("/my/path/to/ninja"));
+/// use std::path::PathBuf;
+///
+/// # fn main() -> cu::Result<()> {
+/// assert_eq!(cu::which("ninja")?, PathBuf::from("/usr/bin/ninja"));
+/// cu::bin::set("ninja", "/my/path/to/ninja")?;
+/// // `which` now returns registered value
+/// assert_eq!(cu::which("ninja")?, PathBuf::from("/my/path/to/ninja"));
+/// # Ok(())
+/// # }
 /// ```
 pub fn set(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathBuf> {
     let name = name.as_ref();
-    let path = direct_strategy(name, path.as_ref())?;
+    let path = location(path.as_ref()).find(name)?;
     crate::debug!("setting bin path: '{name}' -> '{}'", path.display());
     let mut paths = BIN_PATHS.write().expect("could not lock global bin path map");
     let old = paths.insert(name.to_string(), path.clone());
@@ -28,135 +85,33 @@ pub fn set(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathB
     Ok(path)
 }
 
-/// Find an executable in PATH or previously cached.
+/// Find an executable in PATH, or use a previously registered path (also available as
+/// `cu::which`).
 ///
-/// Result will be cached so finding the same executable name will always result in the same path
+/// Result will be cached so finding the same executable name will always result in the same path.
+///
+/// See [`cu::bin`](self) module-level documentation for more info.
 pub fn which(name: impl AsRef<str>) -> crate::Result<PathBuf> {
-    let name = name.as_ref();
-    find_bin_internal(name, which_strategy).with_context(|| format!("could not find executable '{name}'"))
+    find(name, std::iter::once(in_PATH()))
 }
 
-/// Find an executable in PATH or previously cached, falling back
-/// to reading from environment variable `env` if not found.
+/// Resolve an executable at the location provided, or use a previously registered path.
 ///
-/// Result will be cached so finding the same executable name will always result in the same path
-pub fn which_or_env(name: impl AsRef<str>, env: impl AsRef<str>) -> crate::Result<PathBuf> {
-    let name = name.as_ref();
-    let env = env.as_ref();
-    find_bin_internal(name,
-        |name| match which_strategy(name) {
-            Ok(x) => Ok(x),
-            Err(e) => {
-                crate::debug!("could not find executable '{name}' in PATH: {e}");
-                crate::debug!("falling back to finding '{name}' in environment");
-                env_strategy(name, env)
-            }
-        }
-    ).with_context(|| format!("could not find executable '{name}'"))
-}
-
-/// Use the path defined in environment variable `env` as the path for the binary,
-/// or fallback to finding it in PATH.
+/// Result will be cached so finding the same executable name will always result in the same path.
 ///
-/// Result will be cached so finding the same executable name will always result in the same path
-pub fn env_or_which(name: impl AsRef<str>, env: impl AsRef<str>) -> crate::Result<PathBuf> {
-    let name = name.as_ref();
-    let env = env.as_ref();
-    find_bin_internal(name,
-        |name| match env_strategy(name, env) {
-            Ok(x) => Ok(x),
-            Err(e) => {
-                crate::debug!("could not find executable '{name}' in environment: {e}");
-                crate::debug!("falling back to finding '{name}' in PATH");
-                which_strategy(name)
-            }
-        }
-    ).with_context(|| format!("could not find executable '{name}'"))
+/// See [`cu::bin`](self) module-level documentation for more info.
+pub fn resolve(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathBuf> {
+    find(name, std::iter::once(location(path.as_ref())))
 }
 
-/// Register `path` as the path for the binary `name` if it exists,
-/// otherwise falling back to finding it in PATH.
+/// Find the executable using a series of strategies.
 ///
-/// Result will be cached so finding the same executable name will always result in the same path
-pub fn resolve_or_which(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathBuf> {
-    let name = name.as_ref();
-    let path = path.as_ref();
-    find_bin_internal(name,
-        |name| match direct_strategy(name, path) {
-            Ok(x) => Ok(x),
-            Err(e) => {
-                crate::debug!("failed to resolve executable '{name}' at '{}': {e}", path.display());
-                crate::debug!("falling back to finding '{name}' in PATH");
-                which_strategy(name)
-            }
-        }
-    ).with_context(|| format!("could not find executable '{name}'"))
-}
-
-/// Resolve binary path for `name` in the following order:
-/// - Use `path` canonicalized
-/// - Use environment variable `env`
-/// - find in PATH
+/// If there's already a registered path from a previous find that matches `name`,
+/// that path is returned instead.
 ///
-/// Result will be cached so finding the same executable name will always result in the same path
-pub fn resolve_or_env_or_which(name: impl AsRef<str>, path: impl AsRef<Path>, env: impl AsRef<str>) -> crate::Result<PathBuf> {
+/// See [`cu::bin`](self) module-level documentation for more info.
+pub fn find<'a, I: IntoIterator<Item=Strategy<'a>>>(name: impl AsRef<str>, strats: I) -> crate::Result<PathBuf> {
     let name = name.as_ref();
-    let path = path.as_ref();
-    let env = env.as_ref();
-    find_bin_internal(name,
-        |name| {
-            match direct_strategy(name, path) {
-                Ok(x) => return Ok(x),
-                Err(e) => {
-                    crate::debug!("failed to resolve executable '{name}' at '{}': {e}", path.display());
-                    crate::debug!("falling back to finding '{name}' in environment");
-                }
-            }
-            match env_strategy(name, env) {
-                Ok(x) => return Ok(x),
-                Err(e) => {
-                    crate::debug!("failed to resolve executable '{name}' in environment: {e}");
-                    crate::debug!("falling back to finding '{name}' in PATH");
-                }
-            }
-            which_strategy(name)
-        }
-    ).with_context(|| format!("could not find executable '{name}'"))
-}
-
-/// Resolve binary path for `name` in the following order:
-/// - Use `path` canonicalized
-/// - Use environment variable `env`
-/// - find in PATH
-///
-/// Result will be cached so finding the same executable name will always result in the same path
-pub fn resolve_or_which_or_env(name: impl AsRef<str>, path: impl AsRef<Path>, env: impl AsRef<str>) -> crate::Result<PathBuf> {
-    let name = name.as_ref();
-    let path = path.as_ref();
-    let env = env.as_ref();
-    find_bin_internal(name,
-        |name| {
-            match direct_strategy(name, path) {
-                Ok(x) => return Ok(x),
-                Err(e) => {
-                    crate::debug!("failed to resolve executable '{name}' at '{}': {e}", path.display());
-                    crate::debug!("falling back to finding '{name}' in PATH");
-                }
-            }
-            match which_strategy(name) {
-                Ok(x) => return Ok(x),
-                Err(e) => {
-                    crate::debug!("failed to resolve executable '{name}' in PATH: {e}");
-                    crate::debug!("falling back to finding '{name}' in environment");
-                }
-            }
-            env_strategy(name, env)
-        }
-    ).with_context(|| format!("could not find executable '{name}'"))
-}
-
-/// Find the absolute path given the binary name. Return error if cannot find.
-fn find_bin_internal(name: &str, strategy: impl FnOnce(&str) -> crate::Result<PathBuf>) -> crate::Result<PathBuf> {
     {
         let Ok(paths) = BIN_PATHS.read() else {
             crate::bail!("could not lock global bin path map");
@@ -171,30 +126,100 @@ fn find_bin_internal(name: &str, strategy: impl FnOnce(&str) -> crate::Result<Pa
     if let Some(x) = paths.get(name) {
         return Ok(x.clone());
     }
-    let path = strategy(name)?;
-    crate::debug!("found executable '{name}' -> '{}'", path.display());
+    let path = find_with_strats(name, strats)?;
+    crate::debug!("found executable '{name}': {}", path.display());
     paths.insert(name.to_string(), path.clone());
     Ok(path)
 }
 
-fn env_strategy(name: &str, env: &str) -> crate::Result<PathBuf> {
-    crate::trace!("finding executable '{name}' using environment variable '{env}'");
-    match std::env::var(env) {
-        Ok(x) if !x.is_empty() => Path::new(&x).normalize_exists(),
-        _ => crate::bail!("environment variable '{env}' not found"),
+fn find_with_strats<'a, I: IntoIterator<Item=Strategy<'a>>>(name: &str, strats: I) -> crate::Result<PathBuf> {
+    let mut strats = strats.into_iter();
+    let Some(first) = strats.next() else {
+        crate::bail!("must provide at least one strategy to cu::bin::find");
+    };
+    let mut error = match first.find(name) {
+        Ok(x) => return Ok(x),
+        Err(e) => e
+    };
+    let mut prev = first;
+    for strat in strats {
+        crate::debug!("could not finding '{name}' {prev}: {error}");
+        crate::debug!("falling back to finding '{name}' {strat}");
+        error = match strat.find(name) {
+            Ok(x) => return Ok(x),
+            Err(e) => e
+        };
+        prev = strat;
     }
+
+    crate::debug!("could not finding '{name}' {prev}: {error}");
+    crate::bailand!(error!("could not find program '{name}'"));
 }
 
-fn which_strategy(name: &str) -> crate::Result<PathBuf> {
-    crate::trace!("finding executable '{name}' in PATH");
-    match which::which(name) {
-        // which already canonicalize it, which ensures it exists
-        Ok(x) => x.normalize(),
-        Err(e) => Err(e)?
-    }
+/// Strategy to resolve the given path as path for the program
+///
+/// See [`cu::bin`](self) module-level documentation for more info.
+pub fn location<'a>(path: &'a Path) -> Strategy<'a> {
+    Strategy::Resolve(path)
 }
 
-fn direct_strategy(name: &str, path: &Path) -> crate::Result<PathBuf> {
-    crate::trace!("finding executable '{name}' at '{}'", path.display());
-    path.normalize_exists()
+/// Strategy to find the program in the PATH environment variable
+///
+/// See [`cu::bin`](self) module-level documentation for more info.
+#[allow(non_snake_case)]
+pub fn in_PATH() -> Strategy<'static> {
+    Strategy::Which
+}
+/// Strategy to read the environment variable and resolve that path as the program
+///
+/// See [`cu::bin`](self) module-level documentation for more info.
+pub fn from_env<'a>(env: &'a str) -> Strategy<'a> {
+    Strategy::EnvVar(env)
+}
+
+/// Strategy to find a binary
+///
+/// See [`cu::bin`](self) module-level documentation for more info.
+pub enum Strategy<'a> {
+    /// Find it in PATH (like the `which` command)
+    Which,
+    /// Resolve a provided path
+    Resolve(&'a Path),
+    /// Resolve from path in an environment variable
+    EnvVar(&'a str)
+}
+
+impl Strategy<'_> {
+    fn find(&self, name: &str) -> crate::Result<PathBuf> {
+        match self {
+            Self::Which => {
+                crate::debug!("finding executable '{name}' in PATH");
+                match which::which(name) {
+                    // which already canonicalize it, which ensures it exists
+                    Ok(x) => x.normalize(),
+                    Err(e) => Err(e)?
+                }
+            }
+            Self::Resolve(path) => {
+                crate::debug!("finding executable '{name}' at '{}'", path.display());
+                path.normalize_exists()
+            },
+            Self::EnvVar(v) => {
+                crate::debug!("finding executable '{name}' using environment variable '{v}'");
+                match std::env::var(v) {
+                    Ok(x) if !x.is_empty() => Path::new(&x).normalize_exists(),
+                    _ => crate::bail!("environment variable '{v}' not found"),
+                }
+            }
+        }
+    }
+}
+impl std::fmt::Display for Strategy<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Strategy::Which => write!(f, "in PATH"),
+            Strategy::Resolve(path) => write!(f, " at '{}'", path.display()),
+            Strategy::EnvVar(env) => write!(f, "using envvar '{env}'")
+        }
+    }
 }

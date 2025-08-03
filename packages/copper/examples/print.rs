@@ -1,8 +1,13 @@
 use std::time::Duration;
 
+#[derive(cu::cli::Parser, Clone)]
+struct Flags {
+    #[clap(flatten)]
+    inner: cu::cli::Flags
+}
 /// Run with cargo run --example print --features prompt
-#[cu::cli]
-fn main(_: cu::cli::Flags) -> cu::Result<()> {
+#[cu::cli(flags = "inner")]
+fn main(_: Flags) -> cu::Result<()> {
     cu::print!("today's weather is {}", "good");
     cu::hint!("today's weather is {}", "ok");
     cu::info!(
@@ -22,14 +27,14 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
         let bar2 = cu::progress_bar(20, "This takes 5 seconds");
         let bar = cu::progress_unbounded("This is unbounded");
         for i in 0..10 {
-            cu::progress!(bar, (), "step {i}");
-            cu::progress!(bar2, i, "step {i}");
+            cu::progress!(&bar, (), "step {i}");
+            cu::progress!(&bar2, i, "step {i}");
             cu::debug!("this is debug message\n");
             std::thread::sleep(Duration::from_millis(250));
         }
         drop(bar);
         for i in 0..10 {
-            cu::progress!(bar2, i + 10, "step {}", i + 10);
+            cu::progress!(&bar2, i + 10, "step {}", i + 10);
             std::thread::sleep(Duration::from_millis(250));
             cu::print!("doing stuff");
         }

@@ -11,6 +11,21 @@ pub(crate) fn set_log_filter(filter: env_filter::Filter) {
 }
 static USE_COLOR: AtomicBool = AtomicBool::new(true);
 
+/// Shorthand to quickly setup logging. Can be useful in tests.
+///
+/// "qq", "q", "v" and "vv" inputs map to corresponding print levels. Other inputs
+/// are mapped to default level
+pub fn log_init(lv: &str) {
+    let level = match lv {
+        "qq" => PrintLevel::QuietQuiet,
+        "q" => PrintLevel::Quiet,
+        "v" => PrintLevel::Verbose,
+        "vv" => PrintLevel::VerboseVerbose,
+        _ => PrintLevel::Normal
+    };
+    init_print_options(ColorLevel::Auto, level, Some(PromptLevel::No));
+}
+
 /// Set global print options. This is usually called from clap args
 ///
 /// If prompt option is `None`, it will be `Interactive` unless env var `CI` is `true` or `1`, in which case it becomes `No`.

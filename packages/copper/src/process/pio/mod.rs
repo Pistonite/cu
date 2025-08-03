@@ -14,9 +14,9 @@ use print_driver::*;
 macro_rules! ConfiguredChild {
     ($In:ident, $Out:ident, $Err:ident) => {
         $crate::process::spawned::LwChild<
-            <$In as $crate::process::cio::ChildInConfig>::Output,
-            <$Out as $crate::process::cio::ChildOutConfig>::Output,
-            <$Err as $crate::process::cio::ChildOutConfig>::Output
+            <$In as $crate::process::pio::ChildInConfig>::Output,
+            <$Out as $crate::process::pio::ChildOutConfig>::Output,
+            <$Err as $crate::process::pio::ChildOutConfig>::Output
         >
         
     };

@@ -10,6 +10,7 @@ use super::ansi;
 /// ```rust,no_run
 /// let bar = cu::progress_bar(10, "10 steps");
 /// // update the current count and message
+/// let i = 1;
 /// cu::progress!(&bar, i, "doing step {i}");
 /// // update the current count without changing message
 /// cu::progress!(&bar, 2);
@@ -19,15 +20,15 @@ use super::ansi;
 #[macro_export]
 macro_rules! progress {
     ($bar:expr, $current:expr) => {
-        $crate::ProgreeBar::set($bar, $current, None);
+        $crate::ProgressBar::set($bar, $current, None);
     };
     ($bar:expr, (), $($fmt_args:tt)*) => {{
         let message = format!($($fmt_args)*);
-        $bar.set_message(message);
+        $crate::ProgressBar::set_message($bar, message);
     }};
-    ($bar:ident, $current:expr, $($fmt_args:tt)*) => {{
+    ($bar:expr, $current:expr, $($fmt_args:tt)*) => {{
         let message = format!($($fmt_args)*);
-        $bar.set($current, Some(message));
+        $crate::ProgressBar::set($bar, $current, Some(message));
     }};
 }
 
