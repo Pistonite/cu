@@ -15,10 +15,11 @@
 //! This imports traits like [`Context`] and [`PathExtension`] into scope.
 //!
 //! Quick Feature Reference:
-//! - `cli`: Enables CLI entry points and integration with `clap`
-//! - `prompt`: Enables macros to show prompt to the user
-//! - `fs`: Enables file system utils
-//! - `coroutine` and `coroutine-heavy`: Enables `async` and integration with `tokio`
+//! - `cli`: Enables CLI entry points and integration with `clap`. (See [`cli`](module@cli))
+//! - `prompt`: Enables macros to show prompt to the user. (See [Prompting](#prompting))
+//! - `fs`: Enables file system utils. (See [`fs`](module@fs))
+//! - `coroutine` and `coroutine-heavy`: 
+//!   Enables `async` and integration with `tokio`. (See [`co`](module@co))
 //! - `process`: Enables utils spawning child process
 //!
 //! # CLI
@@ -126,10 +127,6 @@
 //
 // mod monitor;
 
-mod async_;
-pub use async_::BoxedFuture;
-#[cfg(feature="coroutine")]
-pub mod co;
 
 #[cfg(feature="process")]
 mod process;
@@ -156,6 +153,15 @@ pub use path::PathExtension;
 pub mod cli;
 #[cfg(feature="cli")]
 pub use copper_proc_macros::cli;
+
+mod async_;
+pub use async_::BoxedFuture;
+#[cfg(feature="coroutine")]
+pub mod co;
+// tokio re-exports
+#[cfg(feature="coroutine")]
+pub use tokio::{join, try_join};
+
 
 /// Low level printing utils and integration with log and clap
 mod print;
@@ -187,6 +193,10 @@ pub mod lv {
 // Atomic helpers
 mod atomic;
 pub use atomic::*;
+
+// other stuff that doesn't have a place
+mod misc;
+pub use misc::*;
 
 // re-exports from libraries
 pub use anyhow::{Context, Result, bail, ensure, Ok};

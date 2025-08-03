@@ -39,12 +39,12 @@ fn expand_cli(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream2
         match flags_ident {
             None => {
                 quote! {
-                    unsafe { cu::cli::__run_heavy(#generated_main_name) }
+                    unsafe { cu::cli::co_run(#generated_main_name) }
                 }
             }
             Some(flags) => {
                 quote! {
-                    unsafe { cu::cli::__run_heavy_f(#generated_main_name, |x| &x.#flags) }
+                    unsafe { cu::cli::__co_run(#generated_main_name, |x| &x.#flags) }
                 }
             }
         }

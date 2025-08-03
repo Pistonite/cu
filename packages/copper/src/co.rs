@@ -1,126 +1,122 @@
 //! `cu::co::` Coroutine driver
 //!
-//! This library is designed to have flexible coroutine handling.
-//! The program can have:
+//! This library is designed to have flexible coroutine handling,
+//! being able to handle `async` both on the current thread,
+//! and on one or more background threads.
+//!
+//! For example, consider these program styles:
 //! - everything being `async` - typically involving both CPU-bound
-//!   work and IO work interwined.
+//!   work and IO work interwined. Can take advantage of multiple background threads.
 //! - Some IO heavy work that doesn't really involve CPU - for example,
 //!   spawning compiler processes and wait for them, or spawning network requests.
-//! - Heavy CPU work that only has a little IO.
+//!   Usually won't have significant performance benefit from having multiple background threads.
+//! - Heavy CPU work that only has a little IO. Using `async` usually has very little
+//!   benefit. (Would probably use something like `rayon` to get parallelism).
 //!
-//! You pick the execution model you want.
+//! You pick the style you want.
 //!
-//! # No `async` at all
-//! Great - no extra learning is needed. You can just write a normal
-//! Rust program. Note that this crate still uses threads to handle
-//! progress bar animation and prompting. However, these threads are spawned
-//! on-demand and only lasts when they are active (i.e. when there
-//! is a progress bar being displayed, or when there is a prompt).
+//! # Async entry point
 //!
-//! # Light-weight `async` + (potentially) heavy CPU work
-//! To enable coroutines for light-weight `async` tasks, enable the `coroutine`
-//! feature. In this mode, coroutines are drived by a single-threaded `tokio` runtime,
-//! and typically, the `async` things are hidden away by synchronous APIs.
+//! With the [`cli`](module@crate::cli) module, you can use the same macro
+//! for an async entry point
 //!
-//! For example, if you want to spawn 2 processes, and pipe their output:
-//! ```rust,ignore
-//!
-//! let git = cu::bin::which("git").unwrap();
-//! let child1 = git.command()
-//!     .args(["clone", "https://example1.git", "dest1", "--progress"])
-//!     .stdin(cu::cio::raw_inherit())
-//!     .stdboth(cu::cio::spinner("cloning example1").info())
-//!     .spawn()?;
-//! let child2 = git.command()
-//!     .args(["clone", "https://example2.git", "dest2", "--progress"])
-//!     .stdin(cu::cio::raw_inherit())
-//!     .stdboth(cu::cio::spinner("cloning example2").info())
-//!     .spawn()?;
-//!
-//! // child1 and child2 are now both running, their IO are handled
-//! // asynchronously on the same IO thread, driven by the same single-threaded
-//! // tokio runtime. The print animation thread handles the progress spinners
-//!
-//! // we need both to finish, so doesn't matter if we wait for them concurrently,
-//! // since they are executed on the background anyway
-//! child1.wait_nz()?; // this checks non-zero exit status
-//! child2.wait_nz()?;
-//! ```
-//!
-//! The benefit of this is we don't waste resource with a potentially heavy,
-//! multi-threaded async runtime. This means you can do heavy CPU-bound work
-//! parallely with max efficiency, with something like `rayon`.
-//!
-//! You can also interact with the async thread directly, with [`cu::co::spawn`](`crate::co::spawn`)
-//! and [`cu::co::run`](crate::co::run). These will post the work to run on the async thread,
-//! and give you a blocking join handle. Note that in this mode, you will get a panic
-//! if you try to spawn or join while on the IO thread. In those cases, you should
-//! use `tokio::spawn` to spawn the task, or use the async APIs that does that under the hood
-//!
-//! ```rust,ignore
-//! // suppose we are in an async context, and we don't want to block
-//! let git = cu::bin::which("git").unwrap();
-//! let child1 = git.command()
-//!     .args(["clone", "https://example1.git", "dest1", "--progress"])
-//!     .stdin(cu::cio::raw_inherit())
-//!     .stdboth(cu::cio::spinner("cloning example1").info())
-//!     .co_spawn()?; // replace `spawn()` with `co_spawn()`
-//! let child2 = git.command()
-//!     .args(["clone", "https://example2.git", "dest2", "--progress"])
-//!     .stdin(cu::cio::raw_inherit())
-//!     .stdboth(cu::cio::spinner("cloning example2").info())
-//!     .co_spawn()?;
-//!
-//! // co_spawn will give a version of the child where the tasks
-//! // are spawned on the current tokio runtime (with tokio::spawn),
-//! // and subsequent operations are async
-//! child1.wait_nz().await?;
-//! child2.wait_nz().await?;
-//! ```
-//!
-//! # Heavy `async` work
-//! If there are a lot of async and sync work interwined, it might make
-//! sense to bring in the heavy, multi-threaded `tokio` runtime.
-//!
-//! The `coroutine-heavy` feature is needed, which automatically turns on
-//! the `coroutine` feature as well. (Note that you don't need the `tokio::main`
-//! macro - the `co_run` function handles that for you).
-//!
-//! ```rust,ignore
-//!
-//! fn main() -> std::process::ExitStatus {
-//!     // This spawns `main_internal` on a multi-threaded `tokio` runtime
-//!     cu::cli::co_run(main_internal)
+//! ```rust
+//! use std::time::Duration;
+//! #[cu::cli]
+//! async fn main(args: cu::cli::Flags) -> cu::Result<()> {
+//!     cu::info!("doing some work");
+//!     tokio::time::sleep(Duration::from_secs(1)).await;
+//!     cu::info!("done");
+//!     Ok(())
 //! }
+//! ```
+//! Note that the entry point is still drived by the main thread despite being `async`
+//! (even if `coroutine-heavy` feature is enabled), meaning that the above program
+//! is still single-threaded! This makes sense because the (fake) workload doesn't benefit
+//! at all from having multiple threads.
 //!
-//! async fn main_internal(args: cu::cli::Flags) -> cu::Result<()> {
-//!     tokio::spawn(async move { /*...*/ })
+//! By default, the number of background threads is 1.
+//! Enabling the `coroutine-heavy` feature will change it
+//! to the number of processors.
+//!
+//! # Internal Coroutine
+//! Some `cu` functions use coroutines internally behind "synchronous" APIs,
+//! allowing seamless integration from a synchronous context.
+//!
+//! For example, `cu` uses coroutines to drive inputs and outputs from a command:
+//! ```rust,no_run
+//! use cu::pre::*;
+//!
+//! #[cu::cli]
+//! fn main(_: cu::cli::Flags) -> cu::Result<()> {
+//!     let git = cu::which("git")?;
+//!     let child1 = git.command()
+//!         .args(["clone", "https://example1.git", "dest1", "--progress"])
+//!         .stdin_null()
+//!     // use a progress bar to display progress, and print other
+//!     // messages as info
+//!         .stdoe(cu::cio::spinner("cloning example1").info())
+//!         .spawn()?;
+//!     // same configuration
+//!     let child2 = git.command()
+//!         .args(["clone", "https://example2.git", "dest2", "--progress"])
+//!         .stdin_null()
+//!         .stdoe(cu::cio::spinner("cloning example2").info())
+//!         .spawn()?;
+//!    
+//!     // Both childs are now running as separate processes in the OS.
+//!     // Also, IO from both childs are drived by the same background thread.
+//!     // You can block the main thread to do other work, and it will not
+//!     // block the child from printing messages
+//!    
+//!     // since we don't get benefit from one child finishing early
+//!     // here, we just wait for them in order
+//!     child1.wait_nz()?;
+//!     child2.wait_nz()?;
+//!    
+//!     Ok(())
 //! }
 //! ```
 //!
-//! You can also use a synchronous entry point, and spawn the heavy
-//! tasks manually, which gives you more control over when to engage
-//! the heavy runtime
+//! # `co_*` APIs
+//! Many APIs in `cu` has a same version with `co_` prefix.
+//! These are designed to be called when you are already in an asynchronous
+//! context. For example, we can rewrite the example above using `co_wait_nz`.
+//! Note that in this case, there's no benefit of using `co_spawn`/`co_wait_nz`,
+//! since we are not doing any extra work.
 //!
-//! ```rust,ignore
-//! fn main() -> std::process::ExitStatus {
-//!     cu::cli::run(main_internal)
-//! }
-//! fn main_internal(args: cu::cli::Flags) -> cu::Result<()> {
-//!     // this internally calls `block_on` to enter the tokio runtime
-//!     cu::co::run_heavy(async move { /*...*/ });
-//!     // and you can do it multiple times to switch between sync and async
-//!     cu::co::run_heavy(async move { /*...*/ });
+//! ```rust
+//! #[cu::cli]
+//! async fn main(_: cu::cli::Flags) -> cu::Result<()> {
+//!     let git = cu::which("git")?;
+//!     let child1 = git.command()
+//!         .args(["clone", "https://example1.git", "dest1", "--progress"])
+//!         .stdin_null()
+//!         .stdoe(cu::cio::spinner("cloning example1").info())
+//!         // using co_spawn() will do the work needed at spawn time
+//!         // using the current async context, instead of off-loading
+//!         // it to a background thread.
+//!         .co_spawn().await?;
+//!         // however, note that the IO work, once spawned, are still
+//!         // driven by a background thread regardless of which spawn API
+//!         // is used
+//!     // same configuration
+//!     let child2 = git.command()
+//!         .args(["clone", "https://example2.git", "dest2", "--progress"])
+//!         .stdin_null()
+//!         .stdoe(cu::cio::spinner("cloning example2").info())
+//!         .co_spawn().await?;
+//!    
+//!     // instead of waiting 1, then 2, we could now use `join!`
+//!     // and let the runtime take care of the scheduling.
+//!     let (r1, r2) = cu::join!(child1.co_wait_nz(), child2.co_wait_nz());
+//!     // also note that, using try_join above will not automatically
+//!     // kill the rest of the child if one fails.
+//!     r1?;
+//!     r2?;
+//!    
+//!     Ok(())
 //! }
 //! ```
-//!
-//! Note that there is no `spawn_heavy` - you should just use `tokio::spawn`.
-//! The single-threaded functions are not disabled, but are disencouraged
-//! and you should use the `co_*` functions if possible when inside a heavy
-//! runtime context, to fully take advantage of all the resources in the runtime.
 
-#[cfg(feature="coroutine")]
-pub use crate::async_::{
-    JoinHandle, LwHandle, Pool, spawn, run, join, join_collect};
-#[cfg(feature="coroutine-heavy")]
-pub use crate::async_::run_heavy;
+pub use crate::async_::{Handle, AbortHandle, RobustHandle, RobustAbortHandle, Pool, spawn, run, co_spawn};

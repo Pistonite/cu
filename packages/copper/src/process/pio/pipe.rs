@@ -41,6 +41,7 @@ impl ChildOutConfig for PipeOut {
             // since tokio does not yet have a way for us to take
             // the pipe out before it's converted to tokio's ChildStdout/ChildStderr
             // see https://github.com/tokio-rs/tokio/pull/7249#issuecomment-3146995525
+            // once Command::spawn_with is stabilized, we can use it
             let x: Result<Stdio, _> = stdout.try_into();
             let x = x.context("failed to convert tokio pipe to std pipe")?;
             Ok(PipeTask(x))
@@ -53,6 +54,7 @@ impl ChildOutConfig for PipeOut {
             // since tokio does not yet have a way for us to take
             // the pipe out before it's converted to tokio's ChildStdout/ChildStderr
             // see https://github.com/tokio-rs/tokio/pull/7249#issuecomment-3146995525
+            // once Command::spawn_with is stabilized, we can use it
             let x: Result<Stdio, _> = stderr.try_into();
             let x = x.context("failed to convert tokio pipe to std pipe")?;
             Ok(PipeTask(x))

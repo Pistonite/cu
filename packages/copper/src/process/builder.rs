@@ -1,11 +1,14 @@
 use std::path::PathBuf;
 use std::ffi::OsStr;
 
-use super::{Command, Config, pio} ;
+use tokio::process::Command as TokioCommand;
 
-use crate::{Context as _, PathExtension as _};
+use super::Config;
 
-pub type CommandBuilderDefault = CommandBuilder<(), (), ()>;
+use crate::{co, pio, Context as _, PathExtension as _};
+
+/// A [`Command`] to be built
+pub type CommandBuilder = Command<(), (), ()>;
 
 /// Builder for spawning a child process.
 ///
@@ -42,9 +45,9 @@ pub type CommandBuilderDefault = CommandBuilder<(), (), ()>;
 /// "default" IO behavior. You cannot spawn the child until you configured how you'd like
 /// `stdout`, `stderr`, and `stdin` to behave.
 ///
-pub struct CommandBuilder<Out, Err, In> {
-    /// Inner command builder
-    command: Command,
+pub struct Command<Out, Err, In> {
+    /// Inner command
+    command: TokioCommand,
     /// buffered current_dir to be set on the command before spawning
     current_dir: Option<PathBuf>,
     /// Name which maybe used by IO to print
@@ -56,7 +59,7 @@ pub struct CommandBuilder<Out, Err, In> {
 
 // expose functions from tokio/std
 #[rustfmt::skip]
-impl<Out, Err, In> CommandBuilder<Out, Err, In> {
+impl<Out, Err, In> Command<Out, Err, In> {
     /// Add one argument
     ///
     /// Use [`Self::args`] or [`args`] macro to add more than one arguments
@@ -97,7 +100,7 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
 
 }
 
-impl CommandBuilderDefault {
+impl CommandBuilder {
     /// Start building a command. If the arg is a `Path` or `PathBuf`,
     /// you can also call `.command()` on it (remember to import prelude);
     pub fn new(bin: impl AsRef<OsStr>) -> Self {
@@ -197,7 +200,7 @@ impl<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig>
     pub fn spawn(mut self) -> crate::Result<pio::ConfiguredChild![Out, Err]> {
         use std::fmt::Write as _;
         let mut trace = String::new();
-        let log_enabled = crate::log_enabled(crate::lv::D);
+        let log_enabled = crate::log_enabled(crate::lv::T);
         if log_enabled {
             let command = self.command.as_std();
             let _ = write!(&mut trace, "spawning '{}', args: [", command.get_program().display());
@@ -215,12 +218,9 @@ impl<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig>
         if let Some(cd) = self.current_dir {
             let cd = cd.normalize_exists().with_context(|| {
                 if log_enabled {
-                    crate::debug!("error while {trace}");
-                    crate::error!("cannot canonicalize current_dir: {}", cd.display());
-                } else {
-                    crate::error!("cannot canonicalize current_dir: {}", cd.display());
-                    crate::hint!("use -v to show debug info for the child process being spawned.");
+                    crate::trace!("error while {trace}");
                 }
+                crate::error!("cannot canonicalize current_dir: {}", cd.display());
                 "cannot canonicalize current_dir while spawning child"
             })?;
             if log_enabled {
@@ -238,35 +238,34 @@ impl<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig>
         self.stderr.configure_stderr(&mut self.command);
         self.stdin.configure_stdin(&mut self.command).context("failed to configure child stdin")?;
 
-        let child = crate::co::spawn(async move {
+        // self.command.spawn() must be called inside tokio
+        let child = co::run(async move {
             let mut child = self.command.spawn().with_context(move || {
                 crate::error!("failed to spawn command");
-                if !log_enabled {
-                    crate::hint!("use -v to show debug info for the child process being spawned.")
-                }
                 "failed to spawn command"
             })?;
-
+        
             let name = self.name.as_ref().map(|x| x.as_str());
-
+        
             let stdout = self.stdout.take(&mut child, name, true).context("failed to take child stdout")?;
             let stderr = self.stderr.take(&mut child, name, false).context("failed to take child stderr")?;
             let stdin = self.stdin.take(&mut child).context("failed to take child stdin")?;
-
+        
             use pio::ChildOutTask as _;
             use pio::ChildInTask as _;
             let (stdout_future, stdout) = stdout.run();
             let (stderr_future, stderr) = stderr.run();
             let stdin_future = stdin.run();
-
-            let wait_task = tokio::spawn(async move {
+        
+            // run the IO tasks in background thread
+            let wait_task = co::spawn(async move {
                 child.wait().await
             });
-            let stdout_task = stdout_future.map(tokio::spawn);
-            let stderr_task = stderr_future.map(tokio::spawn);
-            let stdin_task = stdin_future.map(tokio::spawn);
-
-            crate::Ok(super::spawned::LwChild {
+            let stdout_task = stdout_future.map(co::spawn);
+            let stderr_task = stderr_future.map(co::spawn);
+            let stdin_task = stdin_future.map(co::spawn);
+        
+            crate::Ok(super::child::LwChild {
                 wait_task, stdout, stderr,
                 stdin_task, stdout_task, stderr_task
             })

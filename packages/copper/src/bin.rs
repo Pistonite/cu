@@ -76,11 +76,11 @@ static BIN_PATHS: LazyLock<RwLock<BTreeMap<String, PathBuf>>> = LazyLock::new(||
 pub fn set(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathBuf> {
     let name = name.as_ref();
     let path = location(path.as_ref()).find(name)?;
-    crate::debug!("setting bin path: '{name}' -> '{}'", path.display());
+    crate::trace!("setting bin path: '{name}' -> '{}'", path.display());
     let mut paths = BIN_PATHS.write().expect("could not lock global bin path map");
     let old = paths.insert(name.to_string(), path.clone());
     if let Some(old) = old {
-        crate::debug!("replacing old bin path: '{}'", old.display());
+        crate::trace!("replacing old bin path: '{}'", old.display());
     }
     Ok(path)
 }
@@ -127,7 +127,7 @@ pub fn find<'a, I: IntoIterator<Item=Strategy<'a>>>(name: impl AsRef<str>, strat
         return Ok(x.clone());
     }
     let path = find_with_strats(name, strats)?;
-    crate::debug!("found executable '{name}': {}", path.display());
+    crate::trace!("found executable '{name}': {}", path.display());
     paths.insert(name.to_string(), path.clone());
     Ok(path)
 }
@@ -143,8 +143,8 @@ fn find_with_strats<'a, I: IntoIterator<Item=Strategy<'a>>>(name: &str, strats: 
     };
     let mut prev = first;
     for strat in strats {
-        crate::debug!("could not finding '{name}' {prev}: {error}");
-        crate::debug!("falling back to finding '{name}' {strat}");
+        crate::trace!("could not finding '{name}' {prev}: {error}");
+        crate::trace!("falling back to finding '{name}' {strat}");
         error = match strat.find(name) {
             Ok(x) => return Ok(x),
             Err(e) => e
@@ -152,7 +152,7 @@ fn find_with_strats<'a, I: IntoIterator<Item=Strategy<'a>>>(name: &str, strats: 
         prev = strat;
     }
 
-    crate::debug!("could not finding '{name}' {prev}: {error}");
+    crate::trace!("could not finding '{name}' {prev}: {error}");
     crate::bailand!(error!("could not find program '{name}'"));
 }
 
@@ -193,7 +193,7 @@ impl Strategy<'_> {
     fn find(&self, name: &str) -> crate::Result<PathBuf> {
         match self {
             Self::Which => {
-                crate::debug!("finding executable '{name}' in PATH");
+                crate::trace!("finding executable '{name}' in PATH");
                 match which::which(name) {
                     // which already canonicalize it, which ensures it exists
                     Ok(x) => x.normalize(),
@@ -201,11 +201,11 @@ impl Strategy<'_> {
                 }
             }
             Self::Resolve(path) => {
-                crate::debug!("finding executable '{name}' at '{}'", path.display());
+                crate::trace!("finding executable '{name}' at '{}'", path.display());
                 path.normalize_exists()
             },
             Self::EnvVar(v) => {
-                crate::debug!("finding executable '{name}' using environment variable '{v}'");
+                crate::trace!("finding executable '{name}' using environment variable '{v}'");
                 match std::env::var(v) {
                     Ok(x) if !x.is_empty() => Path::new(&x).normalize_exists(),
                     _ => crate::bail!("environment variable '{v}' not found"),
