@@ -56,31 +56,57 @@ static THREAD: LazyLock<LwThread> = LazyLock::new(|| {
             let active_count = Arc::new(AtomicUsize::new(0));
             let mut recv = recv;
             loop {
+                crate::trace!("blocking on lw thread");
                 // Block the entire runtime, until we get a task
                 let Ok(fut) = recv.recv() else {
                     break;
                 };
+                crate::trace!("inc base");
                 active_count.fetch_add(1, Ordering::SeqCst);
-                let base = tokio::spawn(fut);
+                let base = {
+                    let active_count = Arc::clone(&active_count);
+                    tokio::spawn(async move { 
+                        fut.await;
+                        crate::trace!("dec base");
+                        active_count.fetch_sub(1, Ordering::SeqCst);
+                    })
+                };
                 let polling = {
                     let active_count = Arc::clone(&active_count);
                     // a low poll rate is fine, since another task is already running
-                    const POLL_INTERVAL: Duration = Duration::from_millis(100);
                     tokio::spawn(async move {
+                        crate::trace!("loop");
+                        let mut yield_times = 0;
                         loop {
                             // if no more active tasks are running (other than us),
                             // stop polling and go back to blocking wait
-                            if active_count.load(Ordering::Acquire) == 0 {
+                            let ac = active_count.load(Ordering::Acquire);
+                            if ac == 0 {
                                 break;
                             }
+                            crate::trace!("try_recv");
                             match recv.try_recv() {
-                                Err(TryRecvError::Empty) => tokio::time::sleep(POLL_INTERVAL).await,
-                                Err(_) => break,
+                                Err(TryRecvError::Empty) => {
+                                    tokio::task::yield_now().await;
+                                    yield_times += 1;
+                                    // to prevent the runtime from always scheduling
+                                    // us (since it's not guaranteed)
+                                    // if yield_times > 10 {
+                                    //     tokio::time::sleep(Duration::from_millis(1)).await;
+                                    //     yield_times = 0;
+                                    // }
+                                }
+                                Err(_) => {
+                crate::trace!("disconnect");
+                                    break;
+                                }
                                 Ok(fut) => {
+                crate::trace!("inc");
                                     active_count.fetch_add(1, Ordering::SeqCst);
                                     let active_count = Arc::clone(&active_count);
                                     tokio::spawn(async move {
                                         fut.await;
+                                        crate::trace!("dec");
                                         active_count.fetch_sub(1, Ordering::SeqCst);
                                     });
                                 }

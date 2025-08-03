@@ -4,6 +4,9 @@ use std::path::{Path, PathBuf};
 use crate::Context as _;
 
 /// Extension to paths
+///
+/// Most of these are related to file system, and not purely path processing.
+/// Therefore this is tied to the `fs` feature.
 pub trait PathExtension {
     /// Get file name. Error if the file name is not UTF-8 or other error occurs
     fn file_name_str(&self) -> crate::Result<&str>;

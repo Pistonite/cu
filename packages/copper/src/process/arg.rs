@@ -3,11 +3,13 @@ use super::Command;
 
 
 /// Add arguments to the command
+#[doc(hidden)]
 pub trait Config {
     fn configure(self, command: &mut Command);
 }
 
-pub struct __ConfigFn<F>(F) where F: FnOnce(&mut Command);
+#[doc(hidden)]
+pub struct __ConfigFn<F>(pub F) where F: FnOnce(&mut Command);
 impl<F: FnOnce(&mut Command)> Config for __ConfigFn<F> {
     #[inline(always)]
     fn configure(self, command: &mut Command) {
@@ -18,12 +20,22 @@ impl<F: FnOnce(&mut Command)> Config for __ConfigFn<F> {
 /// Create a config to add multiple args of different types when building
 /// a subprocess.
 ///
+/// See [`CommandBuilder`](crate::CommandBuilder) for more info on spawning
+/// child processes.
+///
 /// # Example
 /// ```rust,no_run
+/// use std::path::Path;
+/// use cu::pre::*;
+///
+/// # fn main() -> cu::Result<()> {
 /// let path = Path::new("foo");
-/// cu::bin::which("ls").unwrap()
-///    .command()
-///    .add(cu::args![path, "-a"]);
+/// cu::which("ls")?.command()
+///    // without the macros, you can't mix `&Path` and `&str`
+///    .add(cu::args![path, "-a"])
+///    // ... more config
+/// # ;
+/// # Ok(()) }
 /// ```
 #[macro_export]
 macro_rules! args {

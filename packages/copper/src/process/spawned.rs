@@ -7,28 +7,17 @@ use crate::{co,Context as _};
 use super::pio;
 
 /// A spawned child, where the IO are drived by the light-weight thread
-pub struct LwChild<I: pio::ChildTask, O: pio::ChildTask, E: pio::ChildTask> {
+pub struct LwChild<Out: pio::ChildOutTask, Err: pio::ChildOutTask> {
     pub(crate) wait_task: co::JoinHandle<std::io::Result<ExitStatus>>,
-    pub(crate) stdin: I::Output,
     pub(crate) stdin_task: Option<co::JoinHandle<()>>,
-    pub(crate) stdout: O::Output,
+    pub(crate) stdout: Out::Output,
     pub(crate) stdout_task: Option<co::JoinHandle<()>>,
-    pub(crate) stderr: E::Output,
+    pub(crate) stderr: Err::Output,
     pub(crate) stderr_task: Option<co::JoinHandle<()>>,
 }
 
-impl <I: pio::ChildTask, O: pio::ChildTask, E: pio::ChildTask> 
-LwChild<I,O,E> {
-    /// Access the stdin handle of the child
-    pub fn stdin(&self) -> &I::Output {
-        &self.stdin
-    }
-
-    /// Mutably access the stdin handle of the child
-    pub fn stdin_mut(&mut self) -> &mut I::Output {
-        &mut self.stdin
-    }
-
+impl <O: pio::ChildOutTask, E: pio::ChildOutTask> 
+LwChild<O,E> {
     /// Mutably access the stdout handle of the child (usually to read result)
     pub fn stdout_mut(&mut self) -> &mut O::Output {
         &mut self.stdout
@@ -51,7 +40,6 @@ LwChild<I,O,E> {
     /// Block the thread and wait for the child to finish,
     /// and return the exit status only. Output handles are discarded
     pub fn wait(self) -> crate::Result<ExitStatus> {
-        drop(self.stdin);
         // ensure the IO tasks are finished first, since blocking
         // on child could dead lock if the child is waiting for IO
         let io_panicked = co::run(async move {
@@ -83,6 +71,7 @@ LwChild<I,O,E> {
         if io_panicked {
             crate::warn!("some io tasks panicked while waiting for child process");
         }
+        crate::trace!("wait task");
         let exit_result = co::run(self.wait_task)?;
         // let exit_result = self.wait_task.join()?;
         exit_result.context("io error while joining a child process")

@@ -5,7 +5,7 @@ use tokio::process::{ChildStderr, ChildStdout};
 
 use crate::{print::Lv, BoxedFuture, ProgressBar, Atomic};
 
-use super::{ChildOutConfig, ChildTask, Command, Child, Driver, DriverOutput};
+use super::{ChildOutConfig, ChildOutTask, Command, Child, Driver, DriverOutput};
 
 /// Display child process's status as a progress bar spinner.
 ///
@@ -49,7 +49,6 @@ use super::{ChildOutConfig, ChildTask, Command, Child, Driver, DriverOutput};
 pub fn spinner(name: impl Into<String>) -> Spinner { 
     Spinner {
         prefix: name.into(),
-        name: String::new(),
         config: Arc::new(
             SpinnerConfig { 
                 lv: Atomic::new_u8(Lv::Off as u8),
@@ -63,8 +62,6 @@ pub fn spinner(name: impl Into<String>) -> Spinner {
 pub struct Spinner {
     /// prefix of the bar
     prefix: String,
-    /// name of the process (when printing, not used in the bar)
-    name: String,
 
     config: Arc<SpinnerConfig>
 }
@@ -101,25 +98,21 @@ pub struct SpinnerTask {
     err: Option<ChildStderr>,
 }
 impl ChildOutConfig for Spinner {
-    type Output = SpinnerTask;
+    type Task = SpinnerTask;
     fn configure_stdout(&mut self, command: &mut Command) {
         command.stdout(std::process::Stdio::piped());
-        // self.1.out.store(true, Ordering::Release);
     }
     fn configure_stderr(&mut self, command: &mut Command) {
         command.stderr(std::process::Stdio::piped());
-        // self.1.err.store(true, Ordering::Release);
     }
-    fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
-    }
-    fn take(self, child: &mut Child, is_out: bool) -> Self::Output {
+    fn take(self, child: &mut Child, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
         let lv= self.config.lv.get();
         let log_prefix = if crate::log_enabled(lv) {
-            if self.name.is_empty() {
+            let name = name.unwrap_or_default();
+            if name.is_empty() {
                 String::new()
             } else {
-                format!("[{}] ", self.name)
+                format!("[{name}] " )
             }
         } else {
             String::new()
@@ -134,16 +127,16 @@ impl ChildOutConfig for Spinner {
                 bar
             }
         };
-        SpinnerTask {
+        Ok(SpinnerTask {
             lv,
             prefix: log_prefix,
             bar,
             out: if is_out { child.stdout.take() } else { None },
             err: if !is_out { child.stderr.take() } else { None },
-        }
+        })
     }
 }
-impl ChildTask for SpinnerTask {
+impl ChildOutTask for SpinnerTask {
     type Output = ();
 
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output) {

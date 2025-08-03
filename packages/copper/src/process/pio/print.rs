@@ -4,10 +4,10 @@ use tokio::process::{ChildStderr, ChildStdout};
 use crate::print::Lv;
 use crate::BoxedFuture;
 
-use super::{ChildOutConfig, ChildTask, Command, Child, DriverOutput, Driver};
+use super::{ChildOutConfig, ChildOutTask, Command, Child, DriverOutput, Driver};
 
 impl ChildOutConfig for Lv {
-    type Output = PrintTask;
+    type Task = PrintTask;
 
     fn configure_stdout(&mut self, command: &mut Command) {
         command.stdout(std::process::Stdio::piped());
@@ -17,16 +17,33 @@ impl ChildOutConfig for Lv {
         command.stderr(std::process::Stdio::piped());
     }
 
-    fn set_name(&mut self, name: &str) {
-        todo!()
-        
-    }
+    fn take(self, child: &mut Child, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+        let name = name.unwrap_or_default();
+        let prefix = if !name.is_empty() {
+            format!("[{name}] ")
+        } else {
+            String::new()
+        };
 
-    fn take(self, child: &mut Child, _: bool) -> Self::Output {
-        todo!()
+        if is_out {
+            Ok(PrintTask {
+                lv: self,
+                prefix,
+                out: child.stdout.take(),
+                err: None
+            })
+        } else {
+            Ok(PrintTask {
+                lv: self,
+                prefix,
+                out: None,
+                err: child.stderr.take()
+            })
+        }
     }
 
 }
+
 
 pub struct PrintTask {
     lv: Lv,
@@ -34,7 +51,7 @@ pub struct PrintTask {
     out: Option<ChildStdout>,
     err: Option<ChildStderr>,
 }
-impl ChildTask for PrintTask {
+impl ChildOutTask for PrintTask {
     type Output = ();
 
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output) {
