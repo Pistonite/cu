@@ -177,9 +177,14 @@ impl<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig>
         if log_enabled {
             let command = self.command.as_std();
             let _ = write!(&mut trace, "spawning '{}', args: [", command.get_program().display());
-            for arg in command.get_args() {
-                let arg = arg.display().to_string().replace('\'', "\\'");
+            let mut args = command.get_args();
+            if let Some(a) = args.next() {
+                let arg = a.display().to_string().replace('\'', "\\'");
                 let _ = write!(&mut trace, "'{arg}'");
+            }
+            for arg in args {
+                let arg = arg.display().to_string().replace('\'', "\\'");
+                let _ = write!(&mut trace, ", '{arg}'");
             }
             let _ = write!(&mut trace, "]");
         }
@@ -213,36 +218,38 @@ impl<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig>
         self.stderr.configure_stderr(&mut self.command);
         self.stdin.configure_stdin(&mut self.command);
 
-        let mut child = self.command.spawn().with_context(move || {
-            crate::error!("failed to spawn command");
-            if !log_enabled {
-                crate::hint!("use -v to show debug info for the child process being spawned.")
-            }
-            "failed to spawn command"
-        })?;
+        let child = crate::co::spawn(async move {
+            let mut child = self.command.spawn().with_context(move || {
+                crate::error!("failed to spawn command");
+                if !log_enabled {
+                    crate::hint!("use -v to show debug info for the child process being spawned.")
+                }
+                "failed to spawn command"
+            })?;
 
-        todo!()
+            let stdout = self.stdout.take(&mut child, true);
+            let stderr = self.stderr.take(&mut child, false);
+            let stdin = self.stdin.take(&mut child);
 
-        // let stdout = self.stdout.take(&mut child);
-        // let stderr = self.stderr.take(&mut child);
-        // let stdin = self.stdin.take(&mut child);
-        //
-        // use cio::ChildTask as _;
-        // let (stdout_future, stdout) = stdout.run();
-        // let (stderr_future, stderr) = stderr.run();
-        // let (stdin_future, stdin) = stdin.run();
-        //
-        // let wait_task = crate::spawn(async move {
-        //     child.wait().await
-        // });
-        // let stdout_task = stdout_future.map(crate::spawn);
-        // let stderr_task = stderr_future.map(crate::spawn);
-        // let stdin_task = stdin_future.map(crate::spawn);
-        //
-        // let child = super::spawned_child::Child {
-        //     wait_task, stdin, stdout, stderr,
-        //     stdin_task, stdout_task, stderr_task
-        // };
-        // Ok(child)
+            use pio::ChildTask as _;
+            let (stdout_future, stdout) = stdout.run();
+            let (stderr_future, stderr) = stderr.run();
+            let (stdin_future, stdin) = stdin.run();
+
+            let wait_task = tokio::spawn(async move {
+                child.wait().await
+            });
+            let stdout_task = stdout_future.map(tokio::spawn);
+            let stderr_task = stderr_future.map(tokio::spawn);
+            let stdin_task = stdin_future.map(tokio::spawn);
+
+            crate::Ok(super::spawned::LwChild {
+                wait_task, stdin, stdout, stderr,
+                stdin_task, stdout_task, stderr_task
+            })
+        });
+        let child = child.join().context("failed to join the spawning task")??;
+        Ok(child)
+            
     }
 }

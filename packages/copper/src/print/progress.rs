@@ -269,7 +269,7 @@ impl ProgressBarState {
                 width -= 1;
             }
         } else {
-            if width > 1 {
+            if !self.message.is_empty() && width > 1 {
                 out.push_str(": ");
                 width -= 2;
             }

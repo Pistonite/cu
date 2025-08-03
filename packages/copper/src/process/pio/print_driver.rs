@@ -144,7 +144,8 @@ impl Driver {
     fn process(buf: &[u8], out: &mut String, line: &mut String) -> (usize, bool) {
         use crate::print::{utf8, ansi};
         let mut i = 0;
-        let mut is_escaping = false;
+        let mut invalid_while_escaping = false;
+        let mut start_escape_pos: Option<usize> = None;
         line.clear();
         let mut full_line = false;
         
@@ -153,7 +154,8 @@ impl Driver {
             match utf8::decode_char(&buf[i..]) {
                 Err(true) => {
                     // invalid, skip one
-                    i += 1
+                    i += 1;
+                    invalid_while_escaping = true;
                 }
                 Err(false) => {
                     // not enough bytes
@@ -163,14 +165,22 @@ impl Driver {
                     i += l;
                     let prev = last;
                     last = c;
-                    if is_escaping {
+                    if let Some(s) = start_escape_pos {
                         if ansi::is_ansi_end_char(c) {
-                            is_escaping = false;
+                            start_escape_pos = None;
+                            // allow color codes
+                            if !invalid_while_escaping && c == 'm' {
+                                // safety: !invalid_while_escaping tells us the range is checked
+                                let escape = unsafe { str::from_utf8_unchecked(&buf[s..i]) };
+                                out.push_str(escape);
+                            }
                         }
                         continue;
                     }
                     if c == '\x1b' {
-                        is_escaping = true;
+                        debug_assert_eq!(l, 1);
+                        invalid_while_escaping = false;
+                        start_escape_pos = Some(i - 1);
                         continue;
                     }
                     if c == '\r' || c == '\n' {

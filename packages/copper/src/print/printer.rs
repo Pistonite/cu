@@ -193,7 +193,7 @@ impl Printer {
             Lv::Print => self.colors.reset,
             Lv::Warn => self.colors.yellow,
             Lv::Info => self.colors.reset,
-            Lv::Debug => self.colors.gray,
+            Lv::Debug => self.colors.cyan,
             Lv::Trace => self.colors.magenta,
         };
         self.format_buffer.reset(self.colors.gray, text_color);
@@ -260,7 +260,7 @@ impl Printer {
 
     /// Format and print a progress bar done message
     pub(crate) fn print_bar_done(&mut self, message: &str) {
-        if PRINT_LEVEL.get() >= PrintLevel::Normal {
+        if PRINT_LEVEL.get() < PrintLevel::Normal {
             return;
         }
         self.format_buffer
@@ -384,9 +384,15 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
     use std::fmt::Write as _;
 
     // 50ms between each cycle
-    const INTERVAL: Duration = Duration::from_millis(50);
-    const CHARS: [char; 6] = [
-        '\u{280b}', '\u{2819}', '\u{2838}', '\u{2834}', '\u{2826}', '\u{2807}',
+    const INTERVAL: Duration = Duration::from_millis(10);
+    #[rustfmt::skip]
+    const CHARS: [char; 30] = [
+        '\u{280b}', '\u{280b}', '\u{280b}', '\u{280b}', '\u{280b}', 
+        '\u{2819}', '\u{2819}', '\u{2819}', '\u{2819}', '\u{2819}', 
+        '\u{2838}', '\u{2838}', '\u{2838}', '\u{2838}', '\u{2838}', 
+        '\u{2834}', '\u{2834}', '\u{2834}', '\u{2834}', '\u{2834}', 
+        '\u{2826}', '\u{2826}', '\u{2826}', '\u{2826}', '\u{2826}', 
+        '\u{2807}', '\u{2807}', '\u{2807}', '\u{2807}', '\u{2807}',
     ];
 
     // main printer loop, also serves as RAII for printer lock
@@ -450,7 +456,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
         let mut more_bars = -max_bars;
         buffer.push_str(printer.colors.yellow);
         *lines = 0;
-        let anime = CHARS[tick % 6];
+        let anime = CHARS[tick % CHARS.len()];
         printer.bars.retain(|bar| {
             let Some(bar) = bar.upgrade() else {
                 return false;

@@ -1,36 +1,96 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use spin::mutex::SpinMutex;
 use tokio::process::{ChildStderr, ChildStdout};
 
 use crate::{print::Lv, BoxedFuture, ProgressBar, Atomic};
 
 use super::{ChildOutConfig, ChildTask, Command, Child, Driver, DriverOutput};
 
+/// Display child process's status as a progress bar spinner.
+///
+/// # Example
+/// Spawn a `git-clone` process, and use a spinner to show progress updates.
+/// ```rust,no_run
+/// # fn main() -> cu::Result<()> {
+/// cu::which("git")?.command()
+///     .args(["clone", "--progress", "https://example1.git"])
+///     // stdout should be empty, but if there are any messages,
+///     // we will print them
+///     .stdout(cu::lv::P)
+///     // use spinner to show the bar
+///     .stderr(cu::pio::spinner("cloning example1"))
+///     .stdin(cu::pio::null())
+///     .wait_nz()?;
+/// # Ok(()) }
+/// ```
+///
+/// # Behavior
+/// The stream is splited into lines by `\r` and `\n` (`\r\n` is turned into single `\n`).
+/// If the line ends with `\r`, it's considered a progress update.
+/// 
+/// By default, no matter if the line ends with `\r`, the bar will be updated
+/// with the line. You can also configure the bar to only display
+/// updates (end with `\r`), and print the other messages (end with `\n`)
+/// as normal messages.
+///
+/// ```rust,no_run
+/// # fn main() -> cu::Result<()> {
+/// cu::which("git")?.command()
+///     .args(["clone", "--progress", "https://example1.git"])
+///     // feed both stdout and stderr into the same bar
+///     // when a progress update is done, it will also be printed as
+///     // an info message
+///     .stdboth(cu::pio::spinner("cloning example1").info())
+///     .stdin(cu::pio::null())
+///     .wait_nz()?;
+/// # Ok(()) }
+/// ```
+pub fn spinner(name: impl Into<String>) -> Spinner { 
+    Spinner {
+        prefix: name.into(),
+        name: String::new(),
+        config: Arc::new(
+            SpinnerConfig { 
+                lv: Atomic::new_u8(Lv::Off as u8),
+                bar: SpinMutex::new(None)
+            })
+    }
+}
+
 #[derive(Clone)]
 #[doc(hidden)]
-pub struct Spinner(String, Arc<SpinnerConfig>);
+pub struct Spinner {
+    /// prefix of the bar
+    prefix: String,
+    /// name of the process (when printing, not used in the bar)
+    name: String,
+
+    config: Arc<SpinnerConfig>
+}
 #[rustfmt::skip]
 impl Spinner {
     /// Print any non-progress outputs as error messages
-    pub fn error(self) -> Self { self.1.lv.set(crate::lv::E); self }
+    pub fn error(self) -> Self { self.config.lv.set(crate::lv::E); self }
     /// Print any non-progress outputs as hint messages
-    pub fn hint(self) -> Self { self.1.lv.set(crate::lv::H); self }
+    pub fn hint(self) -> Self { self.config.lv.set(crate::lv::H); self }
     /// Print any non-progress outputs as print messages
-    pub fn print(self) -> Self { self.1.lv.set(crate::lv::P); self }
+    pub fn print(self) -> Self { self.config.lv.set(crate::lv::P); self }
     /// Print any non-progress outputs as warning messages
-    pub fn warn(self) -> Self { self.1.lv.set(crate::lv::W); self }
+    pub fn warn(self) -> Self { self.config.lv.set(crate::lv::W); self }
     /// Print any non-progress outputs as info messages
-    pub fn info(self) -> Self { self.1.lv.set(crate::lv::I); self }
+    pub fn info(self) -> Self { self.config.lv.set(crate::lv::I); self }
     /// Print any non-progress outputs as debug messages
-    pub fn debug(self) -> Self { self.1.lv.set(crate::lv::D); self }
+    pub fn debug(self) -> Self { self.config.lv.set(crate::lv::D); self }
     /// Print any non-progress outputs as trace messages
-    pub fn trace(self) -> Self { self.1.lv.set(crate::lv::T); self }
+    pub fn trace(self) -> Self { self.config.lv.set(crate::lv::T); self }
 }
 struct SpinnerConfig {
     lv: Atomic<u8, Lv>,
-    out: AtomicBool,
-    err: AtomicBool,
+    // the bar spawned when calling take() for the first time,
+    // using a spin lock because it should be VERY rare that
+    // we get contention
+    bar: SpinMutex<Option<Arc<ProgressBar>>>
 }
 #[doc(hidden)]
 pub struct SpinnerTask {
@@ -40,45 +100,46 @@ pub struct SpinnerTask {
     out: Option<ChildStdout>,
     err: Option<ChildStderr>,
 }
-pub fn spinner(name: impl Into<String>) -> Spinner { 
-    Spinner(name.into(), Arc::new(SpinnerConfig { 
-        lv: Atomic::new_u8(Lv::Off as u8),
-        out: AtomicBool::new(false), err: AtomicBool::new(false) 
-    }))
-}
 impl ChildOutConfig for Spinner {
     type Output = SpinnerTask;
     fn configure_stdout(&mut self, command: &mut Command) {
         command.stdout(std::process::Stdio::piped());
-        self.1.out.store(true, Ordering::Release);
+        // self.1.out.store(true, Ordering::Release);
     }
     fn configure_stderr(&mut self, command: &mut Command) {
         command.stderr(std::process::Stdio::piped());
-        self.1.err.store(true, Ordering::Release);
+        // self.1.err.store(true, Ordering::Release);
     }
     fn set_name(&mut self, name: &str) {
-        self.0 = name.to_string();
+        self.name = name.to_string();
     }
-    fn take(self, child: &mut Child, _: bool) -> Self::Output {
-        let out = self.1.out.load(Ordering::Acquire);
-        let err = self.1.err.load(Ordering::Acquire);
-        let lv= self.1.lv.get();
-        let prefix = if crate::log_enabled(lv) {
-            if self.0.is_empty() {
+    fn take(self, child: &mut Child, is_out: bool) -> Self::Output {
+        let lv= self.config.lv.get();
+        let log_prefix = if crate::log_enabled(lv) {
+            if self.name.is_empty() {
                 String::new()
             } else {
-                format!("[{}] ", self.0)
+                format!("[{}] ", self.name)
             }
         } else {
             String::new()
         };
-        let bar = crate::progress_unbounded(self.0);
+        let bar = {
+            let mut bar_arc = self.config.bar.lock();
+            if let Some(bar) = bar_arc.as_ref() {
+                Arc::clone(bar)
+            } else {
+                let bar = crate::progress_unbounded(self.prefix);
+                *bar_arc = Some(Arc::clone(&bar));
+                bar
+            }
+        };
         SpinnerTask {
             lv,
-            prefix,
+            prefix: log_prefix,
             bar,
-            out: if out { child.stdout.take() } else { None },
-            err: if err { child.stderr.take() } else { None },
+            out: if is_out { child.stdout.take() } else { None },
+            err: if !is_out { child.stderr.take() } else { None },
         }
     }
 }
@@ -100,6 +161,8 @@ impl SpinnerTask {
                 DriverOutput::Line(line) => {
                     if lv != Lv::Off {
                         crate::__priv::__print_with_level(lv, format_args!("{prefix}{line}"));
+                        // erase the progress line if we decide to print it out
+                        crate::progress!(&bar, (), "")
                     } else {
                         crate::progress!(&bar, (), "{line}")
                     }

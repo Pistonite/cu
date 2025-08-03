@@ -23,7 +23,7 @@ macro_rules! ConfiguredChild {
 }
 pub(crate) use ConfiguredChild;
 
-pub trait ChildOutConfig {
+pub trait ChildOutConfig: Send + 'static {
     type Output: ChildTask;
     /// Configure the standard output using this config
     fn configure_stdout(&mut self, command: &mut Command);
@@ -31,14 +31,14 @@ pub trait ChildOutConfig {
     fn set_name(&mut self, name: &str);
     fn take(self, child: &mut Child, is_out: bool) -> Self::Output;
 }
-pub trait ChildInConfig {
+pub trait ChildInConfig: Send + 'static {
     type Output: ChildTask;
     /// Configure the standard input using this config
     fn configure_stdin(&mut self, command: &mut Command);
     fn take(self, child: &mut Child) -> Self::Output;
 }
 pub trait ChildTask {
-    type Output;
+    type Output: Send + 'static;
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output);
 }
 impl ChildTask for () {

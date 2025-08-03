@@ -1,18 +1,20 @@
 use std::process::ExitStatus;
 
+use tokio::task::JoinSet;
+
 use crate::{co,Context as _};
 
 use super::pio;
 
 /// A spawned child, where the IO are drived by the light-weight thread
 pub struct LwChild<I: pio::ChildTask, O: pio::ChildTask, E: pio::ChildTask> {
-    pub(crate) wait_task: co::LwHandle<std::io::Result<ExitStatus>>,
+    pub(crate) wait_task: co::JoinHandle<std::io::Result<ExitStatus>>,
     pub(crate) stdin: I::Output,
-    pub(crate) stdin_task: Option<co::LwHandle<()>>,
+    pub(crate) stdin_task: Option<co::JoinHandle<()>>,
     pub(crate) stdout: O::Output,
-    pub(crate) stdout_task: Option<co::LwHandle<()>>,
+    pub(crate) stdout_task: Option<co::JoinHandle<()>>,
     pub(crate) stderr: E::Output,
-    pub(crate) stderr_task: Option<co::LwHandle<()>>,
+    pub(crate) stderr_task: Option<co::JoinHandle<()>>,
 }
 
 impl <I: pio::ChildTask, O: pio::ChildTask, E: pio::ChildTask> 
@@ -52,18 +54,37 @@ LwChild<I,O,E> {
         drop(self.stdin);
         // ensure the IO tasks are finished first, since blocking
         // on child could dead lock if the child is waiting for IO
-        let mut handles = Vec::with_capacity(3);
-        if let Some(x) = self.stdin_task {
-            handles.push(x);
+        let io_panicked = co::run(async move {
+            let mut j = JoinSet::new();
+            if let Some(x) = self.stdin_task {
+                j.spawn(x);
+            }
+            if let Some(x) = self.stdout_task {
+                j.spawn(x);
+            }
+            if let Some(x) = self.stderr_task {
+                j.spawn(x);
+            }
+            let mut panicked = false;
+            while let Some(x) = j.join_next().await {
+                let Ok(x) = x else {
+                    // could not join because panicked
+                    panicked = true;
+                    continue;
+                };
+                let Ok(_) = x else {
+                    // could not join because panicked
+                    panicked = true;
+                    continue;
+                };
+            }
+            panicked
+        });
+        if io_panicked {
+            crate::warn!("some io tasks panicked while waiting for child process");
         }
-        if let Some(x) = self.stdout_task {
-            handles.push(x);
-        }
-        if let Some(x) = self.stderr_task {
-            handles.push(x);
-        }
-        co::join(handles);
-        let exit_result = self.wait_task.join()?;
+        let exit_result = co::run(self.wait_task)?;
+        // let exit_result = self.wait_task.join()?;
         exit_result.context("io error while joining a child process")
     }
 }

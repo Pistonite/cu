@@ -1,13 +1,13 @@
 use std::time::Duration;
 
 #[derive(cu::cli::Parser, Clone)]
-struct Flags {
+struct Args {
     #[clap(flatten)]
     inner: cu::cli::Flags
 }
 /// Run with cargo run --example print --features prompt
 #[cu::cli(flags = "inner")]
-fn main(_: Flags) -> cu::Result<()> {
+fn main(_: Args) -> cu::Result<()> {
     cu::print!("today's weather is {}", "good");
     cu::hint!("today's weather is {}", "ok");
     cu::info!(
