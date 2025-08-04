@@ -10,7 +10,8 @@ pub(crate) struct Driver {
     out_i: usize,
     err_i: usize,
     buffer: Box<[u8; 1024]>,
-    line_buf: String
+    line_buf: String,
+    only_last_line: bool
 }
 pub(crate) enum DriverOutput<'a> {
     /// A non-empty line ending with a line break
@@ -37,7 +38,7 @@ impl<'a> DriverOutput<'a> {
     }
 }
 impl Driver {
-    pub fn new(out: Option<ChildStdout>, err: Option<ChildStderr>) -> Self {
+    pub fn new(out: Option<ChildStdout>, err: Option<ChildStderr>, only_last_line: bool) -> Self {
         Self {
             out,
             out_buf: String::new(),
@@ -46,7 +47,8 @@ impl Driver {
             out_i: 0,
             err_i: 0,
             buffer: Box::new([0u8; 1024]),
-            line_buf: String::new()
+            line_buf: String::new(),
+            only_last_line
         }
     }
     /// Return the next line and whether it has a line break
@@ -61,7 +63,7 @@ impl Driver {
                     Ok(n) => {
                         let end = self.err_i +n;
                         let slice = &self.buffer.as_ref()[..end];
-                        let (b, lf) = Self::process(slice, &mut self.err_buf, &mut self.line_buf);
+                        let (b, lf) = Self::process(slice, &mut self.err_buf, &mut self.line_buf, self.only_last_line);
                         let buf_mut = self.buffer.as_mut();
                         // shift the remaining section of buf
                         for i in b..end {
@@ -79,7 +81,7 @@ impl Driver {
                     Ok(n) => {
                         let end = self.out_i +n;
                         let slice = &self.buffer.as_ref()[..end];
-                        let (b, lf) = Self::process(slice, &mut self.out_buf, &mut self.line_buf);
+                        let (b, lf) = Self::process(slice, &mut self.out_buf, &mut self.line_buf, self.only_last_line);
                         let buf_mut = self.buffer.as_mut();
                         // shift the remaining section of buf
                         for i in b..end {
@@ -107,7 +109,7 @@ impl Driver {
                         Ok(n) => {
                             let end = self.out_i +n;
                             let slice = &buf_o[..end];
-                            let (b, lf) = Self::process(slice, &mut self.out_buf, &mut self.line_buf);
+                            let (b, lf) = Self::process(slice, &mut self.out_buf, &mut self.line_buf, self.only_last_line);
                             // shift the remaining section of buf
                             for i in b..end {
                                 buf_o[i-b] = buf_o[i];
@@ -124,7 +126,7 @@ impl Driver {
                             Ok(n) => {
                                 let end = self.err_i +n;
                                 let slice = &buf_e[..end];
-                                let (b, lf) = Self::process(slice, &mut self.err_buf, &mut self.line_buf);
+                                let (b, lf) = Self::process(slice, &mut self.err_buf, &mut self.line_buf, self.only_last_line);
                                 // shift the remaining section of buf
                                 for i in b..end {
                                     buf_e[i-b] = buf_e[i];
@@ -141,7 +143,7 @@ impl Driver {
     // out will contain the remaining characters that's not a line,
     // and line will contain the last non-empty line after stripping
     // return how many bytes from buf are used and if the line is ends with `\n`
-    fn process(buf: &[u8], out: &mut String, line: &mut String) -> (usize, bool) {
+    fn process(buf: &[u8], out: &mut String, line: &mut String, only_last_line: bool) -> (usize, bool) {
         use crate::print::{utf8, ansi};
         let mut i = 0;
         let mut invalid_while_escaping = false;
@@ -187,7 +189,11 @@ impl Driver {
                         if c == '\n' && prev == '\r' {
                             full_line = true;
                         } else {
-                            line.clear();
+                            if only_last_line || !full_line {
+                                line.clear();
+                            } else {
+                                line.push('\n');
+                            }
                             line.push_str(out);
                             full_line = c == '\n';
                         }

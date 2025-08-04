@@ -119,4 +119,4 @@
 //! }
 //! ```
 
-pub use crate::async_::{Handle, AbortHandle, RobustHandle, RobustAbortHandle, Pool, spawn, run, co_spawn};
+pub use crate::async_::{Handle, AbortHandle, RobustHandle, RobustAbortHandle, Pool, spawn, run, co_spawn, run_bg};

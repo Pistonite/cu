@@ -6,7 +6,7 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0.98"
-copper-proc-macros = { path = "../copper-proc-macros" }
+copper-proc-macros = { path = "../copper-proc-macros", optional = true }
 env_filter = "0.1.3"
 log = "0.4.27"
 oneshot = "0.1.11"
@@ -20,7 +20,7 @@ spin = "0.10.0"
 
 [dependencies.tokio]
 version = "1.47.0" 
-features = ["io-std", "io-util", "macros", "process", "rt", "sync", "time"]
+features = [ "macros", "rt-multi-thread" ]
 optional = true
 
 [dependencies.clap]
@@ -38,15 +38,18 @@ full = [
 ]
 
 # Command Line Interface (enables integration with `clap` and command line entry points)
-cli = ["dep:clap"]
+cli = ["dep:clap", "dep:copper-proc-macros"]
 # Utils to show prompt for user input in terminal
 prompt = []
 # Enable coroutine drivers, which allow interop with async
 coroutine = ["dep:tokio"]
 # Enable heavy coroutine drived by multi-threaded tokio runtime
-coroutine-heavy = ["coroutine", "tokio/rt-multi-thread"]
+coroutine-heavy = ["coroutine"]
 # Enable spawning child processes
-process = ["coroutine", "fs"]
+process = [
+    "coroutine", "fs",
+    "tokio/process", "tokio/sync", "tokio/io-std", "tokio/io-util"
+]
 # Enable file system and path util
 fs = ["dep:which", "dep:pathdiff", "dep:dunce"]
 

@@ -60,6 +60,16 @@ where
     RUNTIME.block_on(future)
 }
 
+/// Run an async task using the background runtime
+#[inline]
+pub fn run_bg<F>(future: F) -> F::Output
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static {
+
+    BACKGROUND_RUNTIME.block_on(future)
+}
+
 /// Join handle for async task
 ///
 /// This is a wrapper around `tokio`'s `JoinHandle` type.

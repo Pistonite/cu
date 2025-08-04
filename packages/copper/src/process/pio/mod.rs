@@ -1,35 +1,70 @@
-use std::{io::Cursor, sync::{atomic::{AtomicBool, Ordering}, Arc}};
+use std::process::Stdio;
 
-use crate::{print::Lv, BoxedFuture, ProgressBar};
+use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
-use super::{Command, Child};
+use crate::BoxedFuture;
 
 mod spinner;
-pub use spinner::*;
 mod print;
 mod pipe;
-pub use pipe::*;
+mod read;
+
+/// internal task types used in trait implementations
+pub mod config {
+    pub use super::spinner::Spinner as Spinner;
+    pub use super::pipe::Pipe as Pipe;
+    pub use super::read::Buffer as Buffer;
+    pub use super::read::BufferString as String;
+    pub use super::read::Lines as Lines;
+    pub use super::read::CoLines as CoLines;
+}
+
+/// internal task types used in trait implementations
+pub mod task {
+    pub use super::spinner::SpinnerTask as Spinner;
+    pub use super::print::PrintTask as Print;
+    pub use super::pipe::PipeTask as Pipe;
+    pub use super::read::BufferTask as Buffer;
+    pub use super::read::BufferStringTask as String;
+    pub use super::read::LinesTask as Lines;
+    pub use super::read::CoLinesTask as CoLines;
+}
+
+/// internal output types used in trait implementations
+pub mod output {
+    pub use super::pipe::PipeOutput as Pipe;
+    pub use super::read::LinesOutput as Lines;
+    pub use super::read::CoLinesOutput as CoLines;
+}
+
+// internal re-exports
+pub use output::{Pipe, Lines, CoLines};
+// factory re-exports
+pub use spinner::spinner;
+pub use pipe::pipe;
+pub use read::{buffer, string, lines, co_lines};
 
 mod print_driver;
 use print_driver::*;
 
-macro_rules! ConfiguredChild {
-    ($Out:ident, $Err:ident) => {
-        $crate::process::spawned::LwChild<
-            <$Out as $crate::process::pio::ChildOutConfig>::Task,
-            <$Err as $crate::process::pio::ChildOutConfig>::Task
-        >
-        
-    };
-}
-pub(crate) use ConfiguredChild;
-
+/// Configuration for process output to be used with 
+/// [`Command::stdout`] and [`Command::stderr`]
+///
+/// This is essentially a marker, that is used to create tasks
+/// when spawning the child to drive the IO. See [`ChildOutTask`].
+///
+/// See [module documentation](self) for list of available configs
+///
+/// [`Command::stdout`]: crate::Command::stdout
+/// [`Command::stderr`]: crate::Command::stderr
 pub trait ChildOutConfig: Send + 'static {
     type Task: ChildOutTask;
+    #[doc(hidden)]
+    type __Null;
     /// Configure the standard output using this config, called before spawning
-    fn configure_stdout(&mut self, command: &mut Command);
+    fn configure_stdout(&mut self, command: &mut TokioCommand);
     /// Configure the standard error using this config, called before spawning
-    fn configure_stderr(&mut self, command: &mut Command);
+    fn configure_stderr(&mut self, command: &mut TokioCommand);
 
     // === once tokio exposes a way for us to take from StdChild, this could be
     // used to optimize pipes
@@ -42,20 +77,42 @@ pub trait ChildOutConfig: Send + 'static {
     // }
 
     /// Take the bits needed for this out config from the child
-    fn take(self, child: &mut Child, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task>;
+    fn take(self, child: &mut TokioChild, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task>;
 }
+
+/// Configuration for process input to be used with 
+/// [`Command::stdin`]
+///
+/// This is essentially a marker, that is used to create tasks
+/// when spawning the child to drive the IO. See [`ChildInTask`]
+///
+/// See [module documentation](self) for list of available configs
+///
+/// [`Command::stdin`]: crate::Command::stdin
 pub trait ChildInConfig: Send + 'static {
     type Task: ChildInTask;
     /// Configure the standard input using this config
-    fn configure_stdin(&mut self, command: &mut Command) -> crate::Result<()>;
+    fn configure_stdin(&mut self, command: &mut TokioCommand) -> crate::Result<()>;
     /// Take the bits needed for this in config from the child
-    fn take(self, child: &mut Child) -> crate::Result<Self::Task>;
+    fn take(self, child: &mut TokioChild) -> crate::Result<Self::Task>;
 }
+
+/// Task created by [`ChildOutConfig`]
 pub trait ChildOutTask {
     type Output: Send + 'static;
+
+    /// Run the task.
+    ///
+    /// The first return value is a future that will be spawned on the runtime
+    /// and driven internally. The output is accessible by the user.
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output);
 }
+/// Task created by [`ChildInConfig`]
 pub trait ChildInTask {
+    /// Run the task.
+    ///
+    /// Return a future that will be spawned internally to drive writing
+    /// data to the child.
     fn run(self) -> Option<BoxedFuture<()>>;
 }
 impl ChildOutTask for () {
@@ -70,48 +127,81 @@ impl ChildInTask for () {
     }
 }
 
+// #[doc(hidden)]
+// pub(crate) trait __OutConfigType : ChildOutConfig {
+//     type Null;
+// }
+// // #[doc(hidden)]
+// // pub(crate) trait __OutConfigTypeNull {}
+#[doc(hidden)]
+pub struct __OCNull;
+#[doc(hidden)]
+pub struct __OCNonNull;
+// // #[doc(hidden)]
+// // impl __OCNull for __
+
 #[derive(Clone, Copy)]
+#[doc(hidden)]
 pub struct Inherit;
 /// Inherit the parent's stdin, stdout, or stderr.
 pub fn inherit() -> Inherit { Inherit }
 impl ChildOutConfig for Inherit {
     type Task = ();
-    fn configure_stdout(&mut self, command: &mut Command) {
-        command.stdout(std::process::Stdio::inherit());
+    type __Null = __OCNull;
+    fn configure_stdout(&mut self, command: &mut TokioCommand) {
+        command.stdout(Stdio::inherit());
     }
-    fn configure_stderr(&mut self, command: &mut Command) {
-        command.stderr(std::process::Stdio::inherit());
+    fn configure_stderr(&mut self, command: &mut TokioCommand) {
+        command.stderr(Stdio::inherit());
     }
-    fn take(self, _: &mut Child, _: Option<&str>, _: bool) -> crate::Result<()> { Ok(()) }
+    fn take(self, _: &mut TokioChild, _: Option<&str>, _: bool) -> crate::Result<()> { Ok(()) }
 }
 impl ChildInConfig for Inherit {
     type Task = ();
-    fn configure_stdin(&mut self, command: &mut Command) -> crate::Result<()> {
-        command.stdin(std::process::Stdio::inherit());
+    fn configure_stdin(&mut self, command: &mut TokioCommand) -> crate::Result<()> {
+        command.stdin(Stdio::inherit());
         Ok(())
     }
-    fn take(self, _: &mut Child) -> crate::Result<()> { Ok(()) }
+    fn take(self, _: &mut TokioChild) -> crate::Result<()> { Ok(()) }
 }
 #[derive(Clone, Copy)]
+#[doc(hidden)]
 pub struct Null;
 /// Direct the stream to null (i.e. ignore it)
 pub fn null() -> Null { Null }
 impl ChildOutConfig for Null {
     type Task = ();
-    fn configure_stdout(&mut self, command: &mut Command) {
-        command.stdout(std::process::Stdio::null());
+    type __Null = __OCNull;
+    fn configure_stdout(&mut self, command: &mut TokioCommand) {
+        command.stdout(Stdio::null());
     }
-    fn configure_stderr(&mut self, command: &mut Command) {
-        command.stderr(std::process::Stdio::null());
+    fn configure_stderr(&mut self, command: &mut TokioCommand) {
+        command.stderr(Stdio::null());
     }
-    fn take(self, _: &mut Child, _: Option<&str>, _: bool) -> crate::Result<()> { Ok(()) }
+    fn take(self, _: &mut TokioChild, _: Option<&str>, _: bool) -> crate::Result<()> { Ok(()) }
 }
 impl ChildInConfig for Null {
     type Task = ();
-    fn configure_stdin(&mut self, command: &mut Command) -> crate::Result<()> {
-        command.stdin(std::process::Stdio::null());
+    fn configure_stdin(&mut self, command: &mut TokioCommand) -> crate::Result<()> {
+        command.stdin(Stdio::null());
         Ok(())
     }
-    fn take(self, _: &mut Child) -> crate::Result<()> { Ok(()) }
+    fn take(self, _: &mut TokioChild) -> crate::Result<()> { Ok(()) }
 }
 
+pub struct Stdout<T>(pub T);
+pub struct Stderr<T>(pub T);
+
+pub(crate) fn take_child_out(child: &mut TokioChild, is_out: bool) -> crate::Result<Result<ChildStdout, ChildStderr>> {
+    if is_out {
+        let Some(stdout) = child.stdout.take() else {
+            crate::bail!("unexpected: failed to take stdout from child");
+        };
+        Ok(Ok(stdout))
+    } else {
+        let Some(stderr) = child.stderr.take() else {
+            crate::bail!("unexpected: failed to take stderr from child");
+        };
+        Ok(Err(stderr))
+    }
+}

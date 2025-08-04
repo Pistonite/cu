@@ -116,7 +116,7 @@
 //! ```
 //!
 //! The `process` feature enables spawning child process and integrate IO with the child
-//! into the printing utils in this crate. See [`CommandBuilder`] for more info.
+//! into the printing utils in this crate. See [`Command`] for more info.
 
 #![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_auto_cfg))]
 
@@ -131,7 +131,7 @@
 #[cfg(feature="process")]
 mod process;
 #[cfg(feature="process")]
-pub use process::{pio, CommandBuilder, CommandBuilderDefault};
+pub use process::{pio, CommandBuilder, Command, Child, Spawn, color_flag, color_flag_eq, width_flag, width_flag_eq};
 
 #[cfg(feature="fs")]
 pub mod bin;
@@ -199,7 +199,7 @@ mod misc;
 pub use misc::*;
 
 // re-exports from libraries
-pub use anyhow::{Context, Result, bail, ensure, Ok};
+pub use anyhow::{Context, Result, bail, ensure, Ok, anyhow as err};
 pub use log::{debug, error, info, trace, warn};
 
 #[doc(hidden)]
@@ -214,4 +214,6 @@ pub mod pre {
     pub use crate::Context as _;
     #[cfg(feature="fs")]
     pub use crate::PathExtension as _;
+    #[cfg(feature="process")]
+    pub use crate::Spawn as _;
 }

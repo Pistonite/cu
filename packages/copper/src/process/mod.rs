@@ -4,4 +4,5 @@ mod builder;
 pub use builder::*;
 pub mod pio;
 mod child;
+pub use child::*;
 

@@ -2,8 +2,9 @@ use std::path::PathBuf;
 use std::ffi::OsStr;
 
 use tokio::process::Command as TokioCommand;
+use tokio::task::JoinSet;
 
-use super::Config;
+use super::{Config, Child};
 
 use crate::{co, pio, Context as _, PathExtension as _};
 
@@ -13,7 +14,7 @@ pub type CommandBuilder = Command<(), (), ()>;
 /// Builder for spawning a child process.
 ///
 /// You can use the `command()` function on `Path` or `PathBuf`
-/// to create a CommandBuilder.
+/// to create a `CommandBuilder`.
 ///
 /// ```rust,no_run
 /// use std::path::Path;
@@ -27,7 +28,7 @@ pub type CommandBuilder = Command<(), (), ()>;
 /// ```
 ///
 /// # Configuration
-/// Configuring a `CommandBuilder` is much like configuring `Command`
+/// Configuring a `cu::Command` is much like configuring `Command`
 /// from `std` or `tokio`. Notable features are:
 /// - Use [`cu::args`](crate::args) and [`cu::envs`](crate::envs) macro
 ///   to enable adding multiple args or envs of different type in the same call.
@@ -57,12 +58,40 @@ pub struct Command<Out, Err, In> {
     stdin: In,
 }
 
+impl CommandBuilder {
+    /// Start building a command. If the arg is a `Path` or `PathBuf`,
+    /// you can also call `.command()` on it (remember to import prelude)
+    ///
+    /// ```rust
+    /// use cu::pre::*;
+    ///
+    /// # fn main() -> cu::Result<()> {
+    /// let command = cu::CommandBuilder::new("git");
+    /// // or: 
+    /// let command = std::path::Path::new("git").command();
+    /// // even better, find the executable in PATH using the crate's
+    /// // binary registry
+    /// let command = cu::which("git")?.command();
+    /// # Ok(()) }
+    /// ```
+    pub fn new(bin: impl AsRef<OsStr>) -> Self {
+        Self { 
+            command: TokioCommand::new(bin),
+            name: None,
+            current_dir: None,
+            stdout: (),
+            stderr: (),
+            stdin: ()
+        }
+    }
+}
+
 // expose functions from tokio/std
 #[rustfmt::skip]
 impl<Out, Err, In> Command<Out, Err, In> {
     /// Add one argument
     ///
-    /// Use [`Self::args`] or [`args`] macro to add more than one arguments
+    /// Use [`Self::args`] or [`args`](crate::args) macro to add more than one arguments
     /// in one call.
     #[inline(always)]
     pub fn arg(mut self, arg: impl AsRef<OsStr>) -> Self { self.command.arg(arg); self }
@@ -71,7 +100,7 @@ impl<Out, Err, In> Command<Out, Err, In> {
     ///
     /// This only accepts iterators of a single type, which forces
     /// you to call `.as_ref()` if the input has multiple types.
-    /// To workaround this, use the [`args`] shorthand.
+    /// To workaround this, use the [`args`](crate::args) shorthand.
     #[inline(always)]
     pub fn args<I: IntoIterator<Item=S>, S:AsRef<OsStr>>(mut self, args: I) -> Self { self.command.args(args); self }
 
@@ -93,29 +122,9 @@ impl<Out, Err, In> Command<Out, Err, In> {
     ///
     /// This only accepts iterators of a single type, which forces
     /// you to call `.as_ref()` if the input has multiple types.
-    /// To workaround this, use the [`envs`] macro shorthand.
+    /// To workaround this, use the [`envs`](crate::envs) macro shorthand.
     #[inline(always)]
     pub fn envs<I: IntoIterator<Item=(K,V)>,K:AsRef<OsStr>,V:AsRef<OsStr>>(mut self, envs: I) -> Self { self.command.envs(envs); self }
-
-
-}
-
-impl CommandBuilder {
-    /// Start building a command. If the arg is a `Path` or `PathBuf`,
-    /// you can also call `.command()` on it (remember to import prelude);
-    pub fn new(bin: impl AsRef<OsStr>) -> Self {
-        Self { 
-            command: Command::new(bin),
-            name: None,
-            current_dir: None,
-            stdout: (),
-            stderr: (),
-            stdin: ()
-        }
-    }
-}
-
-impl<Out, Err, In> CommandBuilder<Out, Err, In> {
 
     /// Add more configuration. See [`args!`](crate::args) and [`envs!`](crate::envs).
     #[inline(always)]
@@ -129,14 +138,53 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
     /// Unlike `std`/`tokio` implementation, where canonicalizing the current
     /// dir is recommended, we always canonicalize the input here based on this
     /// process before spawning the child.
+    #[inline(always)]
     pub fn current_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.current_dir = Some(dir.into());
         self
     }
 
+    /// Set the name of this command, which maybe used by output config
+    /// to print in the terminal
+    #[inline(always)]
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+}
+
+// stdin
+impl<Out, Err, In> Command<Out, Err, In> {
+    /// Configure child's standard input stream
+    #[inline(always)]
+    pub fn stdin<T: pio::ChildInConfig>(self, config:T) -> Command<Out, Err, T> {
+        Command {
+            command: self.command,
+            current_dir: self.current_dir,
+            name: self.name,
+            stdout: self.stdout,
+            stderr: self.stderr,
+            stdin: config,
+        }
+    }
+
+    /// Configure child's standard input stream as [`pio::null()`]
+    #[inline(always)]
+    pub fn stdin_null(self) -> Command<Out, Err, pio::Null> {
+        self.stdin(pio::null())
+    }
+
+    /// Configure child's standard input stream to inherit from parent ([`pio::inherit()`])
+    #[inline(always)]
+    pub fn stdin_inherit(self) -> Command<Out, Err, pio::Inherit> {
+        self.stdin(pio::inherit())
+    }
+
     /// Configure child's standard output stream
-    pub fn stdout<T: pio::ChildOutConfig>(self, config: T) -> CommandBuilder<T, Err, In> {
-        CommandBuilder {
+    #[inline(always)]
+    pub fn stdout<T: pio::ChildOutConfig>(self, config: T) -> Command<T, Err, In> {
+        Command {
             command: self.command,
             current_dir: self.current_dir,
             name: self.name,
@@ -147,8 +195,9 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
     }
 
     /// Configure child's standard error stream
-    pub fn stderr<T: pio::ChildOutConfig>(self, config: T) -> CommandBuilder<Out, T, In> {
-        CommandBuilder {
+    #[inline(always)]
+    pub fn stderr<T: pio::ChildOutConfig>(self, config: T) -> Command<Out, T, In> {
+        Command {
             command: self.command,
             current_dir: self.current_dir,
             name: self.name,
@@ -159,8 +208,9 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
     }
 
     /// Configure child's both standard output and standard error with the same config
-    pub fn stdboth<T: pio::ChildOutConfig + Clone>(self, config: T) -> CommandBuilder<T, T, In> {
-        CommandBuilder {
+    #[inline(always)]
+    pub fn stdoe<T: pio::ChildOutConfig + Clone>(self, config: T) -> Command<T, T, In> {
+        Command {
             command: self.command,
             current_dir: self.current_dir,
             name: self.name,
@@ -170,108 +220,254 @@ impl<Out, Err, In> CommandBuilder<Out, Err, In> {
         }
     }
 
-    /// Configure child's standard input stream
-    pub fn stdin<T: pio::ChildInConfig>(self, config:T) -> CommandBuilder<Out, Err, T> {
-        CommandBuilder {
-            command: self.command,
-            current_dir: self.current_dir,
-            name: self.name,
-            stdout: self.stdout,
-            stderr: self.stderr,
-            stdin: config
-        }
+    /// Configure child's standard output stream as [`pio::null()`]
+    #[inline(always)]
+    pub fn stdout_null(self) -> Command<pio::Null, Err, In> {
+        self.stdout(pio::null())
     }
 
-    /// Set the name of this command, which maybe used by output config
-    /// to print in the terminal
-    pub fn name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
-        self
+    /// Configure child's standard error stream as [`pio::null()`]
+    #[inline(always)]
+    pub fn stderr_null(self) -> Command<Out, pio::Null, In> {
+        self.stderr(pio::null())
+    }
+
+    /// Configure both child's standard output and error streams as [`pio::null()`]
+    #[inline(always)]
+    pub fn stdoe_null(self) -> Command<pio::Null, pio::Null, In> {
+        self.stdoe(pio::null())
+    }
+
+    /// Configure both child's standard input and error streams as [`pio::null()`]
+    #[inline(always)]
+    pub fn stdie_null(self) -> Command<Out, pio::Null, pio::Null> {
+        self.stdin_null().stderr_null()
+    }
+
+    /// Configure both child's standard input and output streams as [`pio::null()`]
+    #[inline(always)]
+    pub fn stdio_null(self) -> Command<pio::Null, Err, pio::Null> {
+        self.stdin_null().stdout_null()
+    }
+
+    /// Configure all standard input, output and error streams as [`pio::null()`]
+    #[inline(always)]
+    pub fn all_null(self) -> Command<pio::Null, pio::Null, pio::Null> {
+        self.stdin_null().stdout_null().stderr_null()
+    }
+
+    /// Spawn the child and run the child's IO tasks in the background. **Note that
+    /// you have to configure all 3 of `stdin`, `stdout` and `stderr`, before you can spawn the
+    /// child.**
+    ///
+    /// This is safe to use both inside and outside of a tokio runtime context.
+    /// You might be wondering why there's no `co_spawn()` - This is because
+    /// it's error-prone to spawn the child using the current-thread runtime,
+    /// as child's IO are attached to the runtime that spawns it.
+    /// If the child is spawned on a current-thread runtime, then blocking
+    /// that runtime will also block its IO tasks, even if the IO tasks
+    /// are running on the background runtime! For this reason, the child is
+    /// always spawned on the background context, which means we might as
+    /// well always spawn the IO tasks on the background context too.
+    ///
+    /// # Return Value
+    /// The return type shown above is a placeholder. The actual return
+    /// value depends on the configuration for `stdout` and `stderr`,
+    /// specifically, whether they have a handle to access the output.
+    /// For example [`pio::inherit()`] or [`pio::spinner()`] don't
+    /// have handles, because the output is directly printed,
+    /// whereas [`pio::pipe()`] or [`pio::string()`] has handles for reading the output.
+    ///
+    /// - If both `stdout` and `stderr` don't have handle, then the output is [`Child`]
+    /// ```rust
+    /// use cu::pre::*; // The prelude import is required for `spawn`
+    ///
+    /// # fn main() -> cu::Result<()> {
+    /// let child = cu::which("echo")?.command()
+    ///    .arg("Hello, world!")
+    ///    .stdout(cu::lv::I) // print stdout as info level log messages
+    ///    .stdie_null()
+    ///    .spawn()?;
+    /// # Ok(()) }
+    /// ```
+    /// - Otherwise, the output is a 3-tuple ([`Child`], `Stdout`, `Stderr`),
+    ///   where `Stdout` and `Stderr` are the respective handle type for the output configured.
+    /// ```rust
+    /// use cu::pre::*; // The prelude import is required for `spawn`
+    ///
+    /// # fn main() -> cu::Result<()> {
+    /// let (child, lines, err) = cu::which("bash")?.command()
+    ///    .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"# ])
+    ///    .stdout(cu::pio::lines())
+    ///    .stderr(cu::pio::string())
+    ///    .stdin_null()
+    ///    .spawn()?;
+    /// # Ok(()) }
+    /// ```
+    /// - If `Stderr` doesn't have a handle but `Stdout` does, a 2-tuple
+    ///   is also accepted.
+    /// ```rust
+    /// use cu::pre::*; // The prelude import is required for `spawn`
+    ///
+    /// # fn main() -> cu::Result<()> {
+    /// let (child, lines) = cu::which("bash")?.command()
+    /// // let (child, lines, _) also works
+    ///    .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"# ])
+    ///    .stdout(cu::pio::lines())
+    ///    .stdie_null()
+    ///    .spawn()?;
+    /// # Ok(()) }
+    /// ```
+    #[cfg(doc)]
+    pub fn spawn(self) -> crate::Result<EitherOf<Child, (Child, Out, Err)>> {
+        panic!("this is a placeholder for documetnation, see below for implementation")
+    }
+}
+#[cfg(doc)]
+struct EitherOf<A, B>(A, B);
+
+/// This trait allows implementing different return types for [`Command::spawn`] based on the configured IO.
+pub trait Spawn<Target> {
+    fn spawn(self) -> crate::Result<Target>;
+}
+
+#[cfg(not(doc))]
+macro_rules! Spawned {
+    () => {
+        $crate::Child
+    };
+    (Out) => {
+        ( $crate::Child, 
+        <Out::Task as $crate::process::pio::ChildOutTask>::Output,)
+    };
+    ($A:ident, $B:ident) => {
+        ( $crate::Child, 
+        <$A::Task as $crate::process::pio::ChildOutTask>::Output,
+        <$B::Task as $crate::process::pio::ChildOutTask>::Output )
+    };
+}
+
+#[rustfmt::skip]
+#[cfg(not(doc))]
+impl< Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<__Null=pio::__OCNull>, In: pio::ChildInConfig> Spawn<Spawned![]> for Command<Out, Err, In> {
+    fn spawn(self) -> crate::Result<Spawned![]> {
+        spawn_internal(self).map(|x| x.0)
     }
 }
 
-// can only finish building once all IO are configured
-impl<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig> CommandBuilder<Out, Err, In> {
-
-    /// Spawn the child, and use the worker thread to monitor the child's IO.
-    /// Returns a handle that can be used to wait for the child to be finished,
-    /// or start to access the child's output on the current thread,
-    /// as they come in
-    pub fn spawn(mut self) -> crate::Result<pio::ConfiguredChild![Out, Err]> {
-        use std::fmt::Write as _;
-        let mut trace = String::new();
-        let log_enabled = crate::log_enabled(crate::lv::T);
-        if log_enabled {
-            let command = self.command.as_std();
-            let _ = write!(&mut trace, "spawning '{}', args: [", command.get_program().display());
-            let mut args = command.get_args();
-            if let Some(a) = args.next() {
-                let arg = a.display().to_string().replace('\'', "\\'");
-                let _ = write!(&mut trace, "'{arg}'");
-            }
-            for arg in args {
-                let arg = arg.display().to_string().replace('\'', "\\'");
-                let _ = write!(&mut trace, ", '{arg}'");
-            }
-            let _ = write!(&mut trace, "]");
-        }
-        if let Some(cd) = self.current_dir {
-            let cd = cd.normalize_exists().with_context(|| {
-                if log_enabled {
-                    crate::trace!("error while {trace}");
-                }
-                crate::error!("cannot canonicalize current_dir: {}", cd.display());
-                "cannot canonicalize current_dir while spawning child"
-            })?;
-            if log_enabled {
-                let _ = write!(&mut trace, ", current_dir: '{}'", cd.display());
-            }
-            self.command.current_dir(cd);
-        }
-        if log_enabled {
-            match &self.name {
-                Some(name) => crate::debug!("[{name}] {trace}"),
-                _ => crate::debug!("{trace}"),
-            }
-        }
-        self.stdout.configure_stdout(&mut self.command);
-        self.stderr.configure_stderr(&mut self.command);
-        self.stdin.configure_stdin(&mut self.command).context("failed to configure child stdin")?;
-
-        // self.command.spawn() must be called inside tokio
-        let child = co::run(async move {
-            let mut child = self.command.spawn().with_context(move || {
-                crate::error!("failed to spawn command");
-                "failed to spawn command"
-            })?;
-        
-            let name = self.name.as_ref().map(|x| x.as_str());
-        
-            let stdout = self.stdout.take(&mut child, name, true).context("failed to take child stdout")?;
-            let stderr = self.stderr.take(&mut child, name, false).context("failed to take child stderr")?;
-            let stdin = self.stdin.take(&mut child).context("failed to take child stdin")?;
-        
-            use pio::ChildOutTask as _;
-            use pio::ChildInTask as _;
-            let (stdout_future, stdout) = stdout.run();
-            let (stderr_future, stderr) = stderr.run();
-            let stdin_future = stdin.run();
-        
-            // run the IO tasks in background thread
-            let wait_task = co::spawn(async move {
-                child.wait().await
-            });
-            let stdout_task = stdout_future.map(co::spawn);
-            let stderr_task = stderr_future.map(co::spawn);
-            let stdin_task = stdin_future.map(co::spawn);
-        
-            crate::Ok(super::child::LwChild {
-                wait_task, stdout, stderr,
-                stdin_task, stdout_task, stderr_task
-            })
-        });
-        let child = child.join().context("failed to join the spawning task")??;
-        Ok(child)
-            
+#[rustfmt::skip]
+#[cfg(not(doc))]
+impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfig<__Null=pio::__OCNull>, In: pio::ChildInConfig> Spawn<Spawned![Out]> for Command<Out, Err, In> {
+    fn spawn(self) -> crate::Result<Spawned![Out]> {
+        spawn_internal(self).map(|(c,o,_)| (c,o))
     }
+}
+
+#[rustfmt::skip]
+#[cfg(not(doc))]
+impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfig, In: pio::ChildInConfig> Spawn<Spawned![Out, Err]> for Command<Out, Err, In> {
+    fn spawn(self) -> crate::Result<Spawned![Out, Err]> {
+        spawn_internal(self)
+    }
+}
+
+/// handle the actual spawning
+fn spawn_internal<
+    Out: pio::ChildOutConfig, 
+    Err: pio::ChildOutConfig, 
+    In: pio::ChildInConfig
+>(mut self_: Command<Out, Err, In>) -> crate::Result<(
+    Child,
+    <Out::Task as pio::ChildOutTask>::Output,
+    <Err::Task as pio::ChildOutTask>::Output,
+)> {
+    use std::fmt::Write as _;
+    let mut trace = String::new();
+
+    // build the trace message
+    let log_enabled = crate::log_enabled(crate::lv::T);
+    if log_enabled {
+        let command = self_.command.as_std();
+        let _ = write!(&mut trace, "spawning '{}', args: [", command.get_program().display());
+        let mut args = command.get_args();
+        if let Some(a) = args.next() {
+            let arg = a.display().to_string().replace('\'', "\\'");
+            let _ = write!(&mut trace, "'{arg}'");
+        }
+        for arg in args {
+            let arg = arg.display().to_string().replace('\'', "\\'");
+            let _ = write!(&mut trace, ", '{arg}'");
+        }
+        let _ = write!(&mut trace, "]");
+    }
+
+    // configure final things on the Command
+    if let Some(cd) = self_.current_dir {
+        let cd = cd.normalize_exists().with_context(|| {
+            if log_enabled {
+                crate::trace!("error while {trace}");
+            }
+            crate::error!("cannot canonicalize current_dir: {}", cd.display());
+            "cannot canonicalize current_dir while spawning child"
+        })?;
+        if log_enabled {
+            let _ = write!(&mut trace, ", current_dir: '{}'", cd.display());
+        }
+        self_.command.current_dir(cd);
+    }
+
+    if log_enabled {
+        match &self_.name {
+            Some(name) => crate::trace!("[{name}] {trace}"),
+            _ => crate::trace!("{trace}"),
+        }
+    }
+    // configure IO
+    self_.stdout.configure_stdout(&mut self_.command);
+    self_.stderr.configure_stderr(&mut self_.command);
+    self_.stdin.configure_stdin(&mut self_.command).context("failed to configure child stdin")?;
+
+    // self.command.spawn() must be called on the background runtime,
+    // because the IO will be attached to the active runtime context
+    // if we call .spawn() on the current-thread runtime, then blocking
+    // the current-thread runtime will also block the child's IO
+    let mut child = co::run_bg(async move {
+        self_.command.spawn().context("failed to spawn command")
+    })?;
+    let name = self_.name.as_ref().map(|x| x.as_str());
+
+    let stdout = self_.stdout.take(&mut child, name, true).context("failed to take child stdout")?;
+    let stderr = self_.stderr.take(&mut child, name, false).context("failed to take child stderr")?;
+    let stdin = self_.stdin.take(&mut child).context("failed to take child stdin")?;
+
+    // get the IO tasks
+    use pio::ChildOutTask as _;
+    use pio::ChildInTask as _;
+    let (stdout_future, stdout) = stdout.run();
+    let (stderr_future, stderr) = stderr.run();
+    let stdin_future = stdin.run();
+
+    let combined_future = async move {
+        let mut j = JoinSet::new();
+        if let Some(x) = stdin_future {
+            j.spawn(x);
+        }
+        if let Some(x) = stdout_future {
+            j.spawn(x);
+        }
+        if let Some(x) = stderr_future {
+            j.spawn(x);
+        }
+        let mut panicked = false;
+        while let Some(x) = j.join_next().await {
+            // could not join because panicked
+            if x.is_err() {
+                panicked = true;
+            }
+        }
+        panicked
+    };
+    let io_task = co::spawn(combined_future);
+
+    Ok((Child{inner: child, io_task}, stdout, stderr))
 }

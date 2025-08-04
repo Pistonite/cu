@@ -54,7 +54,7 @@ pub trait PathExtension {
 
     /// Start building a child process with the path as the executable
     #[cfg(feature="process")]
-    fn command(&self) -> crate::CommandBuilderDefault;
+    fn command(&self) -> crate::CommandBuilder;
 }
 
 impl PathExtension for Path {
@@ -144,7 +144,7 @@ impl PathExtension for Path {
     }
 
     #[cfg(feature="process")]
-    fn command(&self) -> crate::CommandBuilderDefault {
+    fn command(&self) -> crate::CommandBuilder {
         crate::CommandBuilder::new(self)
     }
 }
@@ -205,7 +205,7 @@ macro_rules! impl_for_as_ref_path {
                 AsRef::<Path>::as_ref(self).try_to_rel_from(path)
             }
             #[cfg(feature="process")]
-            fn command(&self) -> crate::CommandBuilderDefault {
+            fn command(&self) -> crate::CommandBuilder {
                 AsRef::<Path>::as_ref(self).command()
             }
         }

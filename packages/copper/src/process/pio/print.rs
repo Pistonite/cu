@@ -1,23 +1,25 @@
+use std::process::Stdio;
 
-use tokio::process::{ChildStderr, ChildStdout};
+use tokio::process::{ChildStderr, ChildStdout, Command as TokioCommand, Child as TokioChild};
 
 use crate::print::Lv;
 use crate::BoxedFuture;
 
-use super::{ChildOutConfig, ChildOutTask, Command, Child, DriverOutput, Driver};
+use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
 impl ChildOutConfig for Lv {
     type Task = PrintTask;
+    type __Null = super::__OCNull;
 
-    fn configure_stdout(&mut self, command: &mut Command) {
-        command.stdout(std::process::Stdio::piped());
+    fn configure_stdout(&mut self, command: &mut TokioCommand) {
+        command.stdout(Stdio::piped());
     }
 
-    fn configure_stderr(&mut self, command: &mut Command) {
-        command.stderr(std::process::Stdio::piped());
+    fn configure_stderr(&mut self, command: &mut TokioCommand) {
+        command.stderr(Stdio::piped());
     }
 
-    fn take(self, child: &mut Child, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+    fn take(self, child: &mut TokioChild, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
         let name = name.unwrap_or_default();
         let prefix = if !name.is_empty() {
             format!("[{name}] ")
@@ -62,11 +64,13 @@ impl PrintTask {
     async fn main(self) {
         let lv = self.lv;
         let prefix = self.prefix;
-        let mut driver = Driver::new(self.out, self.err);
+        let mut driver = Driver::new(self.out, self.err, false);
         loop {
             match driver.next().await {
                 DriverOutput::Line(line) => {
-                    crate::__priv::__print_with_level(lv, format_args!("{prefix}{line}"));
+                    for l in line.lines() {
+                        crate::__priv::__print_with_level(lv, format_args!("{prefix}{l}"));
+                    }
                 }
                 DriverOutput::Done => break,
                 _ => {}

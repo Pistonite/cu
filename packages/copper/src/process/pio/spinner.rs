@@ -1,11 +1,12 @@
+use std::process::Stdio;
 use std::sync::Arc;
 
 use spin::mutex::SpinMutex;
-use tokio::process::{ChildStderr, ChildStdout};
+use tokio::process::{ChildStderr, ChildStdout, Command as TokioCommand, Child as TokioChild};
 
 use crate::{print::Lv, BoxedFuture, ProgressBar, Atomic};
 
-use super::{ChildOutConfig, ChildOutTask, Command, Child, Driver, DriverOutput};
+use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
 /// Display child process's status as a progress bar spinner.
 ///
@@ -50,7 +51,7 @@ pub fn spinner(name: impl Into<String>) -> Spinner {
     Spinner {
         prefix: name.into(),
         config: Arc::new(
-            SpinnerConfig { 
+            SpinnerInner { 
                 lv: Atomic::new_u8(Lv::Off as u8),
                 bar: SpinMutex::new(None)
             })
@@ -63,7 +64,7 @@ pub struct Spinner {
     /// prefix of the bar
     prefix: String,
 
-    config: Arc<SpinnerConfig>
+    config: Arc<SpinnerInner>
 }
 #[rustfmt::skip]
 impl Spinner {
@@ -82,14 +83,13 @@ impl Spinner {
     /// Print any non-progress outputs as trace messages
     pub fn trace(self) -> Self { self.config.lv.set(crate::lv::T); self }
 }
-struct SpinnerConfig {
+struct SpinnerInner {
     lv: Atomic<u8, Lv>,
     // the bar spawned when calling take() for the first time,
     // using a spin lock because it should be VERY rare that
     // we get contention
     bar: SpinMutex<Option<Arc<ProgressBar>>>
 }
-#[doc(hidden)]
 pub struct SpinnerTask {
     lv: Lv,
     prefix: String,
@@ -99,13 +99,14 @@ pub struct SpinnerTask {
 }
 impl ChildOutConfig for Spinner {
     type Task = SpinnerTask;
-    fn configure_stdout(&mut self, command: &mut Command) {
-        command.stdout(std::process::Stdio::piped());
+    type __Null = super::__OCNull;
+    fn configure_stdout(&mut self, command: &mut TokioCommand) {
+        command.stdout(Stdio::piped());
     }
-    fn configure_stderr(&mut self, command: &mut Command) {
-        command.stderr(std::process::Stdio::piped());
+    fn configure_stderr(&mut self, command: &mut TokioCommand) {
+        command.stderr(Stdio::piped());
     }
-    fn take(self, child: &mut Child, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+    fn take(self, child: &mut TokioChild, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
         let lv= self.config.lv.get();
         let log_prefix = if crate::log_enabled(lv) {
             let name = name.unwrap_or_default();
@@ -148,7 +149,7 @@ impl SpinnerTask {
         let bar = self.bar;
         let lv = self.lv;
         let prefix = self.prefix;
-        let mut driver = Driver::new(self.out, self.err);
+        let mut driver = Driver::new(self.out, self.err, true);
         loop {
             match driver.next().await {
                 DriverOutput::Line(line) => {
