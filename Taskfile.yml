@@ -24,6 +24,10 @@ tasks:
     cmds:
       - task: cu:check
 
+  test:
+    cmds:
+      - task: cu:test
+
   doc:
     cmds:
       # note: require nightly toolchain in CI

@@ -1,0 +1,25 @@
+names: ci
+on:
+  push:
+    branches:
+      - main
+  pull-request:
+    branches:
+      - main
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          mono-dev: packages
+          rust: stable
+      - run: task exec -- check
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          mono-dev: packages
+          rust: stable
+      - run: task exec -- test

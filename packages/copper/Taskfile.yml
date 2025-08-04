@@ -51,4 +51,6 @@ tasks:
 
   test:
     cmds:
-      - cargo test --doc --features full
+      - cargo test 
+      - cargo test --features cli
+      - cargo test --features full
