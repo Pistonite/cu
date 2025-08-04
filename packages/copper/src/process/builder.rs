@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::ExitStatus};
 use std::ffi::OsStr;
 
-use tokio::process::Command as TokioCommand;
+use tokio::process::{Command as TokioCommand, Child as TokioChild};
 use tokio::task::JoinSet;
 
 use super::{Config, Child};
@@ -23,7 +23,7 @@ pub type CommandBuilder = Command<(), (), ()>;
 ///
 /// # fn main() -> cu::Result<()> {
 /// let path = Path::new("ls");
-/// path.command().wait_nz()?;
+/// path.command().all_null().wait_nz()?;
 /// # Ok(()) }
 /// ```
 ///
@@ -45,6 +45,11 @@ pub type CommandBuilder = Command<(), (), ()>;
 /// Unlike `Command` in the standard library or `tokio`, `CommandBuilder` does not have
 /// "default" IO behavior. You cannot spawn the child until you configured how you'd like
 /// `stdout`, `stderr`, and `stdin` to behave.
+///
+/// See [`pio`] (Process IO) for configuration IO.
+///
+/// # Spawning
+/// See [`spawn`](Self::spawn) and [`co_spawn`](Self::co_spawn).
 ///
 pub struct Command<Out, Err, In> {
     /// Inner command
@@ -152,10 +157,6 @@ impl<Out, Err, In> Command<Out, Err, In> {
         self
     }
 
-}
-
-// stdin
-impl<Out, Err, In> Command<Out, Err, In> {
     /// Configure child's standard input stream
     #[inline(always)]
     pub fn stdin<T: pio::ChildInConfig>(self, config:T) -> Command<Out, Err, T> {
@@ -258,17 +259,10 @@ impl<Out, Err, In> Command<Out, Err, In> {
 
     /// Spawn the child and run the child's IO tasks in the background. **Note that
     /// you have to configure all 3 of `stdin`, `stdout` and `stderr`, before you can spawn the
-    /// child.**
+    /// child. Otherwise, you will get a compile error that `spawn` is not defined**
     ///
-    /// This is safe to use both inside and outside of a tokio runtime context.
-    /// You might be wondering why there's no `co_spawn()` - This is because
-    /// it's error-prone to spawn the child using the current-thread runtime,
-    /// as child's IO are attached to the runtime that spawns it.
-    /// If the child is spawned on a current-thread runtime, then blocking
-    /// that runtime will also block its IO tasks, even if the IO tasks
-    /// are running on the background runtime! For this reason, the child is
-    /// always spawned on the background context, which means we might as
-    /// well always spawn the IO tasks on the background context too.
+    /// # Blocking
+    /// Use [`co_spawn`](Self::co_spawn) if you are within an async context.
     ///
     /// # Return Value
     /// The return type shown above is a placeholder. The actual return
@@ -322,13 +316,67 @@ impl<Out, Err, In> Command<Out, Err, In> {
     pub fn spawn(self) -> crate::Result<EitherOf<Child, (Child, Out, Err)>> {
         panic!("this is a placeholder for documetnation, see below for implementation")
     }
+
+
+    /// Spawn the child and run the child's IO tasks in the background. **Note that
+    /// you have to configure all 3 of `stdin`, `stdout` and `stderr`, before you can spawn the
+    /// child. Otherwise, you will get a compile error that `co_spawn` is not defined**
+    ///
+    /// Note that the child's IO are still drived by the background context.
+    /// This is to prevent errors where blocking the current-thread runtime unexpectedly
+    /// block the child's IO, even when the child's IO tasks are running on the background
+    /// thread.
+    ///
+    /// # Return value
+    /// See [`spawn`](Self::spawn)
+    #[cfg(doc)]
+    pub async fn co_spawn(self) -> crate::Result<EitherOf<Child, (Child, Out, Err)>> {
+        panic!("this is a placeholder for documetnation, see below for implementation")
+    }
 }
 #[cfg(doc)]
 struct EitherOf<A, B>(A, B);
 
+/// **Implementation only applies if the child has no output handles (see [`spawn`](Command::spawn) for more
+/// details)**
+impl<Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<__Null=pio::__OCNull>, In: pio::ChildInConfig> Command<Out, Err, In> {
+    /// Spawn and wait for child to exit with non-zero status code.
+    ///
+    /// This is equivalent to calling [`spawn()`](Self::spawn), then
+    /// [`wait_nz()`](Child::wait_nz) on the [`Child`].
+    pub fn wait_nz(self) -> crate::Result<()> {
+        self.spawn()?.wait_nz()
+    }
+    /// Spawn and wait for child to exit, returning its [`ExitStatus`] code
+    ///
+    /// This is equivalent to calling [`spawn()`](Self::spawn), then
+    /// [`wait()`](Child::wait) on the [`Child`].
+    pub fn wait(self) -> crate::Result<ExitStatus> {
+        self.spawn()?.wait()
+    }
+
+    /// Spawn and wait for child to exit with non-zero status code, using
+    /// the current tokio runtime context.
+    ///
+    /// This is equivalent to calling [`co_spawn()`](Self::co_spawn), then
+    /// [`co_wait_nz()`](Child::co_wait_nz) on the [`Child`].
+    pub async fn co_wait_nz(self) -> crate::Result<()> {
+        self.co_spawn().await?.co_wait_nz().await
+    }
+    /// Spawn and wait for child to exit, returning its [`ExitStatus`] code,
+    /// using the current tokio runtime context.
+    ///
+    /// This is equivalent to calling [`co_spawn()`](Self::co_spawn), then
+    /// [`co_wait()`](Child::co_wait) on the [`Child`].
+    pub async fn co_wait(self) -> crate::Result<ExitStatus> {
+        self.co_spawn().await?.co_wait().await
+    }
+}
+
 /// This trait allows implementing different return types for [`Command::spawn`] based on the configured IO.
-pub trait Spawn<Target> {
+pub trait Spawn<Target> where Target: Send + 'static{
     fn spawn(self) -> crate::Result<Target>;
+    fn co_spawn(self) -> crate::BoxedFuture<crate::Result<Target>>;
 }
 
 #[cfg(not(doc))]
@@ -353,6 +401,11 @@ impl< Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<_
     fn spawn(self) -> crate::Result<Spawned![]> {
         spawn_internal(self).map(|x| x.0)
     }
+    fn co_spawn(self) -> crate::BoxedFuture<crate::Result<Spawned![]>> {
+        Box::pin(async move {
+            co_spawn_internal(self).await.map(|x| x.0)
+        })
+    }
 }
 
 #[rustfmt::skip]
@@ -361,6 +414,11 @@ impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfi
     fn spawn(self) -> crate::Result<Spawned![Out]> {
         spawn_internal(self).map(|(c,o,_)| (c,o))
     }
+    fn co_spawn(self) -> crate::BoxedFuture<crate::Result<Spawned![Out]>> {
+        Box::pin(async move {
+            co_spawn_internal(self).await.map(|(c,o,_)| (c,o))
+        })
+    }
 }
 
 #[rustfmt::skip]
@@ -368,6 +426,9 @@ impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfi
 impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfig, In: pio::ChildInConfig> Spawn<Spawned![Out, Err]> for Command<Out, Err, In> {
     fn spawn(self) -> crate::Result<Spawned![Out, Err]> {
         spawn_internal(self)
+    }
+    fn co_spawn(self) -> crate::BoxedFuture<crate::Result<Spawned![Out, Err]>> {
+        Box::pin(co_spawn_internal(self))
     }
 }
 
@@ -381,6 +442,44 @@ fn spawn_internal<
     <Out::Task as pio::ChildOutTask>::Output,
     <Err::Task as pio::ChildOutTask>::Output,
 )> {
+    pre_spawn(&mut self_)?;
+
+    // self.command.spawn() must be called on the background runtime,
+    // because the IO will be attached to the active runtime context
+    // if we call .spawn() on the current-thread runtime, then blocking
+    // the current-thread runtime will also block the child's IO
+    co::spawn(async move {
+        let child = self_.command.spawn().context("failed to spawn command")?;
+        post_spawn(self_, child)
+    }).join()?
+}
+/// handle the actual spawning
+async fn co_spawn_internal<
+    Out: pio::ChildOutConfig, 
+    Err: pio::ChildOutConfig, 
+    In: pio::ChildInConfig
+>(mut self_: Command<Out, Err, In>) -> crate::Result<(
+    Child,
+    <Out::Task as pio::ChildOutTask>::Output,
+    <Err::Task as pio::ChildOutTask>::Output,
+)> {
+    pre_spawn(&mut self_)?;
+
+    // self.command.spawn() must be called on the background runtime,
+    // because the IO will be attached to the active runtime context
+    // if we call .spawn() on the current-thread runtime, then blocking
+    // the current-thread runtime will also block the child's IO
+    co::spawn(async move {
+        let child = self_.command.spawn().context("failed to spawn command")?;
+        post_spawn(self_, child)
+    }).co_join().await?
+}
+
+fn pre_spawn<
+    Out: pio::ChildOutConfig, 
+    Err: pio::ChildOutConfig, 
+    In: pio::ChildInConfig
+>(self_: &mut Command<Out, Err, In>) -> crate::Result<()> {
     use std::fmt::Write as _;
     let mut trace = String::new();
 
@@ -402,7 +501,7 @@ fn spawn_internal<
     }
 
     // configure final things on the Command
-    if let Some(cd) = self_.current_dir {
+    if let Some(cd) = &self_.current_dir {
         let cd = cd.normalize_exists().with_context(|| {
             if log_enabled {
                 crate::trace!("error while {trace}");
@@ -426,14 +525,18 @@ fn spawn_internal<
     self_.stdout.configure_stdout(&mut self_.command);
     self_.stderr.configure_stderr(&mut self_.command);
     self_.stdin.configure_stdin(&mut self_.command).context("failed to configure child stdin")?;
+    Ok(())
+}
 
-    // self.command.spawn() must be called on the background runtime,
-    // because the IO will be attached to the active runtime context
-    // if we call .spawn() on the current-thread runtime, then blocking
-    // the current-thread runtime will also block the child's IO
-    let mut child = co::run_bg(async move {
-        self_.command.spawn().context("failed to spawn command")
-    })?;
+fn post_spawn<
+    Out: pio::ChildOutConfig, 
+    Err: pio::ChildOutConfig, 
+    In: pio::ChildInConfig
+>(self_: Command<Out, Err, In>, mut child: TokioChild) -> crate::Result<(
+    Child,
+    <Out::Task as pio::ChildOutTask>::Output,
+    <Err::Task as pio::ChildOutTask>::Output,
+)> {
     let name = self_.name.as_ref().map(|x| x.as_str());
 
     let stdout = self_.stdout.take(&mut child, name, true).context("failed to take child stdout")?;

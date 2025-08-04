@@ -1,3 +1,44 @@
+//! Utility to configure IO with child process.
+//!
+//! The `cu::pio::*` functions can be used as arguments
+//! into the [`stdin`], [`stdout`] and [`stderr`] functions
+//! of the [`Command`] builder to configure how you want to interact
+//! with the child process's IO.
+//!
+//! An input config can only be passed into [`stdin`], whereas
+//! an output config can be used both for [`stdout`] and [`stderr`].
+//! [`null`] and [`inherit`] can be used both as input and output.
+//!
+//! # Available configurations
+//! - [`cu::pio::null()`]: Turn off the stream, essentially [`Stdio::null()`].
+//! - [`cu::pio::inherit()`]: Turn off the stream, essentially [`Stdio::inherit()`].
+//!   - Note that the child outputs will mess with output from this crate.
+//! - [`cu::lv::*`]: Read the child's output and print them as a log message of the level.
+//! - [`cu::pio::spinner()`]: Show a progress bar for the child's output. Optionally also
+//!   print non-progress outputs as regular messages.
+//! - [`cu::pio::pipe()`]: Get a [`Pipe`] from the output, which can be passed as
+//!   an input config to another command to pipe the output to its stdin.
+//! - [`cu::pio::buffer()`]: Buffer the output as a `Vec<u8>`.
+//! - [`cu::pio::string()`]: Buffer the output as a `String`.
+//! - [`cu::pio::lines()`]: Get a reader that can read the output line-by-line.
+//!   - See [`cu::pio::co_lines()`] for using an async reader.
+//!
+//!
+//! [`cu::pio::null()`]: null
+//! [`cu::pio::inherit()`]: inherit
+//! [`cu::lv::*`]: crate::lv
+//! [`cu::pio::spinner()`]: function@spinner
+//! [`cu::pio::pipe()`]: function@pipe
+//! [`cu::pio::buffer()`]: function@buffer
+//! [`cu::pio::string()`]: function@string
+//! [`cu::pio::lines()`]: function@lines
+//! [`cu::pio::co_lines()`]: function@co_lines
+//! [`Command`]: super::Command
+//! [`stdin`]: super::Command::stdin
+//! [`stdout`]: super::Command::stdout
+//! [`stderr`]: super::Command::stderr
+//!
+//!
 use std::process::Stdio;
 
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
@@ -127,18 +168,10 @@ impl ChildInTask for () {
     }
 }
 
-// #[doc(hidden)]
-// pub(crate) trait __OutConfigType : ChildOutConfig {
-//     type Null;
-// }
-// // #[doc(hidden)]
-// // pub(crate) trait __OutConfigTypeNull {}
 #[doc(hidden)]
 pub struct __OCNull;
 #[doc(hidden)]
 pub struct __OCNonNull;
-// // #[doc(hidden)]
-// // impl __OCNull for __
 
 #[derive(Clone, Copy)]
 #[doc(hidden)]
@@ -188,9 +221,6 @@ impl ChildInConfig for Null {
     }
     fn take(self, _: &mut TokioChild) -> crate::Result<()> { Ok(()) }
 }
-
-pub struct Stdout<T>(pub T);
-pub struct Stderr<T>(pub T);
 
 pub(crate) fn take_child_out(child: &mut TokioChild, is_out: bool) -> crate::Result<Result<ChildStdout, ChildStderr>> {
     if is_out {

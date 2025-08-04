@@ -304,7 +304,7 @@ impl<T> RobustHandle<T> {
     ///     42
     /// }).into_robust();
     ///
-    /// std::time::sleep(Duration::from_millis(20));
+    /// std::thread::sleep(Duration::from_millis(20));
     /// assert!(handle.abort(), "task is not joined yet, so abort is possible");
     /// match handle.join_maybe_aborted_robust() {
     ///     Err(e) => panic!("join failed: {e}"),

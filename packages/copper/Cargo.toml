@@ -23,6 +23,10 @@ version = "1.47.0"
 features = [ "macros", "rt-multi-thread" ]
 optional = true
 
+[dev-dependencies.tokio]
+version = "1.47.0" 
+features = [ "macros", "rt-multi-thread", "time" ]
+
 [dependencies.clap]
 version = "4.5.42"
 features = ["derive"]

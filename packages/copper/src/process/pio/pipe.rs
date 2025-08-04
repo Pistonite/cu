@@ -1,5 +1,4 @@
-
-use std::{process::Stdio, sync::Arc};
+use std::process::Stdio;
 
 use tokio::process::{Command as TokioCommand, Child as TokioChild};
 
@@ -7,10 +6,28 @@ use crate::{BoxedFuture, Context as _};
 
 use super::{ChildOutConfig, ChildInConfig, ChildOutTask};
 
-pub struct Pipe;
-
+/// Pipe the child's output into another command's stdin.
+///
+/// # Example
+/// ```rust,no_run
+/// use cu::pre::*;
+///
+/// # fn main() -> cu::Result<()> {
+/// let (hello, out) = cu::which("echo")?.command()
+///     .arg("Hello, world!")
+///     .stdout(cu::pio::pipe())
+///     .stdie_null()
+///     .spawn()?;
+///
+/// cu::which("rev")?.command()
+///     .stdin(out)
+///     .stdoe(cu::lv::I)
+///     .wait_nz()?;
+/// hello.wait_nz()?;
+/// # Ok(()) }
+/// ```
 pub fn pipe() -> Pipe { Pipe }
-
+pub struct Pipe;
 impl ChildOutConfig for Pipe {
     type Task = PipeTask;
     type __Null = super::__OCNonNull;
@@ -45,8 +62,9 @@ impl ChildOutTask for PipeTask {
         (None, PipeOutput(Some(self.0)))
     }
 }
-pub struct PipeOutput(Option<Stdio>); // this uses an option right now to avoid dealing with unsafe
 
+/// The output of [`pipe`]. Can be piped into another command's [`stdin`](crate::Command::stdin).
+pub struct PipeOutput(Option<Stdio>); // this uses an option right now to avoid dealing with unsafe
 impl ChildInConfig for PipeOutput {
     type Task = ();
 

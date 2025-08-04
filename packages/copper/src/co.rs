@@ -23,9 +23,9 @@
 //! ```rust
 //! use std::time::Duration;
 //! #[cu::cli]
-//! async fn main(args: cu::cli::Flags) -> cu::Result<()> {
+//! async fn main(_: cu::cli::Flags) -> cu::Result<()> {
 //!     cu::info!("doing some work");
-//!     tokio::time::sleep(Duration::from_secs(1)).await;
+//!     tokio::time::sleep(Duration::from_millis(100)).await;
 //!     cu::info!("done");
 //!     Ok(())
 //! }
@@ -55,13 +55,13 @@
 //!         .stdin_null()
 //!     // use a progress bar to display progress, and print other
 //!     // messages as info
-//!         .stdoe(cu::cio::spinner("cloning example1").info())
+//!         .stdoe(cu::pio::spinner("cloning example1").info())
 //!         .spawn()?;
 //!     // same configuration
 //!     let child2 = git.command()
 //!         .args(["clone", "https://example2.git", "dest2", "--progress"])
 //!         .stdin_null()
-//!         .stdoe(cu::cio::spinner("cloning example2").info())
+//!         .stdoe(cu::pio::spinner("cloning example2").info())
 //!         .spawn()?;
 //!    
 //!     // Both childs are now running as separate processes in the OS.
@@ -85,14 +85,15 @@
 //! Note that in this case, there's no benefit of using `co_spawn`/`co_wait_nz`,
 //! since we are not doing any extra work.
 //!
-//! ```rust
+//! ```rust,no_run
+//! use cu::pre::*;
 //! #[cu::cli]
 //! async fn main(_: cu::cli::Flags) -> cu::Result<()> {
 //!     let git = cu::which("git")?;
 //!     let child1 = git.command()
 //!         .args(["clone", "https://example1.git", "dest1", "--progress"])
 //!         .stdin_null()
-//!         .stdoe(cu::cio::spinner("cloning example1").info())
+//!         .stdoe(cu::pio::spinner("cloning example1").info())
 //!         // using co_spawn() will do the work needed at spawn time
 //!         // using the current async context, instead of off-loading
 //!         // it to a background thread.
@@ -104,16 +105,11 @@
 //!     let child2 = git.command()
 //!         .args(["clone", "https://example2.git", "dest2", "--progress"])
 //!         .stdin_null()
-//!         .stdoe(cu::cio::spinner("cloning example2").info())
+//!         .stdoe(cu::pio::spinner("cloning example2").info())
 //!         .co_spawn().await?;
 //!    
-//!     // instead of waiting 1, then 2, we could now use `join!`
-//!     // and let the runtime take care of the scheduling.
-//!     let (r1, r2) = cu::join!(child1.co_wait_nz(), child2.co_wait_nz());
-//!     // also note that, using try_join above will not automatically
-//!     // kill the rest of the child if one fails.
-//!     r1?;
-//!     r2?;
+//!     child1.co_wait_nz().await?;
+//!     child2.co_wait_nz().await?;
 //!    
 //!     Ok(())
 //! }

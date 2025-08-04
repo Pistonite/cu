@@ -13,6 +13,8 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 /// # Example
 /// Spawn a `git-clone` process, and use a spinner to show progress updates.
 /// ```rust,no_run
+/// use cu::pre::*;
+///
 /// # fn main() -> cu::Result<()> {
 /// cu::which("git")?.command()
 ///     .args(["clone", "--progress", "https://example1.git"])
@@ -21,7 +23,7 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 ///     .stdout(cu::lv::P)
 ///     // use spinner to show the bar
 ///     .stderr(cu::pio::spinner("cloning example1"))
-///     .stdin(cu::pio::null())
+///     .stdin_null()
 ///     .wait_nz()?;
 /// # Ok(()) }
 /// ```
@@ -36,17 +38,23 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 /// as normal messages.
 ///
 /// ```rust,no_run
+/// use cu::pre::*;
+///
 /// # fn main() -> cu::Result<()> {
 /// cu::which("git")?.command()
 ///     .args(["clone", "--progress", "https://example1.git"])
 ///     // feed both stdout and stderr into the same bar
 ///     // when a progress update is done, it will also be printed as
 ///     // an info message
-///     .stdboth(cu::pio::spinner("cloning example1").info())
-///     .stdin(cu::pio::null())
+///     .stdoe(cu::pio::spinner("cloning example1").info())
+///     .stdin_null()
 ///     .wait_nz()?;
 /// # Ok(()) }
 /// ```
+///
+/// # Merging streams
+/// You can `clone` a spinner config to direct multiple streams to use the same
+/// progress bar.
 pub fn spinner(name: impl Into<String>) -> Spinner { 
     Spinner {
         prefix: name.into(),

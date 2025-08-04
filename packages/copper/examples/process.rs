@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use cu::pre::*;
 
 #[cu::cli]
@@ -17,56 +15,59 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
         .spawn()?.wait()?;
 
     // spinner
-    cu::info!("git test!");
-    // let child = cu::which("git")?
-    // .command()
-    // .args(["clone", "https://github.com/zeldaret/botw", "--progress"])
-    //     .add(cu::color_flag())
-    //     .stdoe(cu::pio::spinner("cloning botw"))
-    //     .stdin_null()
-    //     .spawn()?;
-    // let child2 = cu::which("git")?
-    // .command()
-    // .args(["clone", "https://github.com/rust-lang/rust", "--progress", "--depth", "1"])
-    //     .stdoe(cu::pio::spinner("cloning rust").info())
-    //     .stdin_null()
-    //     .spawn()?;
-    // child.wait_nz()?;
-    // child2.wait_nz()?;
-    // cu::info!("done");
-    // cu::hint!("cleaning stuff up since you know i don't want to manually delete it");
-    // std::fs::remove_dir_all("botw")?;
-    // std::fs::remove_dir_all("rust")?;
+    if cu::yesno!("run git test?")? {
+        cu::info!("git test!");
+        let child = cu::which("git")?
+            .command()
+            .args(["clone", "https://github.com/zeldaret/botw", "--progress"])
+            .stdoe(cu::pio::spinner("cloning botw"))
+            .stdin_null()
+            .spawn()?;
+        let child2 = cu::which("git")?
+            .command()
+            .args(["clone", "https://github.com/rust-lang/rust", "--progress", "--depth", "1"])
+            .stdoe(cu::pio::spinner("cloning rust").info())
+            .stdin_null()
+            .spawn()?;
+        child.wait_nz()?;
+        child2.wait_nz()?;
+        cu::info!("done");
+        cu::hint!("cleaning stuff up since you know i don't want to manually delete it");
+        std::fs::remove_dir_all("botw")?;
+        std::fs::remove_dir_all("rust")?;
+    }
 
-    // pipes
-    let (hello, out, _) = cu::which("echo")?.command()
-        .arg("Hello, world!")
-        .stdout(cu::pio::pipe())
+    // pipes, co
+    cu::co::run(async move {
+        let (hello, out, _) = cu::which("echo")?.command()
+            .arg("Hello, world!")
+            .stdout(cu::pio::pipe())
+            .stdie_null()
+            .co_spawn().await?;
+        hello.co_wait_nz().await?;
+    
+        cu::which("rev")?.command()
+            .stdin(out)
+            .stdoe(cu::lv::I)
+            .name("rev")
+            .co_wait_nz().await?;
+        cu::Ok(())
+    })?;
+
+
+    // capture
+    let (hello, out) = cu::which("cat")?.command()
+        .arg("Cargo.toml")
+        .stdout(cu::pio::string())
         .stdie_null()
         .spawn()?;
 
-    let reverse = cu::which("rev")?.command()
-        .stdin(out)
-        .stdoe(cu::lv::I)
-        .name("rev")
-        .spawn()?;
-
+    let x = out.join()?;
+    cu::info!("capture output: {x:?}");
+    let x = x?;
+    // let x=String::from_utf8(x)?;
+    cu::info!("decoded: {x}");
     hello.wait_nz()?;
-    reverse.wait_nz()?;
-
-    // capture
-    // let (hello, out) = cu::which("cat")?.command()
-    //     .arg("Cargo.toml")
-    //     .stdout(cu::pio::string())
-    //     .stdie_null()
-    //     .spawn()?;
-
-    // let x = out.join()?;
-    // cu::info!("capture output: {x:?}");
-    // let x = x?;
-    // // let x=String::from_utf8(x)?;
-    // cu::info!("decoded: {x}");
-    // hello.wait_nz()?;
 
     // blocking line stream
     let (child, lines, _) = cu::which("bash")?.command()
