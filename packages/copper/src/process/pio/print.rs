@@ -1,9 +1,9 @@
 use std::process::Stdio;
 
-use tokio::process::{ChildStderr, ChildStdout, Command as TokioCommand, Child as TokioChild};
+use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
-use crate::print::Lv;
 use crate::BoxedFuture;
+use crate::print::Lv;
 
 use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
@@ -19,7 +19,12 @@ impl ChildOutConfig for Lv {
         command.stderr(Stdio::piped());
     }
 
-    fn take(self, child: &mut TokioChild, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+    fn take(
+        self,
+        child: &mut TokioChild,
+        name: Option<&str>,
+        is_out: bool,
+    ) -> crate::Result<Self::Task> {
         let name = name.unwrap_or_default();
         let prefix = if !name.is_empty() {
             format!("[{name}] ")
@@ -32,20 +37,18 @@ impl ChildOutConfig for Lv {
                 lv: self,
                 prefix,
                 out: child.stdout.take(),
-                err: None
+                err: None,
             })
         } else {
             Ok(PrintTask {
                 lv: self,
                 prefix,
                 out: None,
-                err: child.stderr.take()
+                err: child.stderr.take(),
             })
         }
     }
-
 }
-
 
 pub struct PrintTask {
     lv: Lv,

@@ -45,50 +45,50 @@ use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as T
 
 use crate::BoxedFuture;
 
-mod spinner;
-mod print;
 mod pipe;
+mod print;
 mod read;
+mod spinner;
 
 /// internal task types used in trait implementations
 pub mod config {
-    pub use super::spinner::Spinner as Spinner;
-    pub use super::pipe::Pipe as Pipe;
-    pub use super::read::Buffer as Buffer;
+    pub use super::pipe::Pipe;
+    pub use super::read::Buffer;
     pub use super::read::BufferString as String;
-    pub use super::read::Lines as Lines;
-    pub use super::read::CoLines as CoLines;
+    pub use super::read::CoLines;
+    pub use super::read::Lines;
+    pub use super::spinner::Spinner;
 }
 
 /// internal task types used in trait implementations
 pub mod task {
-    pub use super::spinner::SpinnerTask as Spinner;
-    pub use super::print::PrintTask as Print;
     pub use super::pipe::PipeTask as Pipe;
-    pub use super::read::BufferTask as Buffer;
+    pub use super::print::PrintTask as Print;
     pub use super::read::BufferStringTask as String;
-    pub use super::read::LinesTask as Lines;
+    pub use super::read::BufferTask as Buffer;
     pub use super::read::CoLinesTask as CoLines;
+    pub use super::read::LinesTask as Lines;
+    pub use super::spinner::SpinnerTask as Spinner;
 }
 
 /// internal output types used in trait implementations
 pub mod output {
     pub use super::pipe::PipeOutput as Pipe;
-    pub use super::read::LinesOutput as Lines;
     pub use super::read::CoLinesOutput as CoLines;
+    pub use super::read::LinesOutput as Lines;
 }
 
 // internal re-exports
-pub use output::{Pipe, Lines, CoLines};
+pub use output::{CoLines, Lines, Pipe};
 // factory re-exports
-pub use spinner::spinner;
 pub use pipe::pipe;
-pub use read::{buffer, string, lines, co_lines};
+pub use read::{buffer, co_lines, lines, string};
+pub use spinner::spinner;
 
 mod print_driver;
 use print_driver::*;
 
-/// Configuration for process output to be used with 
+/// Configuration for process output to be used with
 /// [`Command::stdout`] and [`Command::stderr`]
 ///
 /// This is essentially a marker, that is used to create tasks
@@ -118,10 +118,15 @@ pub trait ChildOutConfig: Send + 'static {
     // }
 
     /// Take the bits needed for this out config from the child
-    fn take(self, child: &mut TokioChild, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task>;
+    fn take(
+        self,
+        child: &mut TokioChild,
+        name: Option<&str>,
+        is_out: bool,
+    ) -> crate::Result<Self::Task>;
 }
 
-/// Configuration for process input to be used with 
+/// Configuration for process input to be used with
 /// [`Command::stdin`]
 ///
 /// This is essentially a marker, that is used to create tasks
@@ -177,7 +182,9 @@ pub struct __OCNonNull;
 #[doc(hidden)]
 pub struct Inherit;
 /// Inherit the parent's stdin, stdout, or stderr.
-pub fn inherit() -> Inherit { Inherit }
+pub fn inherit() -> Inherit {
+    Inherit
+}
 impl ChildOutConfig for Inherit {
     type Task = ();
     type __Null = __OCNull;
@@ -187,7 +194,9 @@ impl ChildOutConfig for Inherit {
     fn configure_stderr(&mut self, command: &mut TokioCommand) {
         command.stderr(Stdio::inherit());
     }
-    fn take(self, _: &mut TokioChild, _: Option<&str>, _: bool) -> crate::Result<()> { Ok(()) }
+    fn take(self, _: &mut TokioChild, _: Option<&str>, _: bool) -> crate::Result<()> {
+        Ok(())
+    }
 }
 impl ChildInConfig for Inherit {
     type Task = ();
@@ -195,13 +204,17 @@ impl ChildInConfig for Inherit {
         command.stdin(Stdio::inherit());
         Ok(())
     }
-    fn take(self, _: &mut TokioChild) -> crate::Result<()> { Ok(()) }
+    fn take(self, _: &mut TokioChild) -> crate::Result<()> {
+        Ok(())
+    }
 }
 #[derive(Clone, Copy)]
 #[doc(hidden)]
 pub struct Null;
 /// Direct the stream to null (i.e. ignore it)
-pub fn null() -> Null { Null }
+pub fn null() -> Null {
+    Null
+}
 impl ChildOutConfig for Null {
     type Task = ();
     type __Null = __OCNull;
@@ -211,7 +224,9 @@ impl ChildOutConfig for Null {
     fn configure_stderr(&mut self, command: &mut TokioCommand) {
         command.stderr(Stdio::null());
     }
-    fn take(self, _: &mut TokioChild, _: Option<&str>, _: bool) -> crate::Result<()> { Ok(()) }
+    fn take(self, _: &mut TokioChild, _: Option<&str>, _: bool) -> crate::Result<()> {
+        Ok(())
+    }
 }
 impl ChildInConfig for Null {
     type Task = ();
@@ -219,10 +234,15 @@ impl ChildInConfig for Null {
         command.stdin(Stdio::null());
         Ok(())
     }
-    fn take(self, _: &mut TokioChild) -> crate::Result<()> { Ok(()) }
+    fn take(self, _: &mut TokioChild) -> crate::Result<()> {
+        Ok(())
+    }
 }
 
-pub(crate) fn take_child_out(child: &mut TokioChild, is_out: bool) -> crate::Result<Result<ChildStdout, ChildStderr>> {
+pub(crate) fn take_child_out(
+    child: &mut TokioChild,
+    is_out: bool,
+) -> crate::Result<Result<ChildStdout, ChildStderr>> {
     if is_out {
         let Some(stdout) = child.stdout.take() else {
             crate::bail!("unexpected: failed to take stdout from child");

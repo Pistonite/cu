@@ -11,7 +11,7 @@ pub(crate) struct Driver {
     err_i: usize,
     buffer: Box<[u8; 1024]>,
     line_buf: String,
-    only_last_line: bool
+    only_last_line: bool,
 }
 pub(crate) enum DriverOutput<'a> {
     /// A non-empty line ending with a line break
@@ -30,7 +30,7 @@ impl<'a> DriverOutput<'a> {
         let line = line.trim();
         if line.is_empty() {
             Self::Empty
-        }else if lf {
+        } else if lf {
             Self::Line(line)
         } else {
             Self::Progress(line)
@@ -48,11 +48,11 @@ impl Driver {
             err_i: 0,
             buffer: Box::new([0u8; 1024]),
             line_buf: String::new(),
-            only_last_line
+            only_last_line,
         }
     }
     /// Return the next line and whether it has a line break
-    /// If the line is empty after trimming, returns 
+    /// If the line is empty after trimming, returns
     pub async fn next(&mut self) -> DriverOutput<'_> {
         match (self.out.as_mut(), self.err.as_mut()) {
             (None, None) => DriverOutput::Done,
@@ -61,15 +61,20 @@ impl Driver {
                     // probably finished reading
                     Err(_) | Ok(0) => DriverOutput::Done,
                     Ok(n) => {
-                        let end = self.err_i +n;
+                        let end = self.err_i + n;
                         let slice = &self.buffer.as_ref()[..end];
-                        let (b, lf) = Self::process(slice, &mut self.err_buf, &mut self.line_buf, self.only_last_line);
+                        let (b, lf) = Self::process(
+                            slice,
+                            &mut self.err_buf,
+                            &mut self.line_buf,
+                            self.only_last_line,
+                        );
                         let buf_mut = self.buffer.as_mut();
                         // shift the remaining section of buf
                         for i in b..end {
-                            buf_mut[i-b] = buf_mut[i];
+                            buf_mut[i - b] = buf_mut[i];
                         }
-                        self.err_i = end-b;
+                        self.err_i = end - b;
                         DriverOutput::new(&self.line_buf, lf)
                     }
                 }
@@ -79,21 +84,26 @@ impl Driver {
                     // probably finished reading
                     Err(_) | Ok(0) => DriverOutput::Done,
                     Ok(n) => {
-                        let end = self.out_i +n;
+                        let end = self.out_i + n;
                         let slice = &self.buffer.as_ref()[..end];
-                        let (b, lf) = Self::process(slice, &mut self.out_buf, &mut self.line_buf, self.only_last_line);
+                        let (b, lf) = Self::process(
+                            slice,
+                            &mut self.out_buf,
+                            &mut self.line_buf,
+                            self.only_last_line,
+                        );
                         let buf_mut = self.buffer.as_mut();
                         // shift the remaining section of buf
                         for i in b..end {
-                            buf_mut[i-b] = buf_mut[i];
+                            buf_mut[i - b] = buf_mut[i];
                         }
-                        self.out_i = end-b;
+                        self.out_i = end - b;
                         DriverOutput::new(&self.line_buf, lf)
                     }
                 }
             }
             (Some(so), Some(se)) => {
-                let mid = self.buffer.len()/2;
+                let mid = self.buffer.len() / 2;
                 let (buf_o, buf_e) = self.buffer.as_mut().split_at_mut(mid);
                 // read is cancel safe - if canceled, nothing will be read
                 tokio::select! {
@@ -143,14 +153,19 @@ impl Driver {
     // out will contain the remaining characters that's not a line,
     // and line will contain the last non-empty line after stripping
     // return how many bytes from buf are used and if the line is ends with `\n`
-    fn process(buf: &[u8], out: &mut String, line: &mut String, only_last_line: bool) -> (usize, bool) {
-        use crate::print::{utf8, ansi};
+    fn process(
+        buf: &[u8],
+        out: &mut String,
+        line: &mut String,
+        only_last_line: bool,
+    ) -> (usize, bool) {
+        use crate::print::{ansi, utf8};
         let mut i = 0;
         let mut invalid_while_escaping = false;
         let mut start_escape_pos: Option<usize> = None;
         line.clear();
         let mut full_line = false;
-        
+
         let mut last: char = '\0';
         while i < buf.len() {
             match utf8::decode_char(&buf[i..]) {

@@ -3,16 +3,20 @@ use cu::pre::*;
 #[cu::cli]
 fn main(_: cu::cli::Flags) -> cu::Result<()> {
     cu::info!("color test!");
-    cu::which("eza")?.command()
+    cu::which("eza")?
+        .command()
         .stdoe(cu::lv::P)
         .stdin_null()
-        .spawn()?.wait()?;
-    cu::which("eza")?.command()
+        .spawn()?
+        .wait()?;
+    cu::which("eza")?
+        .command()
         .add(cu::color_flag_eq())
         .add(cu::width_flag_eq())
         .stdoe(cu::lv::P)
         .stdin_null()
-        .spawn()?.wait()?;
+        .spawn()?
+        .wait()?;
 
     // spinner
     if cu::yesno!("run git test?")? {
@@ -25,7 +29,13 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
             .spawn()?;
         let child2 = cu::which("git")?
             .command()
-            .args(["clone", "https://github.com/rust-lang/rust", "--progress", "--depth", "1"])
+            .args([
+                "clone",
+                "https://github.com/rust-lang/rust",
+                "--progress",
+                "--depth",
+                "1",
+            ])
             .stdoe(cu::pio::spinner("cloning rust").info())
             .stdin_null()
             .spawn()?;
@@ -39,24 +49,28 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
 
     // pipes, co
     cu::co::run(async move {
-        let (hello, out, _) = cu::which("echo")?.command()
+        let (hello, out, _) = cu::which("echo")?
+            .command()
             .arg("Hello, world!")
             .stdout(cu::pio::pipe())
             .stdie_null()
-            .co_spawn().await?;
+            .co_spawn()
+            .await?;
         hello.co_wait_nz().await?;
-    
-        cu::which("rev")?.command()
+
+        cu::which("rev")?
+            .command()
             .stdin(out)
             .stdoe(cu::lv::I)
             .name("rev")
-            .co_wait_nz().await?;
+            .co_wait_nz()
+            .await?;
         cu::Ok(())
     })?;
 
-
     // capture
-    let (hello, out) = cu::which("cat")?.command()
+    let (hello, out) = cu::which("cat")?
+        .command()
         .arg("Cargo.toml")
         .stdout(cu::pio::string())
         .stdie_null()
@@ -70,8 +84,9 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
     hello.wait_nz()?;
 
     // blocking line stream
-    let (child, lines, _) = cu::which("bash")?.command()
-        .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"# ])
+    let (child, lines, _) = cu::which("bash")?
+        .command()
+        .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"#])
         .stdout(cu::pio::lines())
         .stdie_null()
         .spawn()?;
@@ -82,8 +97,9 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
     child.wait_nz()?;
 
     // async line stream
-    let (child2, lines2) = cu::which("bash")?.command()
-        .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"# ])
+    let (child2, lines2) = cu::which("bash")?
+        .command()
+        .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"#])
         .stdout(cu::pio::co_lines())
         .stdie_null()
         .spawn()?;

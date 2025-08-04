@@ -2,26 +2,31 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use tokio::runtime::{Builder, Runtime};
-use tokio::task::{JoinHandle, JoinError};
+use tokio::task::{JoinError, JoinHandle};
 
 /// the current-thread runtime
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
-    Builder::new_current_thread().enable_all().build()
-    .expect("cannot create current-thread tokio runtime")
+    Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("cannot create current-thread tokio runtime")
 });
 
 /// the multi-threaded, background runtime
 static BACKGROUND_RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
-    #[cfg(feature="coroutine-heavy")]
+    #[cfg(feature = "coroutine-heavy")]
     {
-        Builder::new_multi_thread().enable_all().build()
+        Builder::new_multi_thread()
+            .enable_all()
+            .build()
             .expect("cannot create heavy background tokio runtime")
     }
-    #[cfg(not(feature="coroutine-heavy"))]
+    #[cfg(not(feature = "coroutine-heavy"))]
     {
         Builder::new_multi_thread()
             .worker_threads(1)
-            .enable_all().build()
+            .enable_all()
+            .build()
             .expect("cannot create background tokio runtime")
     }
 });
@@ -31,18 +36,18 @@ static BACKGROUND_RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
 pub fn spawn<F>(future: F) -> Handle<F::Output>
 where
     F: Future + Send + 'static,
-    F::Output: Send + 'static
+    F::Output: Send + 'static,
 {
     Handle(BACKGROUND_RUNTIME.spawn(future))
 }
 
-/// Spawn a task onto the current runtime context. Will panic if not 
+/// Spawn a task onto the current runtime context. Will panic if not
 /// inside a runtime context
 #[inline]
 pub fn co_spawn<F>(future: F) -> Handle<F::Output>
 where
     F: Future + Send + 'static,
-    F::Output: Send + 'static
+    F::Output: Send + 'static,
 {
     Handle(tokio::spawn(future))
 }
@@ -55,8 +60,8 @@ where
 pub fn run<F>(future: F) -> F::Output
 where
     F: Future + Send + 'static,
-    F::Output: Send + 'static {
-
+    F::Output: Send + 'static,
+{
     RUNTIME.block_on(future)
 }
 
@@ -65,8 +70,8 @@ where
 pub fn run_bg<F>(future: F) -> F::Output
 where
     F: Future + Send + 'static,
-    F::Output: Send + 'static {
-
+    F::Output: Send + 'static,
+{
     BACKGROUND_RUNTIME.block_on(future)
 }
 
@@ -146,14 +151,14 @@ impl<T> Handle<T> {
         match Self::handle_error_maybe_aborted(e) {
             Ok(Some(x)) => Ok(x),
             Ok(None) => crate::bail!("aborted"),
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }
 
     fn handle_error_maybe_aborted(e: Result<T, JoinError>) -> crate::Result<Option<T>> {
         let e = match e {
             Ok(x) => return Ok(Some(x)),
-            Err(e) => e
+            Err(e) => e,
         };
         Self::handle_join_error(e)?;
         Ok(None)
@@ -166,7 +171,7 @@ impl<T> Handle<T> {
                 let info = crate::best_effort_panic_info(&panic);
                 crate::bail!("task panicked: {info}");
             }
-            Err(e) => e
+            Err(e) => e,
         };
         if e.is_cancelled() {
             Ok(())
@@ -185,13 +190,13 @@ pub type AbortHandle = tokio::task::AbortHandle;
 /// (even if `join` has already been called)
 pub struct RobustHandle<T> {
     inner: Handle<T>,
-    aborted: Arc<AtomicU8>
+    aborted: Arc<AtomicU8>,
 }
 impl<T> From<Handle<T>> for RobustHandle<T> {
     fn from(value: Handle<T>) -> Self {
         Self {
             inner: value,
-            aborted: Arc::new(AtomicU8::new(0))
+            aborted: Arc::new(AtomicU8::new(0)),
         }
     }
 }
@@ -213,7 +218,10 @@ impl<T> RobustHandle<T> {
 
     /// Return a handle to remotely and robustly abort the task
     pub fn abort_handle(&self) -> RobustAbortHandle {
-        RobustAbortHandle { inner: self.inner.abort_handle(), aborted: Arc::clone(&self.aborted) }
+        RobustAbortHandle {
+            inner: self.inner.abort_handle(),
+            aborted: Arc::clone(&self.aborted),
+        }
     }
 
     /// Block the current thread to join the task
@@ -262,7 +270,7 @@ impl<T> RobustHandle<T> {
     pub fn join_maybe_aborted(self) -> crate::Result<Option<T>> {
         match self.join_maybe_aborted_robust()? {
             Ok(x) => Ok(Some(x)),
-            Err(_) => Ok(None)
+            Err(_) => Ok(None),
         }
     }
 
@@ -276,7 +284,7 @@ impl<T> RobustHandle<T> {
     pub async fn co_join_maybe_aborted(self) -> crate::Result<Option<T>> {
         match self.co_join_maybe_aborted_robust().await? {
             Ok(x) => Ok(Some(x)),
-            Err(_) => Ok(None)
+            Err(_) => Ok(None),
         }
     }
 
@@ -298,7 +306,7 @@ impl<T> RobustHandle<T> {
     ///
     /// ```rust
     /// use std::time::Duration;
-    /// 
+    ///
     /// let handle = cu::co::spawn(async move {
     ///     tokio::time::sleep(Duration::from_millis(10)).await;
     ///     42
@@ -337,7 +345,10 @@ impl<T> RobustHandle<T> {
         Self::handle_error_maybe_aborted_robust(self.inner.0.await, &self.aborted)
     }
 
-    fn handle_error_maybe_aborted_robust(e: Result<T, JoinError>, aborted: &AtomicU8) -> crate::Result<Result<T, Option<T>>> {
+    fn handle_error_maybe_aborted_robust(
+        e: Result<T, JoinError>,
+        aborted: &AtomicU8,
+    ) -> crate::Result<Result<T, Option<T>>> {
         let e = match e {
             Ok(x) => {
                 if Self::check_aborted(aborted) {
@@ -346,7 +357,7 @@ impl<T> RobustHandle<T> {
                     return Ok(Ok(x));
                 }
             }
-            Err(e) => e
+            Err(e) => e,
         };
         if Self::check_aborted(aborted) {
             return Ok(Err(None));
@@ -358,12 +369,15 @@ impl<T> RobustHandle<T> {
     fn check_aborted(aborted: &AtomicU8) -> bool {
         loop {
             let status = aborted.load(Ordering::Relaxed);
-            // aborted 
+            // aborted
             if status == 1 {
                 return true;
             }
             debug_assert_eq!(0, status, "only the join handle can set the status to 2");
-            if aborted.compare_exchange_weak(0, 2, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+            if aborted
+                .compare_exchange_weak(0, 2, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+            {
                 return false;
             }
             std::hint::spin_loop();
@@ -373,7 +387,7 @@ impl<T> RobustHandle<T> {
 
 pub struct RobustAbortHandle {
     inner: AbortHandle,
-    aborted: Arc<AtomicU8>
+    aborted: Arc<AtomicU8>,
 }
 impl RobustAbortHandle {
     /// Abort the [`RobustHandle`] pointed to by this handle.
@@ -402,7 +416,10 @@ impl RobustAbortHandle {
                 debug_assert_eq!(status, 1);
                 return true;
             }
-            if aborted.compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+            if aborted
+                .compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+            {
                 return true;
             }
             std::hint::spin_loop();

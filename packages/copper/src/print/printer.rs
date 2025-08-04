@@ -321,9 +321,7 @@ impl Printer {
             None
         }
     }
-    pub(crate) fn take_prompt_task_if_should_join(
-        &mut self,
-    ) -> Option<JoinHandle<()>> {
+    pub(crate) fn take_prompt_task_if_should_join(&mut self) -> Option<JoinHandle<()>> {
         if self.prompt_task.needs_join {
             return self.prompt_task.take();
         }
@@ -400,12 +398,12 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
     // if drop() is working to prevent holding the lock during sleep
     #[inline(always)]
     fn print_loop(
-        original_width: usize, 
+        original_width: usize,
         max_bars: i32,
         tick: usize,
-        buffer: &mut String, 
+        buffer: &mut String,
         temp: &mut String,
-        lines: &mut i32
+        lines: &mut i32,
     ) -> std::ops::ControlFlow<()> {
         // This won't cause race condition where
         // the return value of start_print_task is put
@@ -425,7 +423,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
                 b.push_str("\x1b[1A\x1b[K"); // move up one line and erase it
             }
         }
-            // std::thread::sleep(INTERVAL);
+        // std::thread::sleep(INTERVAL);
         clear(buffer, *lines);
         // scope for locking the printer
         let Ok(mut printer) = PRINTER.lock() else {
@@ -481,7 +479,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
                 temp.clear();
             }
             if width >= temp.len() {
-                buffer.push_str(&temp);
+                buffer.push_str(temp);
                 buffer.push_str(printer.colors.reset);
                 buffer.push('\r');
             }
@@ -489,7 +487,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
             buffer.push_str(printer.colors.reset);
         }
 
-        printer.print_to_bar_target(&buffer);
+        printer.print_to_bar_target(buffer);
 
         // check exit
         if printer.bars.is_empty() {
@@ -499,7 +497,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
             // we know the printer buffer is empty
             // because we just printed all of it while having
             // the lock on the printer
-            printer.print_to_bar_target(&buffer);
+            printer.print_to_bar_target(buffer);
             std::ops::ControlFlow::Break(())
         } else {
             std::ops::ControlFlow::Continue(())
@@ -515,21 +513,27 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
         // how many bars were printed
         let mut lines = 0;
         loop {
-            match print_loop(original_width, max_bars, tick, &mut buffer, &mut temp, &mut lines) {
+            match print_loop(
+                original_width,
+                max_bars,
+                tick,
+                &mut buffer,
+                &mut temp,
+                &mut lines,
+            ) {
                 std::ops::ControlFlow::Break(_) => break,
-                _ => {}
+                _ => {
+                    std::thread::sleep(INTERVAL);
+                    tick = tick.wrapping_add(1);
+                }
             };
-            std::thread::sleep(INTERVAL);
-            tick = tick.wrapping_add(1);
         }
     })
 }
 
 // note that for interactive io, it's recommended to use blocking io directly
 // on a thread instead of tokio
-fn prompt_task(
-    first_send: oneshot::Sender<std::io::Result<String>>,
-) -> JoinHandle<()> {
+fn prompt_task(first_send: oneshot::Sender<std::io::Result<String>>) -> JoinHandle<()> {
     use std::io::Write;
     let mut stdout = std::io::stdout();
     std::thread::spawn(move || {

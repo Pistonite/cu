@@ -11,7 +11,7 @@ use super::Handle;
 /// The IO work for those tasks are drived by a single monitoring thread.
 ///
 /// This is good for things like spawning compiler processes where the IO between
-/// child and parent processes are low, but not good for spawning 
+/// child and parent processes are low, but not good for spawning
 /// CPU-bound tasks. Use something like `rayon` for CPU parallelism.
 ///
 /// The pool can be cloned and shared between threads. Dropping the pool will not cause the spawned tasks to be either joined
@@ -37,7 +37,7 @@ impl Pool {
     /// If you are in an async context and want to spawn the task
     /// onto the current runtime context, use [`co_spawn`](Self::co_spawn)
     pub fn spawn<F>(&self, future: F) -> Handle<F::Output>
-where
+    where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
@@ -53,7 +53,7 @@ where
     ///
     /// Will panic if not inside a runtime context.
     pub fn co_spawn<F>(&self, future: F) -> Handle<F::Output>
-where
+    where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
@@ -61,16 +61,14 @@ where
         crate::co::co_spawn(Self::wrapped_future(sem, future))
     }
 
-    fn wrapped_future<F>(sem: Arc<PoolInner>, future: F) -> impl Future<Output=F::Output> 
-where
+    async fn wrapped_future<F>(sem: Arc<PoolInner>, future: F) -> F::Output
+    where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        async move {
-            let _permit = sem.0.acquire().await.ok();
-            let result  =future.await;
-            drop(_permit);
-            result
-        }
+        let _permit = sem.0.acquire().await.ok();
+        let result = future.await;
+        drop(_permit);
+        result
     }
 }

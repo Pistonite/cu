@@ -33,7 +33,7 @@ features = ["derive"]
 optional = true
 
 [features]
-default = ["full"]
+default = []
 full = [
     "cli",
     "prompt",
@@ -46,13 +46,13 @@ cli = ["dep:clap", "dep:copper-proc-macros"]
 # Utils to show prompt for user input in terminal
 prompt = []
 # Enable coroutine drivers, which allow interop with async
-coroutine = ["dep:tokio"]
+coroutine = ["dep:tokio", "tokio/sync"]
 # Enable heavy coroutine drived by multi-threaded tokio runtime
 coroutine-heavy = ["coroutine"]
 # Enable spawning child processes
 process = [
     "coroutine", "fs",
-    "tokio/process", "tokio/sync", "tokio/io-std", "tokio/io-util"
+    "tokio/process", "tokio/io-std", "tokio/io-util"
 ]
 # Enable file system and path util
 fs = ["dep:which", "dep:pathdiff", "dep:dunce"]
@@ -63,4 +63,8 @@ nightly = []
 
 [[example]]
 name = "print"
-required-features = ["prompt"]
+required-features = ["prompt", "cli"]
+
+[[example]]
+name = "process"
+required-features = ["prompt", "cli", "process"]

@@ -2,7 +2,7 @@ use std::process::ExitStatus;
 
 use tokio::process::Child as TokioChild;
 
-use crate::{co,Context as _};
+use crate::{Context as _, co};
 
 /// A child process spawned with [`Command`](crate::Command)
 pub struct Child {
@@ -32,20 +32,20 @@ impl Child {
     /// Use [`co_wait`](Self::co_wait) to avoid blocking if in async context.
     pub fn wait(mut self) -> crate::Result<ExitStatus> {
         // consume the child by waiting
-        let wait_task = co::spawn(async move {
-            self.inner.wait().await
-        });
+        let wait_task = co::spawn(async move { self.inner.wait().await });
         // ensure the IO tasks are finished first, since blocking
         // on child could dead lock if the child is waiting for IO
         let io_panicked = match self.io_task.join_maybe_aborted() {
             Ok(Some(panicked)) => panicked,
             Ok(None) => false, // aborted
-            Err(_) => true
+            Err(_) => true,
         };
         if io_panicked {
             crate::warn!("some io tasks panicked while waiting for child process");
         }
-        wait_task.join()?.context("io error while joining a child process")
+        wait_task
+            .join()?
+            .context("io error while joining a child process")
     }
 
     /// Wait for the child asynchronously using the current tokio runtime,
@@ -68,19 +68,20 @@ impl Child {
     /// Will panic if called outside of a tokio runtime context
     pub async fn co_wait(mut self) -> crate::Result<ExitStatus> {
         // consume the child by waiting
-        let wait_task = co::co_spawn(async move {
-            self.inner.wait().await
-        });
+        let wait_task = co::co_spawn(async move { self.inner.wait().await });
         // ensure the IO tasks are finished first, since blocking
         // on child could dead lock if the child is waiting for IO
         let io_panicked = match self.io_task.co_join_maybe_aborted().await {
             Ok(Some(panicked)) => panicked,
             Ok(None) => false, // aborted
-            Err(_) => true
+            Err(_) => true,
         };
         if io_panicked {
             crate::warn!("some io tasks panicked while waiting for child process");
         }
-        wait_task.co_join().await?.context("io error while joining a child process")
+        wait_task
+            .co_join()
+            .await?
+            .context("io error while joining a child process")
     }
 }

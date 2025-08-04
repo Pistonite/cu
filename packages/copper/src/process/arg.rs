@@ -1,6 +1,5 @@
 use tokio::process::Command as TokioCommand;
 
-
 /// Add arguments to the command
 #[doc(hidden)]
 pub trait Config {
@@ -8,7 +7,9 @@ pub trait Config {
 }
 
 #[doc(hidden)]
-pub struct __ConfigFn<F>(pub F) where F: FnOnce(&mut TokioCommand);
+pub struct __ConfigFn<F>(pub F)
+where
+    F: FnOnce(&mut TokioCommand);
 impl<F: FnOnce(&mut TokioCommand)> Config for __ConfigFn<F> {
     #[inline(always)]
     fn configure(self, command: &mut TokioCommand) {

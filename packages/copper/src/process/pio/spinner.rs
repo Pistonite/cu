@@ -2,9 +2,9 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use spin::mutex::SpinMutex;
-use tokio::process::{ChildStderr, ChildStdout, Command as TokioCommand, Child as TokioChild};
+use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
-use crate::{print::Lv, BoxedFuture, ProgressBar, Atomic};
+use crate::{Atomic, BoxedFuture, ProgressBar, print::Lv};
 
 use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
@@ -31,7 +31,7 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 /// # Behavior
 /// The stream is splited into lines by `\r` and `\n` (`\r\n` is turned into single `\n`).
 /// If the line ends with `\r`, it's considered a progress update.
-/// 
+///
 /// By default, no matter if the line ends with `\r`, the bar will be updated
 /// with the line. You can also configure the bar to only display
 /// updates (end with `\r`), and print the other messages (end with `\n`)
@@ -55,14 +55,13 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 /// # Merging streams
 /// You can `clone` a spinner config to direct multiple streams to use the same
 /// progress bar.
-pub fn spinner(name: impl Into<String>) -> Spinner { 
+pub fn spinner(name: impl Into<String>) -> Spinner {
     Spinner {
         prefix: name.into(),
-        config: Arc::new(
-            SpinnerInner { 
-                lv: Atomic::new_u8(Lv::Off as u8),
-                bar: SpinMutex::new(None)
-            })
+        config: Arc::new(SpinnerInner {
+            lv: Atomic::new_u8(Lv::Off as u8),
+            bar: SpinMutex::new(None),
+        }),
     }
 }
 
@@ -72,7 +71,7 @@ pub struct Spinner {
     /// prefix of the bar
     prefix: String,
 
-    config: Arc<SpinnerInner>
+    config: Arc<SpinnerInner>,
 }
 #[rustfmt::skip]
 impl Spinner {
@@ -96,7 +95,7 @@ struct SpinnerInner {
     // the bar spawned when calling take() for the first time,
     // using a spin lock because it should be VERY rare that
     // we get contention
-    bar: SpinMutex<Option<Arc<ProgressBar>>>
+    bar: SpinMutex<Option<Arc<ProgressBar>>>,
 }
 pub struct SpinnerTask {
     lv: Lv,
@@ -114,14 +113,19 @@ impl ChildOutConfig for Spinner {
     fn configure_stderr(&mut self, command: &mut TokioCommand) {
         command.stderr(Stdio::piped());
     }
-    fn take(self, child: &mut TokioChild, name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
-        let lv= self.config.lv.get();
+    fn take(
+        self,
+        child: &mut TokioChild,
+        name: Option<&str>,
+        is_out: bool,
+    ) -> crate::Result<Self::Task> {
+        let lv = self.config.lv.get();
         let log_prefix = if crate::log_enabled(lv) {
             let name = name.unwrap_or_default();
             if name.is_empty() {
                 String::new()
             } else {
-                format!("[{name}] " )
+                format!("[{name}] ")
             }
         } else {
             String::new()

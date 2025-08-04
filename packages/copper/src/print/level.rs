@@ -1,7 +1,6 @@
-use clap::ValueEnum;
-
 /// Color Level settable with `--color` flag
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, ValueEnum)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum ColorLevel {
     Always,
     Never,
@@ -20,7 +19,7 @@ impl std::fmt::Display for ColorLevel {
 impl ColorLevel {
     /// Get if color should be used. If `Auto`, returns if stdout is terminal.
     pub fn is_colored_for_stdout(self) -> bool {
-    use std::io::IsTerminal;
+        use std::io::IsTerminal;
         match self {
             ColorLevel::Always => true,
             ColorLevel::Never => false,
@@ -36,13 +35,13 @@ impl ColorLevel {
         for x in std::env::args() {
             if found_color {
                 if x == "always" {
-                    return Self::Always
+                    return Self::Always;
                 }
                 if x == "never" {
-                    return Self::Never
+                    return Self::Never;
                 }
                 if x == "auto" {
-                    return Self::Auto
+                    return Self::Auto;
                 }
                 found_color = false;
                 continue;
@@ -52,19 +51,18 @@ impl ColorLevel {
                 continue;
             }
             if x == "--color=always" {
-                return Self::Always
+                return Self::Always;
             }
             if x == "--color=never" {
-                return Self::Never
+                return Self::Never;
             }
             if x == "--color=auto" {
-                return Self::Auto
+                return Self::Auto;
             }
         }
         Self::Auto
     }
 }
-
 
 /// Print level settable with `-v` and `-q` flags
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -155,7 +153,7 @@ pub enum Lv {
     Debug,
     Trace,
 
-    Off
+    Off,
 }
 impl Lv {
     /// Check if the current print level can print this message level
@@ -190,7 +188,7 @@ impl From<u8> for Lv {
             4 => Lv::Info,
             5 => Lv::Debug,
             6 => Lv::Trace,
-            _ => Lv::Off
+            _ => Lv::Off,
         }
     }
 }

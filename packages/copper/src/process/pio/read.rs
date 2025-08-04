@@ -1,7 +1,7 @@
 use std::process::Stdio;
 
 use tokio::io::{AsyncBufRead, AsyncBufReadExt as _, AsyncReadExt as _};
-use tokio::process::{Child as TokioChild, Command as TokioCommand, ChildStdout, ChildStderr};
+use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
 use crate::{BoxedFuture, Context as _, co};
 
@@ -24,7 +24,9 @@ use super::{ChildOutConfig, ChildOutTask};
 /// assert_eq!(b"Hello, world!\n".to_vec(), out.join()??);
 /// # Ok(()) }
 /// ```
-pub fn buffer() -> Buffer { Buffer }
+pub fn buffer() -> Buffer {
+    Buffer
+}
 pub struct Buffer;
 impl ChildOutConfig for Buffer {
     type Task = BufferTask;
@@ -35,7 +37,12 @@ impl ChildOutConfig for Buffer {
     fn configure_stderr(&mut self, command: &mut TokioCommand) {
         command.stderr(Stdio::piped());
     }
-    fn take(self, child: &mut TokioChild, _: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+    fn take(
+        self,
+        child: &mut TokioChild,
+        _: Option<&str>,
+        is_out: bool,
+    ) -> crate::Result<Self::Task> {
         Ok(BufferTask(super::take_child_out(child, is_out)?))
     }
 }
@@ -51,9 +58,8 @@ impl ChildOutTask for BufferTask {
         // there could be a scenario where the future is never polled,
         // resulting in stdout being stuck
         let (send, recv) = tokio::sync::oneshot::channel();
-        let output: Self::Output = co::spawn(async move {
-            recv.await.context("failed to receive output as bytes")?
-        });
+        let output: Self::Output =
+            co::spawn(async move { recv.await.context("failed to receive output as bytes")? });
         let task = async move {
             let buf = read_to_end(self.0).await;
             let _: Result<_, _> = send.send(buf);
@@ -79,7 +85,9 @@ impl ChildOutTask for BufferTask {
 /// assert_eq!("Hello, world!\n", out.join()??);
 /// # Ok(()) }
 /// ```
-pub fn string() -> BufferString { BufferString }
+pub fn string() -> BufferString {
+    BufferString
+}
 pub struct BufferString;
 impl ChildOutConfig for BufferString {
     type Task = BufferStringTask;
@@ -90,7 +98,12 @@ impl ChildOutConfig for BufferString {
     fn configure_stderr(&mut self, command: &mut TokioCommand) {
         command.stderr(Stdio::piped());
     }
-    fn take(self, child: &mut TokioChild, _: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+    fn take(
+        self,
+        child: &mut TokioChild,
+        _: Option<&str>,
+        is_out: bool,
+    ) -> crate::Result<Self::Task> {
         Ok(BufferStringTask(super::take_child_out(child, is_out)?))
     }
 }
@@ -106,15 +119,12 @@ impl ChildOutTask for BufferStringTask {
         // there could be a scenario where the future is never polled,
         // resulting in stdout being stuck
         let (send, recv) = tokio::sync::oneshot::channel();
-        let output: Self::Output = co::spawn(async move {
-            recv.await.context("failed to receive output as bytes")?
-        });
+        let output: Self::Output =
+            co::spawn(async move { recv.await.context("failed to receive output as bytes")? });
         let task = async move {
-            let string = read_to_end(self.0).await
-                .and_then(|buf| {
-                    String::from_utf8(buf)
-                        .context("failed to decode child output as utf-8")
-                });
+            let string = read_to_end(self.0).await.and_then(|buf| {
+                String::from_utf8(buf).context("failed to decode child output as utf-8")
+            });
             let _: Result<_, _> = send.send(string);
         };
         (Some(Box::pin(task)), output)
@@ -125,8 +135,9 @@ async fn read_to_end(r: Result<ChildStdout, ChildStderr>) -> crate::Result<Vec<u
     let mut buf = Vec::new();
     match r {
         Ok(mut r) => r.read_to_end(&mut buf).await,
-        Err(mut r) => r.read_to_end(&mut buf).await
-    }.context("io error while reading output")?;
+        Err(mut r) => r.read_to_end(&mut buf).await,
+    }
+    .context("io error while reading output")?;
     Ok(buf)
 }
 
@@ -146,7 +157,7 @@ async fn read_to_end(r: Result<ChildStdout, ChildStderr>) -> crate::Result<Vec<u
 ///     .stdout(cu::pio::lines())
 ///     .stdie_null()
 ///     .spawn()?;
-/// 
+///
 /// assert_eq!(lines.next().unwrap()?, "Line 1");
 /// assert_eq!(lines.next().unwrap()?, "Line 2");
 /// assert_eq!(lines.next().unwrap()?, "Line 3");
@@ -161,7 +172,9 @@ async fn read_to_end(r: Result<ChildStdout, ChildStderr>) -> crate::Result<Vec<u
 /// # Blocking
 /// Since the iterator blocks the thread while waiting for the next line
 /// to be available, use [`co_lines`] when in an async context.
-pub fn lines() -> Lines { Lines }
+pub fn lines() -> Lines {
+    Lines
+}
 pub struct Lines;
 impl ChildOutConfig for Lines {
     type Task = LinesTask;
@@ -172,7 +185,12 @@ impl ChildOutConfig for Lines {
     fn configure_stderr(&mut self, command: &mut TokioCommand) {
         command.stderr(Stdio::piped());
     }
-    fn take(self, child: &mut TokioChild, _: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+    fn take(
+        self,
+        child: &mut TokioChild,
+        _: Option<&str>,
+        is_out: bool,
+    ) -> crate::Result<Self::Task> {
         Ok(LinesTask(super::take_child_out(child, is_out)?))
     }
 }
@@ -183,9 +201,7 @@ impl ChildOutTask for LinesTask {
 
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output) {
         let (send, recv) = std::sync::mpsc::channel();
-        let output = LinesOutput {
-            recv, done: false
-        };
+        let output = LinesOutput { recv, done: false };
         (Some(Box::pin(self.main(send))), output)
     }
 }
@@ -202,10 +218,10 @@ impl LinesTask {
 /// Output of [`lines`], a synchronous iterator that can reads the output line-by-line.
 ///
 /// Just like the standard library's `lines()` iterator, the items have no line endings.
-pub struct LinesOutput{
+pub struct LinesOutput {
     recv: std::sync::mpsc::Receiver<Option<crate::Result<String>>>,
-    done:bool
-    }
+    done: bool,
+}
 impl Iterator for LinesOutput {
     type Item = crate::Result<String>;
 
@@ -257,7 +273,9 @@ impl Iterator for LinesOutput {
 /// child.co_wait_nz().await?;
 /// # Ok(())}
 /// ```
-pub fn co_lines() -> CoLines { CoLines }
+pub fn co_lines() -> CoLines {
+    CoLines
+}
 pub struct CoLines;
 impl ChildOutConfig for CoLines {
     type Task = CoLinesTask;
@@ -268,7 +286,12 @@ impl ChildOutConfig for CoLines {
     fn configure_stderr(&mut self, command: &mut TokioCommand) {
         command.stderr(Stdio::piped());
     }
-    fn take(self, child: &mut TokioChild, _: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+    fn take(
+        self,
+        child: &mut TokioChild,
+        _: Option<&str>,
+        is_out: bool,
+    ) -> crate::Result<Self::Task> {
         Ok(CoLinesTask(super::take_child_out(child, is_out)?))
     }
 }
@@ -278,9 +301,7 @@ impl ChildOutTask for CoLinesTask {
 
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output) {
         let (send, recv) = tokio::sync::mpsc::unbounded_channel();
-        let output = CoLinesOutput {
-            recv, done: false
-        };
+        let output = CoLinesOutput { recv, done: false };
         (Some(Box::pin(self.main(send))), output)
     }
 }
@@ -297,9 +318,9 @@ impl CoLinesTask {
 /// Output of [`co_lines`], an ansynchronous iterator that can reads the output line-by-line.
 ///
 /// Just like the standard library's `lines()` iterator, the items have no line endings.
-pub struct CoLinesOutput{
+pub struct CoLinesOutput {
     recv: tokio::sync::mpsc::UnboundedReceiver<Option<crate::Result<String>>>,
-    done: bool
+    done: bool,
 }
 impl CoLinesOutput {
     /// Get the next line
@@ -336,10 +357,7 @@ impl LineSender for tokio::sync::mpsc::UnboundedSender<Option<crate::Result<Stri
         self.send(payload).is_ok()
     }
 }
-async fn read_send_line<
-R: AsyncBufRead + Unpin,
-S: LineSender
->(r: R, send: S) {
+async fn read_send_line<R: AsyncBufRead + Unpin, S: LineSender>(r: R, send: S) {
     let mut lines = r.lines();
     loop {
         match lines.next_line().await {

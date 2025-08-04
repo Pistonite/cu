@@ -1,12 +1,12 @@
-use std::{path::PathBuf, process::ExitStatus};
 use std::ffi::OsStr;
+use std::{path::PathBuf, process::ExitStatus};
 
-use tokio::process::{Command as TokioCommand, Child as TokioChild};
+use tokio::process::{Child as TokioChild, Command as TokioCommand};
 use tokio::task::JoinSet;
 
-use super::{Config, Child};
+use super::{Child, Config};
 
-use crate::{co, pio, Context as _, PathExtension as _};
+use crate::{Context as _, PathExtension as _, co, pio};
 
 /// A [`Command`] to be built
 pub type CommandBuilder = Command<(), (), ()>;
@@ -72,7 +72,7 @@ impl CommandBuilder {
     ///
     /// # fn main() -> cu::Result<()> {
     /// let command = cu::CommandBuilder::new("git");
-    /// // or: 
+    /// // or:
     /// let command = std::path::Path::new("git").command();
     /// // even better, find the executable in PATH using the crate's
     /// // binary registry
@@ -80,13 +80,13 @@ impl CommandBuilder {
     /// # Ok(()) }
     /// ```
     pub fn new(bin: impl AsRef<OsStr>) -> Self {
-        Self { 
+        Self {
             command: TokioCommand::new(bin),
             name: None,
             current_dir: None,
             stdout: (),
             stderr: (),
-            stdin: ()
+            stdin: (),
         }
     }
 }
@@ -133,6 +133,7 @@ impl<Out, Err, In> Command<Out, Err, In> {
 
     /// Add more configuration. See [`args!`](crate::args) and [`envs!`](crate::envs).
     #[inline(always)]
+    #[allow(clippy::should_implement_trait)]
     pub fn add(mut self, config: impl Config) -> Self {
         config.configure(&mut self.command);
         self
@@ -339,11 +340,17 @@ struct EitherOf<A, B>(A, B);
 
 /// **Implementation only applies if the child has no output handles (see [`spawn`](Command::spawn) for more
 /// details)**
-impl<Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<__Null=pio::__OCNull>, In: pio::ChildInConfig> Command<Out, Err, In> {
+impl<
+    Out: pio::ChildOutConfig<__Null = pio::__OCNull>,
+    Err: pio::ChildOutConfig<__Null = pio::__OCNull>,
+    In: pio::ChildInConfig,
+> Command<Out, Err, In>
+{
     /// Spawn and wait for child to exit with non-zero status code.
     ///
     /// This is equivalent to calling [`spawn()`](Self::spawn), then
     /// [`wait_nz()`](Child::wait_nz) on the [`Child`].
+    #[inline(always)]
     pub fn wait_nz(self) -> crate::Result<()> {
         self.spawn()?.wait_nz()
     }
@@ -351,6 +358,7 @@ impl<Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<__
     ///
     /// This is equivalent to calling [`spawn()`](Self::spawn), then
     /// [`wait()`](Child::wait) on the [`Child`].
+    #[inline(always)]
     pub fn wait(self) -> crate::Result<ExitStatus> {
         self.spawn()?.wait()
     }
@@ -360,6 +368,7 @@ impl<Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<__
     ///
     /// This is equivalent to calling [`co_spawn()`](Self::co_spawn), then
     /// [`co_wait_nz()`](Child::co_wait_nz) on the [`Child`].
+    #[inline(always)]
     pub async fn co_wait_nz(self) -> crate::Result<()> {
         self.co_spawn().await?.co_wait_nz().await
     }
@@ -368,13 +377,17 @@ impl<Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<__
     ///
     /// This is equivalent to calling [`co_spawn()`](Self::co_spawn), then
     /// [`co_wait()`](Child::co_wait) on the [`Child`].
+    #[inline(always)]
     pub async fn co_wait(self) -> crate::Result<ExitStatus> {
         self.co_spawn().await?.co_wait().await
     }
 }
 
 /// This trait allows implementing different return types for [`Command::spawn`] based on the configured IO.
-pub trait Spawn<Target> where Target: Send + 'static{
+pub trait Spawn<Target>
+where
+    Target: Send + 'static,
+{
     fn spawn(self) -> crate::Result<Target>;
     fn co_spawn(self) -> crate::BoxedFuture<crate::Result<Target>>;
 }
@@ -385,22 +398,28 @@ macro_rules! Spawned {
         $crate::Child
     };
     (Out) => {
-        ( $crate::Child, 
-        <Out::Task as $crate::process::pio::ChildOutTask>::Output,)
+        (
+            $crate::Child,
+            <Out::Task as $crate::process::pio::ChildOutTask>::Output,
+        )
     };
     ($A:ident, $B:ident) => {
-        ( $crate::Child, 
-        <$A::Task as $crate::process::pio::ChildOutTask>::Output,
-        <$B::Task as $crate::process::pio::ChildOutTask>::Output )
+        (
+            $crate::Child,
+            <$A::Task as $crate::process::pio::ChildOutTask>::Output,
+            <$B::Task as $crate::process::pio::ChildOutTask>::Output,
+        )
     };
 }
 
 #[rustfmt::skip]
 #[cfg(not(doc))]
 impl< Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<__Null=pio::__OCNull>, In: pio::ChildInConfig> Spawn<Spawned![]> for Command<Out, Err, In> {
+    #[inline(always)]
     fn spawn(self) -> crate::Result<Spawned![]> {
         spawn_internal(self).map(|x| x.0)
     }
+    #[inline(always)]
     fn co_spawn(self) -> crate::BoxedFuture<crate::Result<Spawned![]>> {
         Box::pin(async move {
             co_spawn_internal(self).await.map(|x| x.0)
@@ -411,9 +430,11 @@ impl< Out: pio::ChildOutConfig<__Null=pio::__OCNull>, Err: pio::ChildOutConfig<_
 #[rustfmt::skip]
 #[cfg(not(doc))]
 impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfig<__Null=pio::__OCNull>, In: pio::ChildInConfig> Spawn<Spawned![Out]> for Command<Out, Err, In> {
+    #[inline(always)]
     fn spawn(self) -> crate::Result<Spawned![Out]> {
         spawn_internal(self).map(|(c,o,_)| (c,o))
     }
+    #[inline(always)]
     fn co_spawn(self) -> crate::BoxedFuture<crate::Result<Spawned![Out]>> {
         Box::pin(async move {
             co_spawn_internal(self).await.map(|(c,o,_)| (c,o))
@@ -424,20 +445,21 @@ impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfi
 #[rustfmt::skip]
 #[cfg(not(doc))]
 impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfig, In: pio::ChildInConfig> Spawn<Spawned![Out, Err]> for Command<Out, Err, In> {
+    #[inline(always)]
     fn spawn(self) -> crate::Result<Spawned![Out, Err]> {
         spawn_internal(self)
     }
+    #[inline(always)]
     fn co_spawn(self) -> crate::BoxedFuture<crate::Result<Spawned![Out, Err]>> {
         Box::pin(co_spawn_internal(self))
     }
 }
 
 /// handle the actual spawning
-fn spawn_internal<
-    Out: pio::ChildOutConfig, 
-    Err: pio::ChildOutConfig, 
-    In: pio::ChildInConfig
->(mut self_: Command<Out, Err, In>) -> crate::Result<(
+#[allow(clippy::type_complexity)]
+fn spawn_internal<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig>(
+    mut self_: Command<Out, Err, In>,
+) -> crate::Result<(
     Child,
     <Out::Task as pio::ChildOutTask>::Output,
     <Err::Task as pio::ChildOutTask>::Output,
@@ -451,14 +473,18 @@ fn spawn_internal<
     co::spawn(async move {
         let child = self_.command.spawn().context("failed to spawn command")?;
         post_spawn(self_, child)
-    }).join()?
+    })
+    .join()?
 }
 /// handle the actual spawning
+#[allow(clippy::type_complexity)]
 async fn co_spawn_internal<
-    Out: pio::ChildOutConfig, 
-    Err: pio::ChildOutConfig, 
-    In: pio::ChildInConfig
->(mut self_: Command<Out, Err, In>) -> crate::Result<(
+    Out: pio::ChildOutConfig,
+    Err: pio::ChildOutConfig,
+    In: pio::ChildInConfig,
+>(
+    mut self_: Command<Out, Err, In>,
+) -> crate::Result<(
     Child,
     <Out::Task as pio::ChildOutTask>::Output,
     <Err::Task as pio::ChildOutTask>::Output,
@@ -472,14 +498,14 @@ async fn co_spawn_internal<
     co::spawn(async move {
         let child = self_.command.spawn().context("failed to spawn command")?;
         post_spawn(self_, child)
-    }).co_join().await?
+    })
+    .co_join()
+    .await?
 }
 
-fn pre_spawn<
-    Out: pio::ChildOutConfig, 
-    Err: pio::ChildOutConfig, 
-    In: pio::ChildInConfig
->(self_: &mut Command<Out, Err, In>) -> crate::Result<()> {
+fn pre_spawn<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig>(
+    self_: &mut Command<Out, Err, In>,
+) -> crate::Result<()> {
     use std::fmt::Write as _;
     let mut trace = String::new();
 
@@ -487,7 +513,11 @@ fn pre_spawn<
     let log_enabled = crate::log_enabled(crate::lv::T);
     if log_enabled {
         let command = self_.command.as_std();
-        let _ = write!(&mut trace, "spawning '{}', args: [", command.get_program().display());
+        let _ = write!(
+            &mut trace,
+            "spawning '{}', args: [",
+            command.get_program().display()
+        );
         let mut args = command.get_args();
         if let Some(a) = args.next() {
             let arg = a.display().to_string().replace('\'', "\\'");
@@ -524,28 +554,40 @@ fn pre_spawn<
     // configure IO
     self_.stdout.configure_stdout(&mut self_.command);
     self_.stderr.configure_stderr(&mut self_.command);
-    self_.stdin.configure_stdin(&mut self_.command).context("failed to configure child stdin")?;
+    self_
+        .stdin
+        .configure_stdin(&mut self_.command)
+        .context("failed to configure child stdin")?;
     Ok(())
 }
 
-fn post_spawn<
-    Out: pio::ChildOutConfig, 
-    Err: pio::ChildOutConfig, 
-    In: pio::ChildInConfig
->(self_: Command<Out, Err, In>, mut child: TokioChild) -> crate::Result<(
+#[allow(clippy::type_complexity)]
+fn post_spawn<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildInConfig>(
+    self_: Command<Out, Err, In>,
+    mut child: TokioChild,
+) -> crate::Result<(
     Child,
     <Out::Task as pio::ChildOutTask>::Output,
     <Err::Task as pio::ChildOutTask>::Output,
 )> {
-    let name = self_.name.as_ref().map(|x| x.as_str());
+    let name = self_.name.as_deref();
 
-    let stdout = self_.stdout.take(&mut child, name, true).context("failed to take child stdout")?;
-    let stderr = self_.stderr.take(&mut child, name, false).context("failed to take child stderr")?;
-    let stdin = self_.stdin.take(&mut child).context("failed to take child stdin")?;
+    let stdout = self_
+        .stdout
+        .take(&mut child, name, true)
+        .context("failed to take child stdout")?;
+    let stderr = self_
+        .stderr
+        .take(&mut child, name, false)
+        .context("failed to take child stderr")?;
+    let stdin = self_
+        .stdin
+        .take(&mut child)
+        .context("failed to take child stdin")?;
 
     // get the IO tasks
-    use pio::ChildOutTask as _;
     use pio::ChildInTask as _;
+    use pio::ChildOutTask as _;
     let (stdout_future, stdout) = stdout.run();
     let (stderr_future, stderr) = stderr.run();
     let stdin_future = stdin.run();
@@ -572,5 +614,12 @@ fn post_spawn<
     };
     let io_task = co::spawn(combined_future);
 
-    Ok((Child{inner: child, io_task}, stdout, stderr))
+    Ok((
+        Child {
+            inner: child,
+            io_task,
+        },
+        stdout,
+        stderr,
+    ))
 }

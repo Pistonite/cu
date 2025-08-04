@@ -1,10 +1,10 @@
 use std::process::Stdio;
 
-use tokio::process::{Command as TokioCommand, Child as TokioChild};
+use tokio::process::{Child as TokioChild, Command as TokioCommand};
 
 use crate::{BoxedFuture, Context as _};
 
-use super::{ChildOutConfig, ChildInConfig, ChildOutTask};
+use super::{ChildInConfig, ChildOutConfig, ChildOutTask};
 
 /// Pipe the child's output into another command's stdin.
 ///
@@ -26,7 +26,9 @@ use super::{ChildOutConfig, ChildInConfig, ChildOutTask};
 /// hello.wait_nz()?;
 /// # Ok(()) }
 /// ```
-pub fn pipe() -> Pipe { Pipe }
+pub fn pipe() -> Pipe {
+    Pipe
+}
 pub struct Pipe;
 impl ChildOutConfig for Pipe {
     type Task = PipeTask;
@@ -40,7 +42,12 @@ impl ChildOutConfig for Pipe {
         command.stderr(std::process::Stdio::piped());
     }
 
-    fn take(self, child: &mut TokioChild, _name: Option<&str>, is_out: bool) -> crate::Result<Self::Task> {
+    fn take(
+        self,
+        child: &mut TokioChild,
+        _name: Option<&str>,
+        is_out: bool,
+    ) -> crate::Result<Self::Task> {
         let stream = super::take_child_out(child, is_out)?;
         // note: the falliable conversion is necessary right now
         // since tokio does not yet have a way for us to take
@@ -49,7 +56,7 @@ impl ChildOutConfig for Pipe {
         // once Command::spawn_with is stabilized, we can use it
         let x: Result<Stdio, _> = match stream {
             Ok(s) => s.try_into(),
-            Err(s) => s.try_into()
+            Err(s) => s.try_into(),
         };
         let x = x.context("failed to convert tokio pipe to std pipe")?;
         Ok(PipeTask(x))
@@ -74,7 +81,7 @@ impl ChildInConfig for PipeOutput {
                 command.stdin(x);
                 Ok(())
             }
-            _ => crate::bail!("unexpected: pipe was already taken")
+            _ => crate::bail!("unexpected: pipe was already taken"),
         }
     }
 

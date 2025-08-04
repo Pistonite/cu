@@ -1,9 +1,10 @@
-
 /// An atomic wrapper with an underlying atomic storage and conversion to
 /// a type T
 #[derive(Debug, Default)]
 pub struct Atomic<S, T>(S::Type, std::marker::PhantomData<T>)
-    where S: AtomicType, T: From<S> + Into<S>;
+where
+    S: AtomicType,
+    T: From<S> + Into<S>;
 /// Marker type to associate primitive with their atomic versions
 pub trait AtomicType {
     type Type;

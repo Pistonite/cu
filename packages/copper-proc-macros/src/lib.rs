@@ -72,7 +72,7 @@ fn expand_cli(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream2
         #item
     };
 
-    Ok(expanded.into())
+    Ok(expanded)
 }
 
 fn unwrap_syn<T: Into<TokenStream2>>(result: syn::Result<T>) -> TokenStream {

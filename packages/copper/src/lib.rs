@@ -18,7 +18,7 @@
 //! - `cli`: Enables CLI entry points and integration with `clap`. (See [`cli`](module@cli))
 //! - `prompt`: Enables macros to show prompt to the user. (See [Prompting](#prompting))
 //! - `fs`: Enables file system utils. (See [`fs`](module@fs))
-//! - `coroutine` and `coroutine-heavy`: 
+//! - `coroutine` and `coroutine-heavy`:
 //!   Enables `async` and integration with `tokio`. (See [`co`](module@co))
 //! - `process`: Enables utils spawning child process
 //!
@@ -127,49 +127,50 @@
 //
 // mod monitor;
 
-
-#[cfg(feature="process")]
+#[cfg(feature = "process")]
 mod process;
-#[cfg(feature="process")]
-pub use process::{pio, CommandBuilder, Command, Child, Spawn, color_flag, color_flag_eq, width_flag, width_flag_eq};
+#[cfg(feature = "process")]
+pub use process::{
+    Child, Command, CommandBuilder, Spawn, color_flag, color_flag_eq, pio, width_flag,
+    width_flag_eq,
+};
 
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 pub mod bin;
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 #[doc(inline)]
 pub use bin::which;
 
 /// File System utils (WIP)
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 pub mod fs;
 
 /// Path utils
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 mod path;
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 pub use path::PathExtension;
 
-#[cfg(feature="cli")]
+#[cfg(feature = "cli")]
 pub mod cli;
-#[cfg(feature="cli")]
+#[cfg(feature = "cli")]
 pub use copper_proc_macros::cli;
 
 mod async_;
 pub use async_::BoxedFuture;
-#[cfg(feature="coroutine")]
+#[cfg(feature = "coroutine")]
 pub mod co;
 // tokio re-exports
-#[cfg(feature="coroutine")]
+#[cfg(feature = "coroutine")]
 pub use tokio::{join, try_join};
-
 
 /// Low level printing utils and integration with log and clap
 mod print;
 pub use print::{
     ColorLevel, PrintLevel, ProgressBar, PromptLevel, color_enabled, init_print_options,
-    progress_bar, progress_bar_lowp, progress_unbounded, progress_unbounded_lowp,
-    set_thread_print_name, log_enabled,
-    term_width, term_width_or_max, term_width_height,log_init
+    log_enabled, log_init, progress_bar, progress_bar_lowp, progress_unbounded,
+    progress_unbounded_lowp, set_thread_print_name, term_width, term_width_height,
+    term_width_or_max,
 };
 
 /// Level shorthand for message/events
@@ -199,21 +200,21 @@ mod misc;
 pub use misc::*;
 
 // re-exports from libraries
-pub use anyhow::{Context, Result, bail, ensure, Ok, anyhow as err};
+pub use anyhow::{Context, Ok, Result, anyhow as err, bail, ensure};
 pub use log::{debug, error, info, trace, warn};
 
 #[doc(hidden)]
 pub mod __priv {
-    #[cfg(feature="process")]
-    pub use crate::process::__ConfigFn;
     pub use crate::print::{__print_with_level, __prompt, __prompt_yesno, Lv};
+    #[cfg(feature = "process")]
+    pub use crate::process::__ConfigFn;
 }
 
 /// Prelude imports
 pub mod pre {
     pub use crate::Context as _;
-    #[cfg(feature="fs")]
+    #[cfg(feature = "fs")]
     pub use crate::PathExtension as _;
-    #[cfg(feature="process")]
+    #[cfg(feature = "process")]
     pub use crate::Spawn as _;
 }

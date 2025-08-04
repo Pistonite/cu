@@ -1,11 +1,11 @@
-
 /// Decode the first UTF-8 `char` out of the buffer.
 ///
 /// Returns `Ok(char, len)` if the char can be decoded succesfully,
 /// `Err(false)` if there is not enough bytes to fully decode
 /// a char, and `Err(true)` if the bytes are invalid
+#[allow(unused)]
 pub(crate) fn decode_char(buf: &[u8]) -> Result<(char, usize), bool> {
-    let Some(first) = buf.get(0) else {
+    let Some(first) = buf.first() else {
         return Err(false);
     };
     let first = *first;
@@ -33,6 +33,6 @@ pub(crate) fn decode_char(buf: &[u8]) -> Result<(char, usize), bool> {
             debug_assert_eq!(c.len_utf8(), expected_len, "utf8::decode_char wrong");
             Ok((c, expected_len))
         }
-        None => Err(false)
+        None => Err(false),
     }
 }

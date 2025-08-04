@@ -3,7 +3,7 @@ use std::time::Duration;
 #[derive(cu::cli::Parser, Clone)]
 struct Args {
     #[clap(flatten)]
-    inner: cu::cli::Flags
+    inner: cu::cli::Flags,
 }
 /// Run with cargo run --example print --features prompt
 #[cu::cli(flags = "inner")]

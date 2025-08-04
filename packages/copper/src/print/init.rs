@@ -21,7 +21,7 @@ pub fn log_init(lv: &str) {
         "q" => PrintLevel::Quiet,
         "v" => PrintLevel::Verbose,
         "vv" => PrintLevel::VerboseVerbose,
-        _ => PrintLevel::Normal
+        _ => PrintLevel::Normal,
     };
     init_print_options(ColorLevel::Auto, level, Some(PromptLevel::No));
 }

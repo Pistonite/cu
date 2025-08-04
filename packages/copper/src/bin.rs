@@ -52,7 +52,8 @@ use std::sync::{LazyLock, RwLock};
 
 use crate::PathExtension as _;
 
-static BIN_PATHS: LazyLock<RwLock<BTreeMap<String, PathBuf>>> = LazyLock::new(|| RwLock::new(BTreeMap::new()));
+static BIN_PATHS: LazyLock<RwLock<BTreeMap<String, PathBuf>>> =
+    LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
 /// Check and set bin name to the specified path. Return the absolute path that is set.
 ///
@@ -77,7 +78,9 @@ pub fn set(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathB
     let name = name.as_ref();
     let path = location(path.as_ref()).find(name)?;
     crate::trace!("setting bin path: '{name}' -> '{}'", path.display());
-    let mut paths = BIN_PATHS.write().expect("could not lock global bin path map");
+    let mut paths = BIN_PATHS
+        .write()
+        .expect("could not lock global bin path map");
     let old = paths.insert(name.to_string(), path.clone());
     if let Some(old) = old {
         crate::trace!("replacing old bin path: '{}'", old.display());
@@ -110,7 +113,10 @@ pub fn resolve(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<P
 /// that path is returned instead.
 ///
 /// See [`cu::bin`](self) module-level documentation for more info.
-pub fn find<'a, I: IntoIterator<Item=Strategy<'a>>>(name: impl AsRef<str>, strats: I) -> crate::Result<PathBuf> {
+pub fn find<'a, I: IntoIterator<Item = Strategy<'a>>>(
+    name: impl AsRef<str>,
+    strats: I,
+) -> crate::Result<PathBuf> {
     let name = name.as_ref();
     {
         let Ok(paths) = BIN_PATHS.read() else {
@@ -132,14 +138,17 @@ pub fn find<'a, I: IntoIterator<Item=Strategy<'a>>>(name: impl AsRef<str>, strat
     Ok(path)
 }
 
-fn find_with_strats<'a, I: IntoIterator<Item=Strategy<'a>>>(name: &str, strats: I) -> crate::Result<PathBuf> {
+fn find_with_strats<'a, I: IntoIterator<Item = Strategy<'a>>>(
+    name: &str,
+    strats: I,
+) -> crate::Result<PathBuf> {
     let mut strats = strats.into_iter();
     let Some(first) = strats.next() else {
         crate::bail!("must provide at least one strategy to cu::bin::find");
     };
     let mut error = match first.find(name) {
         Ok(x) => return Ok(x),
-        Err(e) => e
+        Err(e) => e,
     };
     let mut prev = first;
     for strat in strats {
@@ -147,7 +156,7 @@ fn find_with_strats<'a, I: IntoIterator<Item=Strategy<'a>>>(name: &str, strats: 
         crate::trace!("falling back to finding '{name}' {strat}");
         error = match strat.find(name) {
             Ok(x) => return Ok(x),
-            Err(e) => e
+            Err(e) => e,
         };
         prev = strat;
     }
@@ -186,7 +195,7 @@ pub enum Strategy<'a> {
     /// Resolve a provided path
     Resolve(&'a Path),
     /// Resolve from path in an environment variable
-    EnvVar(&'a str)
+    EnvVar(&'a str),
 }
 
 impl Strategy<'_> {
@@ -197,13 +206,13 @@ impl Strategy<'_> {
                 match which::which(name) {
                     // which already canonicalize it, which ensures it exists
                     Ok(x) => x.normalize(),
-                    Err(e) => Err(e)?
+                    Err(e) => Err(e)?,
                 }
             }
             Self::Resolve(path) => {
                 crate::trace!("finding executable '{name}' at '{}'", path.display());
                 path.normalize_exists()
-            },
+            }
             Self::EnvVar(v) => {
                 crate::trace!("finding executable '{name}' using environment variable '{v}'");
                 match std::env::var(v) {
@@ -219,7 +228,7 @@ impl std::fmt::Display for Strategy<'_> {
         match self {
             Strategy::Which => write!(f, "in PATH"),
             Strategy::Resolve(path) => write!(f, " at '{}'", path.display()),
-            Strategy::EnvVar(env) => write!(f, "using envvar '{env}'")
+            Strategy::EnvVar(env) => write!(f, "using envvar '{env}'"),
         }
     }
 }
