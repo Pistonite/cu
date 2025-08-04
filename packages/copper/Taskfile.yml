@@ -8,7 +8,34 @@ includes:
 tasks:
   check:
     cmds:
-      - task: cargo:clippy-all
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: cli
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: prompt
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: prompt,cli
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: cli,coroutine
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: fs
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: process
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: full
       - task: cargo:fmt-check
 
   fix:
@@ -19,4 +46,11 @@ tasks:
     cmds:
       - task: cargo:watch-serve-doc
         vars:
-          CARGO_DOC_ARGS: --features full
+          CARGO_ARGS: --all-features
+          TOOLCHAIN: +nightly
+
+  test:
+    cmds:
+      - cargo test 
+      - cargo test --features cli
+      - cargo test --features full

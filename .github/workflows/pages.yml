@@ -10,7 +10,7 @@ jobs:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           mono-dev: packages
-          rust: stable
+          rust: nightly
       - run: task exec -- doc
       - uses: actions/upload-pages-artifact@v3
         with:

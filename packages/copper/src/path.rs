@@ -4,6 +4,9 @@ use std::path::{Path, PathBuf};
 use crate::Context as _;
 
 /// Extension to paths
+///
+/// Most of these are related to file system, and not purely path processing.
+/// Therefore this is tied to the `fs` feature.
 pub trait PathExtension {
     /// Get file name. Error if the file name is not UTF-8 or other error occurs
     fn file_name_str(&self) -> crate::Result<&str>;
@@ -21,6 +24,9 @@ pub trait PathExtension {
     /// On Windows only, it returns the most compatible form using the `dunce` crate instead of
     /// UNC, and the drive letter is also normalized to upper case
     fn normalize(&self) -> crate::Result<PathBuf>;
+
+    /// Normalize the path and ensure it exists
+    fn normalize_exists(&self) -> crate::Result<PathBuf>;
 
     /// Get the parent path as an absolute path
     ///
@@ -45,6 +51,10 @@ pub trait PathExtension {
 
     /// Try converting self to a relative path from a base path
     fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path>;
+
+    /// Start building a child process with the path as the executable
+    #[cfg(feature = "process")]
+    fn command(&self) -> crate::CommandBuilder;
 }
 
 impl PathExtension for Path {
@@ -59,6 +69,14 @@ impl PathExtension for Path {
             crate::bail!("file name is not valid UTF-8: {}", self.display());
         };
         Ok(file_name)
+    }
+
+    fn normalize_exists(&self) -> crate::Result<PathBuf> {
+        let r = self.normalize()?;
+        if !r.exists() {
+            crate::bail!("path '{}' does not exist.", r.display());
+        }
+        Ok(r)
     }
 
     fn normalize(&self) -> crate::Result<PathBuf> {
@@ -124,6 +142,11 @@ impl PathExtension for Path {
             Some(x) => Cow::Owned(x),
         }
     }
+
+    #[cfg(feature = "process")]
+    fn command(&self) -> crate::CommandBuilder {
+        crate::CommandBuilder::new(self)
+    }
 }
 
 /// Normalize a path that failed to canonicalize
@@ -172,11 +195,18 @@ macro_rules! impl_for_as_ref_path {
             fn normalize(&self) -> crate::Result<PathBuf> {
                 AsRef::<Path>::as_ref(self).normalize()
             }
+            fn normalize_exists(&self) -> crate::Result<PathBuf> {
+                AsRef::<Path>::as_ref(self).normalize_exists()
+            }
             fn parent_abs_times(&self, x: usize) -> crate::Result<PathBuf> {
                 AsRef::<Path>::as_ref(self).parent_abs_times(x)
             }
             fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path> {
                 AsRef::<Path>::as_ref(self).try_to_rel_from(path)
+            }
+            #[cfg(feature = "process")]
+            fn command(&self) -> crate::CommandBuilder {
+                AsRef::<Path>::as_ref(self).command()
             }
         }
     };

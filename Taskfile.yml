@@ -24,8 +24,13 @@ tasks:
     cmds:
       - task: cu:check
 
+  test:
+    cmds:
+      - task: cu:test
+
   doc:
     cmds:
+      # note: require nightly toolchain in CI
       - cargo doc --no-deps --all-features
       - cmd: >
           echo "Generating index redirect";
