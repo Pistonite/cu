@@ -23,3 +23,11 @@ jobs:
           mono-dev: packages
           rust: stable
       - run: task exec -- test
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          mono-dev: packages
+          rust: nightly
+      - run: task exec -- doc
