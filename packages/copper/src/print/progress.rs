@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::ansi;
 
@@ -114,9 +114,17 @@ impl ProgressBar {
             bar.message = message;
         }
     }
-    pub(crate) fn format(&self, width: usize, now: Instant, out: &mut String, temp: &mut String) {
-        if let Ok(bar) = self.inner.lock() {
-            bar.format(width, now, out, temp)
+    pub(crate) fn format(
+        &self,
+        width: usize,
+        now: Instant,
+        tick: u32,
+        tick_interval: Duration,
+        out: &mut String,
+        temp: &mut String,
+    ) {
+        if let Ok(mut bar) = self.inner.lock() {
+            bar.format(width, now, tick, tick_interval, out, temp)
         }
     }
 }
@@ -127,6 +135,14 @@ struct ProgressBarState {
     total: usize,
     /// Current count, has no meaning for unbounded
     current: usize,
+    /// Current when we last estimated ETA
+    last_eta_current: usize,
+    /// Tick when we last estimated ETA
+    last_eta_tick: u32,
+    /// Last calculation
+    previous_eta: f64,
+    /// If ETA should be shown, we only show if it's reasonably accurate
+    should_show_eta: bool,
     /// Prefix to display, usually indicating what the progress bar is for
     prefix: String,
     /// Message to display, usually indicating what the current action is
@@ -153,6 +169,10 @@ impl ProgressBarState {
         Self {
             total,
             current: 0,
+            last_eta_current: 0,
+            last_eta_tick: 0,
+            previous_eta: 0f64,
+            should_show_eta: false,
             started,
             prefix,
             message: String::new(),
@@ -164,9 +184,11 @@ impl ProgressBarState {
     /// Format the progress bar, adding at most `width` bytes to the buffer,
     /// not including a newline
     pub(crate) fn format(
-        &self,
+        &mut self,
         mut width: usize,
         now: Instant,
+        tick: u32,
+        tick_interval: Duration,
         out: &mut String,
         temp: &mut String,
     ) {
@@ -225,7 +247,7 @@ impl ProgressBarState {
             width -= w;
             out.push(c);
         }
-        if !self.is_unbounded() {
+        if !self.is_unbounded() && self.current > 0 {
             let start = unsafe { self.started.assume_init_read() };
             let elapsed = (now - start).as_secs_f64();
             // show percentage/ETA if the progress takes more than 2s
@@ -248,20 +270,47 @@ impl ProgressBarState {
                         out.push_str(temp);
                     }
                 }
-                if width > 0 {
-                    out.push(' ');
-                    width -= 1;
-                }
                 // ETA SS.SSs
-                temp.clear();
                 let secs_per_unit = elapsed / self.current as f64;
-                let eta = secs_per_unit * (self.total - self.current) as f64;
-                if write!(temp, "ETA {eta:.2}s").is_err() {
-                    temp.clear();
+                let mut eta = secs_per_unit * (self.total - self.current) as f64;
+                if self.current == self.last_eta_current {
+                    // subtract time passed since updating to this step
+                    let elapased_since_current =
+                        (tick_interval * (tick - self.last_eta_tick)).as_secs_f64();
+                    if elapased_since_current > eta {
+                        self.last_eta_current = self.current;
+                        self.last_eta_tick = tick;
+                    }
+                    eta = (eta - elapased_since_current).max(0f64);
+                    // only start showing ETA if it's reasonably accurate
+                    if !self.should_show_eta
+                        && eta < self.previous_eta - tick_interval.as_secs_f64()
+                    {
+                        self.should_show_eta = true;
+                    }
+                    self.previous_eta = eta;
+                } else {
+                    self.last_eta_current = self.current;
+                    self.last_eta_tick = tick;
                 }
-                if width >= temp.len() {
-                    width -= temp.len();
-                    out.push_str(temp);
+                if self.should_show_eta {
+                    if width > 0 {
+                        out.push(' ');
+                        width -= 1;
+                    }
+                    temp.clear();
+                    if write!(temp, "ETA {eta:.2}s;").is_err() {
+                        temp.clear();
+                    }
+                    if width >= temp.len() {
+                        width -= temp.len();
+                        out.push_str(temp);
+                    }
+                }
+            } else {
+                if !self.message.is_empty() && width > 0 {
+                    out.push(':');
+                    width -= 1;
                 }
             }
             if width > 0 {

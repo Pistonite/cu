@@ -120,13 +120,6 @@
 
 #![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_auto_cfg))]
 
-// mod env_var;
-// pub use env_var::*;
-// mod parse;
-// pub use parse::*;
-//
-// mod monitor;
-
 #[cfg(feature = "process")]
 mod process;
 #[cfg(feature = "process")]
@@ -160,9 +153,6 @@ mod async_;
 pub use async_::BoxedFuture;
 #[cfg(feature = "coroutine")]
 pub mod co;
-// tokio re-exports
-#[cfg(feature = "coroutine")]
-pub use tokio::{join, try_join};
 
 /// Low level printing utils and integration with log and clap
 mod print;
@@ -202,6 +192,8 @@ pub use misc::*;
 // re-exports from libraries
 pub use anyhow::{Context, Ok, Result, anyhow as err, bail, ensure};
 pub use log::{debug, error, info, trace, warn};
+#[cfg(feature = "coroutine")]
+pub use tokio::{join, try_join};
 
 #[doc(hidden)]
 pub mod __priv {

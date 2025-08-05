@@ -400,7 +400,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
     fn print_loop(
         original_width: usize,
         max_bars: i32,
-        tick: usize,
+        tick: u32,
         buffer: &mut String,
         temp: &mut String,
         lines: &mut i32,
@@ -454,7 +454,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
         let mut more_bars = -max_bars;
         buffer.push_str(printer.colors.yellow);
         *lines = 0;
-        let anime = CHARS[tick % CHARS.len()];
+        let anime = CHARS[(tick as usize) % CHARS.len()];
         printer.bars.retain(|bar| {
             let Some(bar) = bar.upgrade() else {
                 return false;
@@ -463,7 +463,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
                 if width >= 2 {
                     buffer.push(anime);
                     buffer.push(']');
-                    bar.format(width - 2, now, buffer, temp);
+                    bar.format(width - 2, now, tick, INTERVAL, buffer, temp);
                 }
                 buffer.push('\n');
                 *lines += 1;
