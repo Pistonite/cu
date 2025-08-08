@@ -212,7 +212,7 @@ impl Printer {
             }
             Lv::Print => {
                 self.format_buffer.push_control(self.colors.gray);
-                self.format_buffer.push(' ', 1);
+                self.format_buffer.push(':', 1);
                 self.format_buffer.push(':', 1);
             }
             Lv::Warn => {

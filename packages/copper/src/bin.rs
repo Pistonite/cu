@@ -205,18 +205,18 @@ impl Strategy<'_> {
                 crate::trace!("finding executable '{name}' in PATH");
                 match which::which(name) {
                     // which already canonicalize it, which ensures it exists
-                    Ok(x) => x.normalize(),
+                    Ok(x) => Ok(x.simplified().to_path_buf()),
                     Err(e) => Err(e)?,
                 }
             }
             Self::Resolve(path) => {
                 crate::trace!("finding executable '{name}' at '{}'", path.display());
-                path.normalize_exists()
+                path.normalize_executable()
             }
             Self::EnvVar(v) => {
                 crate::trace!("finding executable '{name}' using environment variable '{v}'");
                 match std::env::var(v) {
-                    Ok(x) if !x.is_empty() => Path::new(&x).normalize_exists(),
+                    Ok(x) if !x.is_empty() => Path::new(&x).normalize_executable(),
                     _ => crate::bail!("environment variable '{v}' not found"),
                 }
             }

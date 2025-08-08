@@ -11,6 +11,12 @@ pub trait PathExtension {
     /// Get file name. Error if the file name is not UTF-8 or other error occurs
     fn file_name_str(&self) -> crate::Result<&str>;
 
+    /// Check that the path exists, or fail with an error
+    fn check_exists(&self) -> crate::Result<()>;
+
+    /// Return the simplified path if the path has a Windows UNC prefix
+    fn simplified(&self) -> &Path;
+
     /// Get absolute path for a path.
     ///
     /// This is different from `canonicalize()` since that fails for paths that don't
@@ -25,8 +31,17 @@ pub trait PathExtension {
     /// UNC, and the drive letter is also normalized to upper case
     fn normalize(&self) -> crate::Result<PathBuf>;
 
-    /// Normalize the path and ensure it exists
-    fn normalize_exists(&self) -> crate::Result<PathBuf>;
+    /// Like `normalize`, but with the additional guarantee that the path exists
+    fn normalize_exists(&self) -> crate::Result<PathBuf> {
+        let x = self.normalize()?;
+        x.check_exists()?;
+        Ok(x)
+    }
+
+    /// Like `normalize`, but with the additional guarantee that:
+    /// - The file name of the output will be the same as the input
+    /// - The path exists and is not a directory
+    fn normalize_executable(&self) -> crate::Result<PathBuf>;
 
     /// Get the parent path as an absolute path
     ///
@@ -71,12 +86,19 @@ impl PathExtension for Path {
         Ok(file_name)
     }
 
-    fn normalize_exists(&self) -> crate::Result<PathBuf> {
-        let r = self.normalize()?;
-        if !r.exists() {
-            crate::bail!("path '{}' does not exist.", r.display());
+    fn simplified(&self) -> &Path {
+        if self.as_os_str().as_encoded_bytes().starts_with(b"\\\\") {
+            dunce::simplified(self)
+        } else {
+            self
         }
-        Ok(r)
+    }
+
+    fn check_exists(&self) -> crate::Result<()> {
+        if !self.exists() {
+            crate::bail!("path '{}' does not exist.", self.display());
+        }
+        Ok(())
     }
 
     fn normalize(&self) -> crate::Result<PathBuf> {
@@ -97,6 +119,32 @@ impl PathExtension for Path {
 
         base.push(self);
         fallback_normalize_absolute(&base)
+    }
+
+    fn normalize_executable(&self) -> crate::Result<PathBuf> {
+        // canonicalize will resolve symlinks, which will destroy
+        // the file name, so we cannot use that
+        let absolute_self = if self.is_absolute() {
+            fallback_normalize_absolute(self)?
+        } else {
+            let Ok(mut base) = dunce::canonicalize(".") else {
+                crate::warn!("failed to normalize current directory");
+                crate::bail!(
+                    "cannot normalize current directory when normalizing relative path: {}",
+                    self.display()
+                );
+            };
+
+            base.push(self);
+            fallback_normalize_absolute(&base)?
+        };
+        if !absolute_self.exists() {
+            crate::bail!("failed to normalize executable path '{}': does not exist", absolute_self.display());
+        }
+        if absolute_self.is_dir() {
+            crate::bail!("failed to normalize executable path '{}': is a directory", absolute_self.display())
+        }
+        Ok(absolute_self)
     }
 
     fn parent_abs_times(&self, x: usize) -> crate::Result<PathBuf> {
@@ -192,11 +240,17 @@ macro_rules! impl_for_as_ref_path {
             fn file_name_str(&self) -> crate::Result<&str> {
                 AsRef::<Path>::as_ref(self).file_name_str()
             }
+            fn simplified(&self) -> &Path {
+                AsRef::<Path>::as_ref(self).simplified()
+            }
             fn normalize(&self) -> crate::Result<PathBuf> {
                 AsRef::<Path>::as_ref(self).normalize()
             }
-            fn normalize_exists(&self) -> crate::Result<PathBuf> {
-                AsRef::<Path>::as_ref(self).normalize_exists()
+            fn normalize_executable(&self) -> crate::Result<PathBuf> {
+                AsRef::<Path>::as_ref(self).normalize_executable()
+            }
+            fn check_exists(&self) -> crate::Result<()> {
+                AsRef::<Path>::as_ref(self).check_exists()
             }
             fn parent_abs_times(&self, x: usize) -> crate::Result<PathBuf> {
                 AsRef::<Path>::as_ref(self).parent_abs_times(x)
