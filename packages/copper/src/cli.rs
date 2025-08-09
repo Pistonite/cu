@@ -1,5 +1,10 @@
 //! CLI entry point and integration with `clap`
 //!
+//! You will need to add `clap` to dependency, if you need to add extra options.
+//! ```bash
+//! cargo add clap --features derive
+//! ```
+//!
 //! # Command Options
 //! The [`Flags`] struct implement `clap::Args` to provide common
 //! options that integrates with the rest of the crate:
@@ -19,9 +24,6 @@
 //! // Typically, you want to have a wrapper struct
 //! // so you can derive additional options with clap,
 //! // and provide a description via doc comments, like below
-//! // clap::Parser is re-exported, so if you don't require
-//! // additional functions from clap, you can avoid adding it
-//! // to dependency
 //!
 //! /// My program
 //! ///
@@ -54,9 +56,6 @@
 //!     Ok(())
 //! }
 //! ```
-//!
-//!
-//!
 //!
 //! # Async Entry Point
 //! For async usage, see the [`coroutine`](crate::co) concept.

@@ -255,15 +255,28 @@ impl ProgressBarState {
                 // percentage
                 // : DD.DD% or : 100%
                 if self.current == self.total {
-                    if width >= 6 {
-                        width -= 6;
-                        out.push_str(": 100%");
+                    if self.prefix.is_empty() {
+                        if width >= 4 {
+                            width -= 4;
+                            out.push_str("100%");
+                        }
+                    } else {
+                        if width >= 6 {
+                            width -= 6;
+                            out.push_str(": 100%");
+                        }
                     }
                 } else {
                     let percentage = self.current as f32 * 100f32 / self.total as f32;
                     temp.clear();
-                    if write!(temp, ": {percentage:.2}%").is_err() {
-                        temp.clear();
+                    if self.prefix.is_empty() {
+                        if write!(temp, "{percentage:.2}%").is_err() {
+                            temp.clear();
+                        }
+                    } else {
+                        if write!(temp, ": {percentage:.2}%").is_err() {
+                            temp.clear();
+                        }
                     }
                     if width >= temp.len() {
                         width -= temp.len();
@@ -308,7 +321,7 @@ impl ProgressBarState {
                     }
                 }
             } else {
-                if !self.message.is_empty() && width > 0 {
+                if !self.prefix.is_empty() && !self.message.is_empty() && width > 0 {
                     out.push(':');
                     width -= 1;
                 }
@@ -318,7 +331,7 @@ impl ProgressBarState {
                 width -= 1;
             }
         } else {
-            if !self.message.is_empty() && width > 1 {
+            if !self.prefix.is_empty() && !self.message.is_empty() && width > 1 {
                 out.push_str(": ");
                 width -= 2;
             }
@@ -335,8 +348,16 @@ impl ProgressBarState {
 
 fn format_bar_done(total: usize, message: &str) -> String {
     if total == 0 {
-        format!("\u{283f}] {message}: done")
+        if message.is_empty() {
+            "\u{283f}] done".to_string()
+        } else {
+            format!("\u{283f}] {message}: done")
+        }
     } else {
-        format!("\u{283f}][{total}/{total}] {message}: done")
+        if message.is_empty() {
+            format!("\u{283f}][{total}/{total}] done")
+        } else {
+            format!("\u{283f}][{total}/{total}] {message}: done")
+        }
     }
 }
