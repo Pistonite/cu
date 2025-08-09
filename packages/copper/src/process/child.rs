@@ -84,4 +84,39 @@ impl Child {
             .await?
             .context("io error while joining a child process")
     }
+
+    /// Create a wait guard that will automatically wait for the child
+    /// (and ignore the error) when going out of scope.
+    pub fn wait_guard(self) -> ChildWaitGuard {
+        ChildWaitGuard { inner: Some(self) }
+    }
+}
+
+/// A guard that automatically calls `wait` on a child
+/// when dropped. The result of the `wait` is ignored.
+///
+/// This can be constructed with [`Child::wait_guard`]
+pub struct ChildWaitGuard {
+    inner: Option<Child>,
+}
+impl Drop for ChildWaitGuard {
+    fn drop(&mut self) {
+        let Some(child) = self.inner.take() else {
+            return;
+        };
+        match child.wait() {
+            Err(e) => crate::trace!("wait guard: error while waiting for child: {e}"),
+            Ok(x) => crate::trace!("wait guard: child exited with status: {x}"),
+        };
+    }
+}
+impl ChildWaitGuard {
+    /// Call [`wait_nz`](Child::wait_nz) on the inner child
+    pub fn wait_nz(mut self) -> crate::Result<()> {
+        self.inner.take().unwrap().wait_nz()
+    }
+    /// Call [`wait`](Child::wait) on the inner child
+    pub fn wait(mut self) -> crate::Result<ExitStatus> {
+        self.inner.take().unwrap().wait()
+    }
 }

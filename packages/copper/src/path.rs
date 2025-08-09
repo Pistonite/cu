@@ -139,10 +139,16 @@ impl PathExtension for Path {
             fallback_normalize_absolute(&base)?
         };
         if !absolute_self.exists() {
-            crate::bail!("failed to normalize executable path '{}': does not exist", absolute_self.display());
+            crate::bail!(
+                "failed to normalize executable path '{}': does not exist",
+                absolute_self.display()
+            );
         }
         if absolute_self.is_dir() {
-            crate::bail!("failed to normalize executable path '{}': is a directory", absolute_self.display())
+            crate::bail!(
+                "failed to normalize executable path '{}': is a directory",
+                absolute_self.display()
+            )
         }
         Ok(absolute_self)
     }

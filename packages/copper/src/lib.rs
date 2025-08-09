@@ -202,6 +202,12 @@ pub mod __priv {
     pub use crate::process::__ConfigFn;
 }
 
+/// Lib re-exports
+pub mod lib {
+    #[cfg(feature = "cli")]
+    pub use clap;
+}
+
 /// Prelude imports
 pub mod pre {
     pub use crate::Context as _;
@@ -209,4 +215,6 @@ pub mod pre {
     pub use crate::PathExtension as _;
     #[cfg(feature = "process")]
     pub use crate::Spawn as _;
+    #[cfg(feature = "cli")]
+    pub use crate::lib::clap;
 }

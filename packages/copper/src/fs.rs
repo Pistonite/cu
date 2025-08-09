@@ -1,11 +1,12 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::{Context, PathExtension};
 
 /// Like `std::fs::read`, but shows the path in the error
 pub fn read(path: impl AsRef<Path>) -> crate::Result<Vec<u8>> {
     let path = path.as_ref();
-    std::fs::read(path).with_context(|| format!("failed to read file '{}' as bytes", path.display()))
+    std::fs::read(path)
+        .with_context(|| format!("failed to read file '{}' as bytes", path.display()))
 }
 
 /// Like `std::fs::read_to_string`, but shows the path in the error
@@ -52,7 +53,6 @@ pub fn write(path: impl AsRef<Path>, content: impl AsRef<[u8]>) -> crate::Result
     Err(x).context(format!("failed to write to {}", path.display()))
 }
 
-
 /// Ensure `path` exists and is a directory, creating one if not
 pub fn ensure_dir(path: impl AsRef<Path>) -> crate::Result<()> {
     let path = path.as_ref();
@@ -79,5 +79,13 @@ pub fn remove_dir(path: impl AsRef<Path>) -> crate::Result<()> {
     if !path.exists() {
         return Ok(());
     }
-    std::fs::remove_dir_all(path).with_context(|| format!("failed to remove '{}' recursively", path.display()))
+    std::fs::remove_dir_all(path)
+        .with_context(|| format!("failed to remove '{}' recursively", path.display()))
+}
+
+/// Get the path to the current executable.
+///
+/// Wrapps [`std::env::current_exe`] with error context.
+pub fn current_exe() -> crate::Result<PathBuf> {
+    std::env::current_exe().context("failed to get current exe path")
 }
