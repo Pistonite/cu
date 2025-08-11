@@ -3,4 +3,4 @@ resolver = "2"
 members = [
     "packages/copper",
     "packages/copper-proc-macros"
-]
+, "packages/promethium"]

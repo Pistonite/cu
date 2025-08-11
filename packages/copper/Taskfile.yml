@@ -42,12 +42,6 @@ tasks:
     cmds:
       - task: cargo:fmt-fix
 
-  dev-doc:
-    cmds:
-      - task: cargo:watch-serve-doc
-        vars:
-          CARGO_ARGS: --all-features
-          TOOLCHAIN: +nightly
 
   test:
     cmds:

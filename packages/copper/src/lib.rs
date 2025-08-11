@@ -14,111 +14,19 @@
 //! ```
 //! This imports traits like [`Context`] and [`PathExtension`] into scope.
 //!
-//! Quick Feature Reference:
-//! - `cli`: Enables CLI entry points and integration with `clap`. (See [`cli`](module@cli))
-//! - `prompt`: Enables macros to show prompt to the user. (See [Prompting](#prompting))
-//! - `fs`: Enables file system utils. (See [`fs`](module@fs))
+//! # Feature Reference:
+//! - `cli`, `print`, `prompt`:
+//!   See [`cli`](module@cli). Note that logging is still available without any feature flag.
 //! - `coroutine` and `coroutine-heavy`:
-//!   Enables `async` and integration with `tokio`. (See [`co`](module@co))
-//! - `process`: Enables utils spawning child process
-//!
-//! # CLI
-//! Enable the `cli` feature when using `cu` in a binary crate.
-//! See [`cli`](module@cli) for usage. This also takes care of setting
-//! up logging.
-//!
-//! Note that general usage of logging, prompting, and progress bar does not require
-//! the `cli` flag, meaning libraries can also use them.
-//!
-//! # `log` integration
-//! In additional to the common `error`, `warn`, `info`, `debug`, `trace`
-//! log types, `cu` provides 2 extra types:
-//! - `print`: like `info`, but has a higher importance
-//! - `hint`: like `print`, but specifically for hinting actions the user can take
-//!   (to resolve an error, for example).
-//!
-//! These 2 levels are not directly controlled by `log`,
-//! and can still print when logging is statically disabled.
-//!
-//! The following table shows what are printed for each level,
-//! (other than `print` and `hint`, the rest are re-exports from `log`)
-//! |         | `-qq` | ` -q` | `   ` | ` -v` | `-vv` |
-//! |-|-      |-     |-       |-     |-      |
-//! | [`error!`](crate::error) | ❌ | ✅ | ✅ | ✅ | ✅ |
-//! | [`hint!`](crate::hint) | ❌ | ✅ | ✅ | ✅ | ✅ |
-//! | [`print!`](macro@crate::print) | ❌ | ✅ | ✅ | ✅ | ✅ |
-//! | [`warn!`](crate::warn)  | ❌ | ❌ | ✅ | ✅ | ✅ |
-//! | [`info!`](crate::info)  | ❌ | ❌ | ✅ | ✅ | ✅ |
-//! | [`debug!`](crate::debug) | ❌ | ❌ | ❌ | ✅ | ✅ |
-//! | [`trace!`](crate::trace) | ❌ | ❌ | ❌ | ❌ | ✅ |
-//!
-//! The `RUST_LOG` environment variable is also supported in the same
-//! way as in [`env_logger`](https://docs.rs/env_logger/latest/env_logger/#enabling-logging).
-//! When mixing `RUST_LOG` and verbosity flags, logging messages are filtered
-//! by `RUST_LOG`, and the verbosity would only apply to `print` and `hint`
-//!
-//! When setting up test, you can use [`log_init`] to quickly inititialize logging
-//! without dealing with the details.
-//!
-//! [`set_thread_print_name`] can be used to add a prefix to all messages printed
-//! by the current thread.
-//!
-//! Messages that are too long and multi-line messages are automatically wrapped.
-//!
-//! # Progress Bar
-//! Animated progress bars are displayed at the bottom of the terminal.
-//! While progress bars are visible, printing still works and will be put
-//! above the bars. However, prints will be buffered and refreshed
-//! and the same frame rate as the bars.
-//!
-//! [`progress_bar`] and [`progress_bar_lowp`] are used to create a bar.
-//! The only difference is that `lowp` doesn't print a message when the progress
-//! is done (as if the bar was never there). The bar takes a message to indicate
-//! the current action, and each update call can accept a message to indicate
-//! the current step. When `bar` is dropped, it will print a done message.
-//!
-//! ```rust,no_run
-//! use std::time::Duration;
-//! {
-//!    let bar = cu::progress_bar(10, "This takes 2.5 seconds");
-//!    for i in 0..10 {
-//!        cu::progress!(&bar, i, "step {i}");
-//!        cu::debug!("this is debug message");
-//!        std::thread::sleep(Duration::from_millis(250));
-//!    }
-//! }
-//! ```
-//!
-//! [`progress_unbounded`] and [`progress_unbounded_lowp`] are variants
-//! that doesn't display the total steps. Use `()` as the step placeholder
-//! when updating the bar.
-//!
-//! # Prompting
-//! With the `prompt` feature enabled, you can
-//! use [`prompt!`] and [`yesno!`] to show prompts.
-//!
-//! The prompts are thread-safe, meaning
-//! You can call them from multiple threads, and they will be queued to prompt the user one after
-//! the other. Prompts are always shown regardless of verbosity. But when stdout is redirected,
-//! they will not render in terminal.
-//!
-//! # Async coroutines
-//! See [`cu::co`](co) to see how coroutine and `async` works in this crate.
-//!
-//! # File, Path and Process
-//! The `fs` feature enables [`cu::fs`](fs) and [`cu::bin`](bin), as well
-//! as additional path helpers via [`PathExtension`].
-//!
-//! The file system wrappers provided by `cu` has automatic error logging,
-//! so you can freely `?` without running into errors like this without any context:
-//! ```txt
-//! Error: system cannot find the specified path
-//! ```
-//!
-//! The `process` feature enables spawning child process and integrate IO with the child
-//! into the printing utils in this crate. See [`Command`] for more info.
+//!   Enables `async` and integration with `tokio`. See [`cu::co`](module@co).
+//! - `fs`: Enables file system utils. See [`cu::fs`](module@fs) and [`cu::bin`](module@bin).
+//! - `process`: Enables utils spawning child process. See [`Command`].
+//! - `parse`, `json`, `yaml`, `toml`:
+//!   Enable parsing utilities, and additional support for common formats. See
+//!   [`Parse`](trait@Parse).
 
 #![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_auto_cfg))]
+#![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_cfg))]
 
 #[cfg(feature = "process")]
 mod process;
@@ -147,7 +55,7 @@ pub use path::PathExtension;
 #[cfg(feature = "cli")]
 pub mod cli;
 #[cfg(feature = "cli")]
-pub use copper_proc_macros::cli;
+pub use cu_proc_macros::cli;
 
 mod async_;
 pub use async_::BoxedFuture;
@@ -155,7 +63,9 @@ pub use async_::BoxedFuture;
 pub mod co;
 
 /// Low level printing utils and integration with log and clap
+#[cfg(feature = "print")]
 mod print;
+#[cfg(feature = "print")]
 pub use print::{
     ColorLevel, PrintLevel, ProgressBar, PromptLevel, color_enabled, init_print_options,
     log_enabled, log_init, progress_bar, progress_bar_lowp, progress_unbounded,
@@ -181,6 +91,14 @@ pub mod lv {
     pub const T: crate::__priv::Lv = crate::__priv::Lv::Trace;
 }
 
+/// Parsing utilities
+#[cfg(feature = "parse")]
+mod parse;
+#[cfg(feature = "parse")]
+pub use parse::*;
+#[cfg(feature = "parse")]
+pub use cu_proc_macros::Parse;
+
 // Atomic helpers
 mod atomic;
 pub use atomic::*;
@@ -190,7 +108,7 @@ mod misc;
 pub use misc::*;
 
 // re-exports from libraries
-pub use anyhow::{Context, Ok, Result, anyhow as err, bail, ensure};
+pub use anyhow::{Context, Ok, Result, anyhow as fmterr, bail, ensure};
 pub use log::{debug, error, info, trace, warn};
 #[cfg(feature = "coroutine")]
 pub use tokio::{join, try_join};
@@ -206,6 +124,8 @@ pub mod __priv {
 pub mod lib {
     #[cfg(feature = "cli")]
     pub use clap;
+    #[cfg(feature = "serde")]
+    pub use serde;
 }
 
 /// Prelude imports
@@ -213,8 +133,18 @@ pub mod pre {
     pub use crate::Context as _;
     #[cfg(feature = "fs")]
     pub use crate::PathExtension as _;
+    #[cfg(feature = "parse")]
+    pub use crate::IntoParsed as _;
     #[cfg(feature = "process")]
     pub use crate::Spawn as _;
     #[cfg(feature = "cli")]
     pub use crate::lib::clap;
+    #[cfg(feature = "serde")]
+    pub use crate::lib::serde::{self, Serialize, Deserialize};
+    #[cfg(feature = "json")]
+    pub use crate::json;
+    #[cfg(feature = "toml")]
+    pub use crate::toml;
+    #[cfg(feature = "yaml")]
+    pub use crate::yaml;
 }

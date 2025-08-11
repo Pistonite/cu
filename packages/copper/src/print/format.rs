@@ -1,57 +1,5 @@
 use super::ansi;
 
-/// Format and invoke a print macro
-///
-/// # Example
-/// ```rust
-/// let x = cu::fmtand!(error!("found {} errors", 3));
-/// assert_eq!(x, "found 3 errors");
-/// ```
-#[macro_export]
-macro_rules! fmtand {
-    ($mac:ident !( $($fmt_args:tt)* )) => {{
-        let s = format!($($fmt_args)*);
-        $crate::$mac!("{s}");
-        s
-    }}
-}
-/// Invoke a print macro, then bail with the same message
-///
-/// # Example
-/// ```rust
-/// # fn main() {
-/// fn fn_1() -> cu::Result<()> {
-///     cu::bailand!(error!("found {} errors", 3));
-/// }
-/// fn fn_2() -> cu::Result<()> {
-///     cu::bailand!(warn!("warning!"));
-/// }
-/// assert!(fn_1().is_err()); // will also log error "found 3 errors"
-/// assert!(fn_2().is_err()); // will also log warning "warning!"
-/// # }
-/// ```
-#[macro_export]
-macro_rules! bailand {
-    ($mac:ident !( $($fmt_args:tt)* )) => {{
-        let s = format!($($fmt_args)*);
-        $crate::$mac!("{s}");
-        $crate::bail!(s);
-    }}
-}
-/// Invoke a print macro, then panic with the same message
-///
-/// # Example
-/// ```rust,no_run
-/// cu::panicand!(error!("found {} errors", 3));
-/// ```
-#[macro_export]
-macro_rules! panicand {
-    ($mac:ident !( $($fmt_args:tt)* )) => {{
-        let s = format!($($fmt_args)*);
-        $crate::$mac!("{s}");
-        panic!("{s}");
-    }}
-}
 
 /// Get the terminal width, or the internal max if cannot get
 pub fn term_width_or_max() -> usize {

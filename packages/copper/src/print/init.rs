@@ -89,7 +89,37 @@ pub fn init_print_options(color: ColorLevel, level: PrintLevel, prompt: Option<P
                 return;
             }
             let typ: Lv = record.level().into();
-            let message = record.args().to_string();
+            let message = if typ == Lv::Trace {
+                // enable source location logging in trace messages
+                let mut message = String::new();
+                message.push('[');
+                if let Some(p) = record.module_path() {
+                    message.push_str(p);
+                    message.push(' ');
+                }
+                if let Some(f) = record.file() {
+                    let name = match f.rfind(['/', '\\']) {
+                        None => f,
+                        Some(i) => &f[i+1..],
+                    };
+                    message.push_str(name);
+                }
+                if let Some(l) = record.line() {
+                    message.push(':');
+                    message.push_str(&format!("{l}"));
+                }
+                if message.len() > 1 {
+                    message += "] ";
+                } else {
+                    message.clear();
+                }
+                
+                use std::fmt::Write;
+                let _: Result<_, _> = write!(&mut message, "{}", record.args());
+                message
+            } else {
+                record.args().to_string()
+            };
             if let Ok(mut printer) = super::PRINTER.lock() {
                 printer.print_message(typ, &message);
             }
