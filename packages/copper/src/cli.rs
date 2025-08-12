@@ -155,7 +155,7 @@ use std::time::Instant;
 
 use clap::{Command, CommandFactory, FromArgMatches, Parser};
 
-use crate::{ColorLevel, PrintLevel};
+use crate::lv;
 
 #[derive(Default, Debug, Clone, PartialEq, Parser)]
 pub struct Flags {
@@ -169,7 +169,7 @@ pub struct Flags {
     ///
     /// Fooo
     #[clap(long)]
-    color: Option<ColorLevel>,
+    color: Option<lv::Color>,
     /// Automatically answer 'yes' to all yes/no prompts
     #[cfg(feature = "prompt")]
     #[clap(short = 'y', long)]
@@ -199,8 +199,8 @@ impl Flags {
     /// when the program only has the main thread.
     pub unsafe fn apply(&self) {
         let level = self.verbose.clamp(0, 2) as i8 - self.quiet.clamp(0, 2) as i8;
-        let level: PrintLevel = level.into();
-        if level == PrintLevel::VerboseVerbose {
+        let level: lv::Print = level.into();
+        if level == lv::Print::VerboseVerbose {
             if std::env::var("RUST_BACKTRACE")
                 .unwrap_or_default()
                 .is_empty()
@@ -216,19 +216,19 @@ impl Flags {
             {
                 ..0 => {
                     if self.yes {
-                        Some(crate::PromptLevel::Yes)
+                        Some(lv::Prompt::Yes)
                     } else {
-                        Some(crate::PromptLevel::Interactive)
+                        Some(lv::Prompt::Interactive)
                     }
                 }
                 0 => {
                     if self.yes {
-                        Some(crate::PromptLevel::Yes)
+                        Some(lv::Prompt::Yes)
                     } else {
                         None
                     }
                 }
-                _ => Some(crate::PromptLevel::No),
+                _ => Some(lv::Prompt::No),
             }
             #[cfg(not(feature = "prompt"))]
             {
@@ -314,7 +314,7 @@ unsafe fn parse_args_or_help<T: Parser, F: FnOnce(&T) -> &Flags>(f: F) -> T {
 /// Wrapper for clap parse to respect the color flag when printing help or error
 fn parse_args<T: Parser>() -> T {
     // parse the color arg first, so that we can respect it when printing help
-    let color = ColorLevel::from_os_args();
+    let color = lv::Color::from_os_args();
     let use_color = color.is_colored_for_stdout();
     let mut matches = get_colored_command::<T>(use_color).get_matches();
 

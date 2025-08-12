@@ -31,9 +31,7 @@
 #[cfg(feature = "process")]
 mod process;
 #[cfg(feature = "process")]
-pub use process::{
-    Child, Command, CommandBuilder, Spawn, color_flag, color_flag_eq, pio, 
-};
+pub use process::{Child, Command, CommandBuilder, Spawn, color_flag, color_flag_eq, pio};
 #[cfg(all(feature = "process", feature = "print"))]
 pub use process::{width_flag, width_flag_eq};
 
@@ -64,40 +62,18 @@ pub use async_::BoxedFuture;
 pub mod co;
 
 /// Low level printing utils and integration with log and clap
+#[cfg(feature = "print")]
 mod print;
-pub use print::{
-    ColorLevel, PrintLevel, 
-    PromptLevel, 
-    log_enabled, 
-    color_enabled,
-};
 #[cfg(feature = "print")]
 pub use print::{
-    ProgressBar, 
-    init_print_options,
-    log_init, progress_bar, progress_bar_lowp, progress_unbounded,
+    ProgressBar, init_print_options, log_init, progress_bar, progress_bar_lowp, progress_unbounded,
     progress_unbounded_lowp, set_thread_print_name, term_width, term_width_height,
     term_width_or_max,
 };
 
-
-/// Level shorthand for message/events
-pub mod lv {
-    /// Error
-    pub const E: crate::__priv::Lv = crate::__priv::Lv::Error;
-    /// Hint
-    pub const H: crate::__priv::Lv = crate::__priv::Lv::Hint;
-    /// Print
-    pub const P: crate::__priv::Lv = crate::__priv::Lv::Print;
-    /// Warn
-    pub const W: crate::__priv::Lv = crate::__priv::Lv::Warn;
-    /// Info
-    pub const I: crate::__priv::Lv = crate::__priv::Lv::Info;
-    /// Debug
-    pub const D: crate::__priv::Lv = crate::__priv::Lv::Debug;
-    /// Trace
-    pub const T: crate::__priv::Lv = crate::__priv::Lv::Trace;
-}
+/// Printing level values
+pub mod lv;
+pub use lv::{color_enabled, log_enabled};
 
 /// Parsing utilities
 #[cfg(feature = "parse")]
@@ -124,8 +100,7 @@ pub use tokio::{join, try_join};
 #[doc(hidden)]
 pub mod __priv {
     #[cfg(feature = "print")]
-    pub use crate::print::{__prompt, __prompt_yesno};
-    pub use crate::print::{__print_with_level, Lv};
+    pub use crate::print::{__print_with_level, __prompt, __prompt_yesno};
     #[cfg(feature = "process")]
     pub use crate::process::__ConfigFn;
 }

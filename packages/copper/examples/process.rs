@@ -7,14 +7,16 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
         .command()
         .stdoe(cu::lv::P)
         .stdin_null()
-        .co_wait().await?;
+        .co_wait()
+        .await?;
     cu::which("eza")?
         .command()
         .add(cu::color_flag_eq())
         .add(cu::width_flag_eq())
         .stdoe(cu::lv::P)
         .stdin_null()
-        .co_wait().await?;
+        .co_wait()
+        .await?;
 
     // spinner
     let cleanup = if cu::yesno!("run git test?")? {
@@ -24,7 +26,8 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
             .args(["clone", "https://github.com/zeldaret/botw", "--progress"])
             .stdoe(cu::pio::spinner("cloning botw"))
             .stdin_null()
-            .co_spawn().await?;
+            .co_spawn()
+            .await?;
         let child2 = cu::which("git")?
             .command()
             .args([
@@ -36,7 +39,8 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
             ])
             .stdoe(cu::pio::spinner("cloning rust").info())
             .stdin_null()
-            .co_spawn().await?;
+            .co_spawn()
+            .await?;
         child.co_wait_nz().await?;
         child2.co_wait_nz().await?;
         cu::info!("done");
@@ -78,7 +82,9 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
             .co_wait_nz()
             .await?;
         cu::Ok(())
-    }).co_join().await??;
+    })
+    .co_join()
+    .await??;
 
     // capture
     let (hello, out) = cu::which("cat")?
@@ -86,7 +92,8 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
         .arg("Cargo.toml")
         .stdout(cu::pio::string())
         .stdie_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
 
     let x = out.co_join().await?;
     cu::info!("capture output: {x:?}");
@@ -101,7 +108,8 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
         .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"#])
         .stdout(cu::pio::lines())
         .stdie_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
     // read the lines
     for line in lines {
         cu::info!("{line:?}");
@@ -114,7 +122,8 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
         .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"#])
         .stdout(cu::pio::co_lines())
         .stdie_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
     // wait and read the lines
     let mut lines2 = lines2;
     while let Some(line) = lines2.next().await {

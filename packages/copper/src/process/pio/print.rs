@@ -3,7 +3,7 @@ use std::process::Stdio;
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
 use crate::BoxedFuture;
-use crate::print::Lv;
+use crate::lv::Lv;
 
 use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 

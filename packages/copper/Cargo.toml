@@ -76,10 +76,10 @@ fs = ["dep:which", "dep:pathdiff", "dep:dunce", "dep:filetime", "tokio?/fs"]
 # Enable parsing utils
 parse = ["dep:cu-proc-macros"]
 serde = ["dep:serde"]
-json = ["serde", "dep:serde_json"]
+json = ["parse", "serde", "dep:serde_json"]
 json-preserve-order = ["json", "serde_json/preserve_order"]
-yaml = ["serde", "dep:serde_yaml_ng"]
-toml = ["serde", "dep:toml"]
+yaml = ["parse", "serde", "dep:serde_yaml_ng"]
+toml = ["parse", "serde", "dep:toml"]
 toml-preserve-order = ["toml", "toml/preserve_order"]
 
 # Internally used to document where nightly feature is used

@@ -46,6 +46,7 @@ use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as T
 use crate::BoxedFuture;
 
 mod pipe;
+#[cfg(feature = "print")]
 mod print;
 mod read;
 #[cfg(feature = "print")]
@@ -65,6 +66,7 @@ pub mod config {
 /// internal task types used in trait implementations
 pub mod task {
     pub use super::pipe::PipeTask as Pipe;
+    #[cfg(feature = "print")]
     pub use super::print::PrintTask as Print;
     pub use super::read::BufferStringTask as String;
     pub use super::read::BufferTask as Buffer;
@@ -89,7 +91,9 @@ pub use read::{buffer, co_lines, lines, string};
 #[cfg(feature = "print")]
 pub use spinner::spinner;
 
+#[cfg(feature = "print")]
 mod print_driver;
+#[cfg(feature = "print")]
 use print_driver::*;
 
 /// Configuration for process output to be used with
