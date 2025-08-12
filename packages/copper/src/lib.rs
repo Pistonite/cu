@@ -73,6 +73,7 @@ pub use print::{
 
 /// Printing level values
 pub mod lv;
+#[doc(inline)]
 pub use lv::{color_enabled, log_enabled};
 
 /// Parsing utilities

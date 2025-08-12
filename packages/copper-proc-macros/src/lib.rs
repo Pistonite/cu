@@ -1,6 +1,4 @@
-
 use pm::pre::*;
-
 
 /// See documentation for [`cu::cli`](../cu/cli/index.html) module
 #[proc_macro_attribute]
