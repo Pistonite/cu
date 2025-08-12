@@ -35,13 +35,13 @@ macro_rules! noimpl {
 #[macro_export]
 macro_rules! check {
     ($result:expr, $msg:literal) => {
-        { $result }.context($msg)?
+        { $result }.context($msg)
     };
     ($result:expr, $($args:tt)*) => {{
-        { $result }.with_context(|| format!($($args)*))?
+        { $result }.with_context(|| format!($($args)*))
     }};
     ($result:expr, $mac:ident ! $($args:tt)*) => {{
-        { $result }.with_context(|| $crate::fmtand!($mac!($($args)*)))?
+        { $result }.with_context(|| $crate::fmtand!($mac!($($args)*)))
     }};
 }
 

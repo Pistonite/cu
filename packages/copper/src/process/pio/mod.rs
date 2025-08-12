@@ -48,6 +48,7 @@ use crate::BoxedFuture;
 mod pipe;
 mod print;
 mod read;
+#[cfg(feature = "print")]
 mod spinner;
 
 /// internal task types used in trait implementations
@@ -57,6 +58,7 @@ pub mod config {
     pub use super::read::BufferString as String;
     pub use super::read::CoLines;
     pub use super::read::Lines;
+    #[cfg(feature = "print")]
     pub use super::spinner::Spinner;
 }
 
@@ -68,6 +70,7 @@ pub mod task {
     pub use super::read::BufferTask as Buffer;
     pub use super::read::CoLinesTask as CoLines;
     pub use super::read::LinesTask as Lines;
+    #[cfg(feature = "print")]
     pub use super::spinner::SpinnerTask as Spinner;
 }
 
@@ -83,6 +86,7 @@ pub use output::{CoLines, Lines, Pipe};
 // factory re-exports
 pub use pipe::pipe;
 pub use read::{buffer, co_lines, lines, string};
+#[cfg(feature = "print")]
 pub use spinner::spinner;
 
 mod print_driver;

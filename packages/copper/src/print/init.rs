@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 
 use super::{ColorLevel, Lv, PrintLevel, PromptLevel};
 
@@ -9,7 +9,6 @@ static LOG_FILTER: OnceLock<env_filter::Filter> = OnceLock::new();
 pub(crate) fn set_log_filter(filter: env_filter::Filter) {
     let _ = LOG_FILTER.set(filter);
 }
-static USE_COLOR: AtomicBool = AtomicBool::new(true);
 
 /// Shorthand to quickly setup logging. Can be useful in tests.
 ///
@@ -44,7 +43,7 @@ pub fn init_print_options(color: ColorLevel, level: PrintLevel, prompt: Option<P
     };
     log::set_max_level(log_level);
     let use_color = color.is_colored_for_stdout();
-    USE_COLOR.store(use_color, Ordering::Release);
+    super::USE_COLOR.store(use_color, Ordering::Release);
     if let Ok(mut printer) = super::PRINTER.lock() {
         printer.set_colors(use_color);
     }
@@ -100,7 +99,7 @@ pub fn init_print_options(color: ColorLevel, level: PrintLevel, prompt: Option<P
                 if let Some(f) = record.file() {
                     let name = match f.rfind(['/', '\\']) {
                         None => f,
-                        Some(i) => &f[i+1..],
+                        Some(i) => &f[i + 1..],
                     };
                     message.push_str(name);
                 }
@@ -113,7 +112,7 @@ pub fn init_print_options(color: ColorLevel, level: PrintLevel, prompt: Option<P
                 } else {
                     message.clear();
                 }
-                
+
                 use std::fmt::Write;
                 let _: Result<_, _> = write!(&mut message, "{}", record.args());
                 message
@@ -129,12 +128,9 @@ pub fn init_print_options(color: ColorLevel, level: PrintLevel, prompt: Option<P
     }
 
     let _ = log::set_logger(&LogImpl);
+    let _ = super::PRINT_DELEGATE.set(Box::new(super::__do_print_with_level));
 }
 
-/// Get if color printing is enabled
-pub fn color_enabled() -> bool {
-    USE_COLOR.load(Ordering::Acquire)
-}
 
 thread_local! {
     pub(crate) static THREAD_NAME: RefCell<Option<String>> = const { RefCell::new(None) };

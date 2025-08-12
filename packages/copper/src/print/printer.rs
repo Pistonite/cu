@@ -3,9 +3,6 @@ use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-// use crate::AsyncHandle;
-use crate::Atomic;
-
 use super::{FormatBuffer, Lv, PrintLevel, ProgressBar, ansi};
 
 /// Print something
@@ -26,8 +23,8 @@ macro_rules! hint {
 }
 
 /// Internal print function for macros
-pub fn __print_with_level(lv: Lv, message: std::fmt::Arguments<'_>) {
-    if !lv.can_print(PRINT_LEVEL.get()) {
+pub(crate) fn __do_print_with_level(lv: Lv, message: std::fmt::Arguments<'_>) {
+    if !lv.can_print(super::PRINT_LEVEL.get()) {
         return;
     }
     let message = format!("{message}");
@@ -36,12 +33,6 @@ pub fn __print_with_level(lv: Lv, message: std::fmt::Arguments<'_>) {
     }
 }
 
-/// Check if the logging level is enabled
-pub fn log_enabled(lv: Lv) -> bool {
-    lv.can_print(PRINT_LEVEL.get())
-}
-
-pub(crate) static PRINT_LEVEL: Atomic<u8, PrintLevel> = Atomic::new_u8(PrintLevel::Normal as u8);
 pub(crate) static PRINTER: LazyLock<Mutex<Printer>> =
     LazyLock::new(|| Mutex::new(Printer::default()));
 
@@ -160,7 +151,7 @@ impl Printer {
 
     /// Spawn a progress bar, starting a print task if not already
     pub(crate) fn add_progress_bar(&mut self, bar: &Arc<ProgressBar>) {
-        if PRINT_LEVEL.get() < PrintLevel::Normal {
+        if super::PRINT_LEVEL.get() < PrintLevel::Normal {
             return;
         }
         if self.bar_target.is_none() {
@@ -260,7 +251,7 @@ impl Printer {
 
     /// Format and print a progress bar done message
     pub(crate) fn print_bar_done(&mut self, message: &str) {
-        if PRINT_LEVEL.get() < PrintLevel::Normal {
+        if super::PRINT_LEVEL.get() < PrintLevel::Normal {
             return;
         }
         self.format_buffer

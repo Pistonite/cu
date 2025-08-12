@@ -1,4 +1,3 @@
-
 /// The parsing utilities in `cu` provides wrapper to the std library
 /// for parsing common data, such as different radix for numbers,
 /// and support for common formats like `json`, `yaml` and `toml`.
@@ -13,21 +12,21 @@
 ///
 /// # fn main() -> cu::Result<()> {
 /// // bool: empty string, 0, 1, "true", or "false", case-insensitive
-/// let x: bool = cu::parse("0")?;
+/// let x = cu::parse::<bool>("0")?;
 /// assert_eq!(x, false);
 ///
 /// // numbers: hex, oct and binary are supported with 0x, 0b, and 0o prefix
-/// let x: u32 = cu::parse("0")?;
+/// let x = cu::parse::<u32>("0")?;
 /// assert_eq!(x, 0);
-/// let x: i32 = cu::parse("-123")?;
+/// let x = cu::parse::<i32>("-123")?;
 /// assert_eq!(x, -123);
-/// let x: usize = cu::parse("0x123")?;
+/// let x = cu::parse::<usize>("0x123")?;
 /// assert_eq!(x, 0x123);
 ///
-/// // .into_parsed() can be used when chaining,
+/// // .parse_to() can be used when chaining,
 /// // instead of wrapping in cu::parse or use a temporary variable.
-/// let _x: PathBuf = "imagine some long chaining is used to get this value"
-///     .into_parsed()?;
+/// let _x = "imagine some long chaining is used to get this value"
+///     .parse_to::<PathBuf>()?;
 /// # Ok(()) }
 /// ```
 ///
@@ -47,9 +46,20 @@
 /// this trait by using the [`Parse`] derive macro
 /// for any type that implements [`FromStr`].
 ///
+/// # Common Formats
+/// When `json`/`yaml`/`toml` features are enabled, the respective
+/// module will be included in the prelude.
+/// See [`json`]/[`yaml`]/[`toml`] for more details.
+///
 /// [`FromStr`]: std::str::FromStr
 /// [`Parse`]: macro@crate::Parse
-pub trait Parse where Self: Sized {
+/// [`json`]: module@crate::json
+/// [`yaml`]: module@crate::yaml
+/// [`toml`]: module@crate::toml
+pub trait Parse
+where
+    Self: Sized,
+{
     type Output;
     fn parse_borrowed(x: &str) -> crate::Result<Self::Output>;
     fn parse_owned(x: String) -> crate::Result<Self::Output> {
@@ -63,28 +73,27 @@ pub trait Parse where Self: Sized {
     }
 }
 
-/// the `.into_parsed` function.
+/// the `.parse_to` function.
 ///
 /// See [`Parse`](trait@Parse)
-pub trait IntoParsed {
-    fn into_parsed<T: Parse>(self) -> crate::Result<T::Output>;
+pub trait ParseTo {
+    fn parse_to<T: Parse>(self) -> crate::Result<T::Output>;
 }
-impl IntoParsed for &str {
-    fn into_parsed<T: Parse>(self) -> crate::Result<T::Output> {
+impl ParseTo for &str {
+    fn parse_to<T: Parse>(self) -> crate::Result<T::Output> {
         T::parse_borrowed(self)
     }
 }
-impl IntoParsed for &mut str {
-    fn into_parsed<T: Parse>(self) -> crate::Result<T::Output> {
+impl ParseTo for &mut str {
+    fn parse_to<T: Parse>(self) -> crate::Result<T::Output> {
         T::parse_borrowed(self)
     }
 }
-impl IntoParsed for String {
-    fn into_parsed<T: Parse>(self) -> crate::Result<T::Output> {
+impl ParseTo for String {
+    fn parse_to<T: Parse>(self) -> crate::Result<T::Output> {
         T::parse_owned(self)
     }
 }
-
 
 /// Parse a value from a `&str`.
 ///
@@ -114,10 +123,14 @@ pub fn read<T: Parse>(x: impl std::io::Read) -> crate::Result<T::Output> {
 ///
 /// See [`Parse`](trait@Parse)
 #[cfg(feature = "coroutine")]
-pub async fn co_read<T: Parse>(mut x: impl tokio::io::AsyncRead + Unpin) -> crate::Result<T::Output> {
-    use tokio::io::AsyncReadExt as _;
+pub async fn co_read<T: Parse>(
+    mut x: impl tokio::io::AsyncRead + Unpin,
+) -> crate::Result<T::Output> {
     use crate::Context as _;
+    use tokio::io::AsyncReadExt as _;
     let mut s = String::new();
-    x.read_to_string(&mut s).await.context("io error while parsing")?;
+    x.read_to_string(&mut s)
+        .await
+        .context("io error while parsing")?;
     T::parse_owned(s)
 }

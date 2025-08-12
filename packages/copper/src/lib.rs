@@ -32,9 +32,10 @@
 mod process;
 #[cfg(feature = "process")]
 pub use process::{
-    Child, Command, CommandBuilder, Spawn, color_flag, color_flag_eq, pio, width_flag,
-    width_flag_eq,
+    Child, Command, CommandBuilder, Spawn, color_flag, color_flag_eq, pio, 
 };
+#[cfg(all(feature = "process", feature = "print"))]
+pub use process::{width_flag, width_flag_eq};
 
 #[cfg(feature = "fs")]
 pub mod bin;
@@ -63,15 +64,22 @@ pub use async_::BoxedFuture;
 pub mod co;
 
 /// Low level printing utils and integration with log and clap
-#[cfg(feature = "print")]
 mod print;
+pub use print::{
+    ColorLevel, PrintLevel, 
+    PromptLevel, 
+    log_enabled, 
+    color_enabled,
+};
 #[cfg(feature = "print")]
 pub use print::{
-    ColorLevel, PrintLevel, ProgressBar, PromptLevel, color_enabled, init_print_options,
-    log_enabled, log_init, progress_bar, progress_bar_lowp, progress_unbounded,
+    ProgressBar, 
+    init_print_options,
+    log_init, progress_bar, progress_bar_lowp, progress_unbounded,
     progress_unbounded_lowp, set_thread_print_name, term_width, term_width_height,
     term_width_or_max,
 };
+
 
 /// Level shorthand for message/events
 pub mod lv {
@@ -95,9 +103,9 @@ pub mod lv {
 #[cfg(feature = "parse")]
 mod parse;
 #[cfg(feature = "parse")]
-pub use parse::*;
-#[cfg(feature = "parse")]
 pub use cu_proc_macros::Parse;
+#[cfg(feature = "parse")]
+pub use parse::*;
 
 // Atomic helpers
 mod atomic;
@@ -115,7 +123,9 @@ pub use tokio::{join, try_join};
 
 #[doc(hidden)]
 pub mod __priv {
-    pub use crate::print::{__print_with_level, __prompt, __prompt_yesno, Lv};
+    #[cfg(feature = "print")]
+    pub use crate::print::{__prompt, __prompt_yesno};
+    pub use crate::print::{__print_with_level, Lv};
     #[cfg(feature = "process")]
     pub use crate::process::__ConfigFn;
 }
@@ -131,18 +141,18 @@ pub mod lib {
 /// Prelude imports
 pub mod pre {
     pub use crate::Context as _;
+    #[cfg(feature = "parse")]
+    pub use crate::ParseTo as _;
     #[cfg(feature = "fs")]
     pub use crate::PathExtension as _;
-    #[cfg(feature = "parse")]
-    pub use crate::IntoParsed as _;
     #[cfg(feature = "process")]
     pub use crate::Spawn as _;
+    #[cfg(feature = "json")]
+    pub use crate::json;
     #[cfg(feature = "cli")]
     pub use crate::lib::clap;
     #[cfg(feature = "serde")]
-    pub use crate::lib::serde::{self, Serialize, Deserialize};
-    #[cfg(feature = "json")]
-    pub use crate::json;
+    pub use crate::lib::serde::{self, Deserialize, Serialize};
     #[cfg(feature = "toml")]
     pub use crate::toml;
     #[cfg(feature = "yaml")]

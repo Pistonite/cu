@@ -31,6 +31,10 @@
 //! to parse the flags and pass it to your main function.
 //! It also handles the `Result` returned back
 //! ```rust,no_run
+//! use cu::pre::*;
+//! // clap will be part of the prelude
+//! // when the `cli` feature is enabled
+//!
 //! // Typically, you want to have a wrapper struct
 //! // so you can derive additional options with clap,
 //! // and provide a description via doc comments, like below
@@ -38,7 +42,7 @@
 //! /// My program
 //! ///
 //! /// This is my program, it is very good.
-//! #[derive(cu::cli::Parser, Clone)]
+//! #[derive(clap::Parser, Clone)]
 //! struct Args {
 //!     /// Input of the program
 //!     #[clap(short, long)]
@@ -295,7 +299,7 @@ pub unsafe fn __co_run<
 ) -> std::process::ExitCode {
     let start = std::time::Instant::now();
     let args = unsafe { parse_args_or_help::<T, FF>(flags) };
-    let result = crate::co::run(f(args));
+    let result = crate::co::spawn(f(args)).join().flatten();
 
     handle_result(start, result)
 }

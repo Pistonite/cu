@@ -7,7 +7,7 @@ macro_rules! blanket_parse_borrowed {
         fn parse_borrowed(x: &str) -> crate::Result<Self::Output> {
             Self::parse_owned(x.to_owned())
         }
-    }
+    };
 }
 macro_rules! blanket {
     ($($t:ty),* $(,)?) => { $(
@@ -92,7 +92,7 @@ macro_rules! impl_parse_number {
                 $parse(x)
             }
         }
-    }
+    };
 }
 impl_parse_number!(i8, parse_i8);
 impl_parse_number!(i16, parse_i16);

@@ -11,6 +11,14 @@ tasks:
       - task: cargo:clippy-package-feature
         vars:
           PACKAGE: cu
+          FEATURES: default
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: print
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
           FEATURES: cli
       - task: cargo:clippy-package-feature
         vars:
@@ -32,6 +40,14 @@ tasks:
         vars:
           PACKAGE: cu
           FEATURES: process
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: parse
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: json,yaml,toml
       - task: cargo:clippy-package-feature
         vars:
           PACKAGE: cu
