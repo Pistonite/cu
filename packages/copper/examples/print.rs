@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-#[derive(cu::cli::Parser, Clone)]
+use cu::pre::*;
+
+#[derive(clap::Parser, Clone)]
 struct Args {
     #[clap(flatten)]
     inner: cu::cli::Flags,

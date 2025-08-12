@@ -6,7 +6,13 @@ includes:
     flatten: true
     optional: true
 
-  cu: {taskfile: ./packages/copper, dir: ./packages/copper, internal: true}
+  cargo:
+    taskfile: ./packages/mono-dev/task/cargo.yaml
+    optional: true
+    internal: true
+
+  cu:             {taskfile: ./packages/copper,             dir: ./packages/copper,             internal: true}
+  cu-proc-macros: {taskfile: ./packages/copper-proc-macros, dir: ./packages/copper-proc-macros, internal: true}
 
 tasks:
   install-cargo-extra-tools:
@@ -22,16 +28,24 @@ tasks:
 
   check:
     cmds:
+      - task: cu-proc-macros:check
       - task: cu:check
 
   test:
     cmds:
       - task: cu:test
 
+  dev-doc:
+    cmds:
+      - task: cargo:watch-serve-doc
+        vars:
+          CARGO_ARGS: --features full,nightly
+          TOOLCHAIN: +nightly
+
   doc:
     cmds:
       # note: require nightly toolchain in CI
-      - cargo doc --no-deps --all-features
+      - cargo doc --no-deps --features full,nightly
       - cmd: >
           echo "Generating index redirect";
           echo "<!DOCTYPE html>" > target/doc/index.html;

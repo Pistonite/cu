@@ -1,0 +1,27 @@
+[package]
+name = "pm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+proc-macro2 = { version = "1.0.96", default-features = false }
+quote = { version = "1.0.40", default-features = false }
+syn = { version = "2.0.104", default-features = false }
+
+[features]
+default = [
+    "base",
+    "proc-macro",
+]
+base = [
+    "syn/derive",
+    "syn/parsing",
+    "syn/printing",
+    "syn/clone-impls",
+]
+proc-macro = [
+    "quote/proc-macro", 
+    "proc-macro2/proc-macro",
+    "syn/proc-macro"
+]
+full = ["syn/full"]

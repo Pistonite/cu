@@ -1,6 +1,6 @@
 use crate::{Atomic, Context as _};
 
-use super::PromptLevel;
+use crate::lv;
 /// Show a Yes/No prompt
 ///
 /// Return `true` if the answer is Yes. Return an error if prompt is not allowed
@@ -24,14 +24,14 @@ macro_rules! prompt {
         $crate::__priv::__prompt(format_args!($($fmt_args)*))
     }}
 }
-pub(crate) static PROMPT_LEVEL: Atomic<u8, PromptLevel> =
-    Atomic::new_u8(PromptLevel::Interactive as u8);
+pub(crate) static PROMPT_LEVEL: Atomic<u8, lv::Prompt> =
+    Atomic::new_u8(lv::Prompt::Interactive as u8);
 
 pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     match PROMPT_LEVEL.get() {
-        PromptLevel::Interactive => {}
-        PromptLevel::Yes => return Ok(true),
-        PromptLevel::No => {
+        lv::Prompt::Interactive => {}
+        lv::Prompt::Yes => return Ok(true),
+        lv::Prompt::No => {
             crate::bailand!(error!(
                 "prompt not allowed in non-interactive mode: {message}"
             ));
@@ -68,7 +68,7 @@ pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
 }
 
 pub fn __prompt(message: std::fmt::Arguments<'_>) -> crate::Result<String> {
-    if let PromptLevel::No = PROMPT_LEVEL.get() {
+    if let lv::Prompt::No = PROMPT_LEVEL.get() {
         crate::bailand!(error!(
             "prompt not allowed in non-interactive mode: {message}"
         ));

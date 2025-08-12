@@ -3,10 +3,9 @@ use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-// use crate::AsyncHandle;
-use crate::Atomic;
+use super::{FormatBuffer, ProgressBar, ansi};
 
-use super::{FormatBuffer, Lv, PrintLevel, ProgressBar, ansi};
+use crate::lv;
 
 /// Print something
 ///
@@ -26,8 +25,8 @@ macro_rules! hint {
 }
 
 /// Internal print function for macros
-pub fn __print_with_level(lv: Lv, message: std::fmt::Arguments<'_>) {
-    if !lv.can_print(PRINT_LEVEL.get()) {
+pub fn __print_with_level(lv: lv::Lv, message: std::fmt::Arguments<'_>) {
+    if !lv.can_print(lv::PRINT_LEVEL.get()) {
         return;
     }
     let message = format!("{message}");
@@ -36,12 +35,6 @@ pub fn __print_with_level(lv: Lv, message: std::fmt::Arguments<'_>) {
     }
 }
 
-/// Check if the logging level is enabled
-pub fn log_enabled(lv: Lv) -> bool {
-    lv.can_print(PRINT_LEVEL.get())
-}
-
-pub(crate) static PRINT_LEVEL: Atomic<u8, PrintLevel> = Atomic::new_u8(PrintLevel::Normal as u8);
 pub(crate) static PRINTER: LazyLock<Mutex<Printer>> =
     LazyLock::new(|| Mutex::new(Printer::default()));
 
@@ -160,7 +153,7 @@ impl Printer {
 
     /// Spawn a progress bar, starting a print task if not already
     pub(crate) fn add_progress_bar(&mut self, bar: &Arc<ProgressBar>) {
-        if PRINT_LEVEL.get() < PrintLevel::Normal {
+        if lv::PRINT_LEVEL.get() < lv::Print::Normal {
             return;
         }
         if self.bar_target.is_none() {
@@ -184,54 +177,54 @@ impl Printer {
     }
 
     /// Format and print the message
-    pub(crate) fn print_message(&mut self, lv: Lv, message: &str) {
+    pub(crate) fn print_message(&mut self, lv: lv::Lv, message: &str) {
         let mut lines = message.lines();
         let text_color = match lv {
-            Lv::Off => return,
-            Lv::Error => self.colors.red,
-            Lv::Hint => self.colors.yellow,
-            Lv::Print => self.colors.reset,
-            Lv::Warn => self.colors.yellow,
-            Lv::Info => self.colors.reset,
-            Lv::Debug => self.colors.cyan,
-            Lv::Trace => self.colors.magenta,
+            lv::Lv::Off => return,
+            lv::Lv::Error => self.colors.red,
+            lv::Lv::Hint => self.colors.yellow,
+            lv::Lv::Print => self.colors.reset,
+            lv::Lv::Warn => self.colors.yellow,
+            lv::Lv::Info => self.colors.reset,
+            lv::Lv::Debug => self.colors.cyan,
+            lv::Lv::Trace => self.colors.magenta,
         };
         self.format_buffer.reset(self.colors.gray, text_color);
         match lv {
-            Lv::Off => unreachable!(),
-            Lv::Error => {
+            lv::Lv::Off => unreachable!(),
+            lv::Lv::Error => {
                 self.format_buffer.push_control(self.colors.red);
                 self.format_buffer.push('E', 1);
                 self.format_buffer.push(']', 1);
             }
-            Lv::Hint => {
+            lv::Lv::Hint => {
                 self.format_buffer.push_control(self.colors.cyan);
                 self.format_buffer.push('H', 1);
                 self.format_buffer.push_control(self.colors.gray);
                 self.format_buffer.push(']', 1);
             }
-            Lv::Print => {
+            lv::Lv::Print => {
                 self.format_buffer.push_control(self.colors.gray);
                 self.format_buffer.push(':', 1);
                 self.format_buffer.push(':', 1);
             }
-            Lv::Warn => {
+            lv::Lv::Warn => {
                 self.format_buffer.push_control(self.colors.yellow);
                 self.format_buffer.push('W', 1);
                 self.format_buffer.push(']', 1);
             }
-            Lv::Info => {
+            lv::Lv::Info => {
                 self.format_buffer.push_control(self.colors.green);
                 self.format_buffer.push('I', 1);
                 self.format_buffer.push_control(self.colors.gray);
                 self.format_buffer.push(']', 1);
             }
-            Lv::Debug => {
+            lv::Lv::Debug => {
                 self.format_buffer.push_control(self.colors.gray);
                 self.format_buffer.push('D', 1);
                 self.format_buffer.push(']', 1);
             }
-            Lv::Trace => {
+            lv::Lv::Trace => {
                 self.format_buffer.push_control(self.colors.magenta);
                 self.format_buffer.push('*', 1);
                 self.format_buffer.push(']', 1);
@@ -260,7 +253,7 @@ impl Printer {
 
     /// Format and print a progress bar done message
     pub(crate) fn print_bar_done(&mut self, message: &str) {
-        if PRINT_LEVEL.get() < PrintLevel::Normal {
+        if lv::PRINT_LEVEL.get() < lv::Print::Normal {
             return;
         }
         self.format_buffer

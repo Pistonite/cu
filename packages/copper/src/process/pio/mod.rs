@@ -46,8 +46,10 @@ use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as T
 use crate::BoxedFuture;
 
 mod pipe;
+#[cfg(feature = "print")]
 mod print;
 mod read;
+#[cfg(feature = "print")]
 mod spinner;
 
 /// internal task types used in trait implementations
@@ -57,17 +59,20 @@ pub mod config {
     pub use super::read::BufferString as String;
     pub use super::read::CoLines;
     pub use super::read::Lines;
+    #[cfg(feature = "print")]
     pub use super::spinner::Spinner;
 }
 
 /// internal task types used in trait implementations
 pub mod task {
     pub use super::pipe::PipeTask as Pipe;
+    #[cfg(feature = "print")]
     pub use super::print::PrintTask as Print;
     pub use super::read::BufferStringTask as String;
     pub use super::read::BufferTask as Buffer;
     pub use super::read::CoLinesTask as CoLines;
     pub use super::read::LinesTask as Lines;
+    #[cfg(feature = "print")]
     pub use super::spinner::SpinnerTask as Spinner;
 }
 
@@ -83,9 +88,12 @@ pub use output::{CoLines, Lines, Pipe};
 // factory re-exports
 pub use pipe::pipe;
 pub use read::{buffer, co_lines, lines, string};
+#[cfg(feature = "print")]
 pub use spinner::spinner;
 
+#[cfg(feature = "print")]
 mod print_driver;
+#[cfg(feature = "print")]
 use print_driver::*;
 
 /// Configuration for process output to be used with

@@ -156,13 +156,16 @@ pub fn color_flag_eq() -> ColorFlag {
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
+#[cfg(feature = "print")]
 pub struct WidthFlag(bool);
+#[cfg(feature = "print")]
 impl WidthFlag {
     #[inline(always)]
     pub fn use_eq_sign(self) -> bool {
         self.0
     }
 }
+#[cfg(feature = "print")]
 impl Config for WidthFlag {
     fn configure(self, command: &mut TokioCommand) {
         if let Some(w) = crate::term_width() {
@@ -192,6 +195,7 @@ impl Config for WidthFlag {
 /// # Ok(()) }
 /// ```
 #[inline(always)]
+#[cfg(feature = "print")]
 pub fn width_flag() -> WidthFlag {
     WidthFlag(false)
 }
@@ -212,6 +216,7 @@ pub fn width_flag() -> WidthFlag {
 /// # Ok(()) }
 /// ```
 #[inline(always)]
+#[cfg(feature = "print")]
 pub fn width_flag_eq() -> WidthFlag {
     WidthFlag(true)
 }

@@ -1,29 +1,46 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::{Atomic, lv};
+
+pub(crate) static PRINT_LEVEL: Atomic<u8, lv::Print> = Atomic::new_u8(lv::Print::Normal as u8);
+pub(crate) static USE_COLOR: AtomicBool = AtomicBool::new(true);
+
+/// Check if the logging level is enabled
+pub fn log_enabled(lv: lv::Lv) -> bool {
+    lv.can_print(PRINT_LEVEL.get())
+}
+
+/// Get if color printing is enabled
+pub fn color_enabled() -> bool {
+    USE_COLOR.load(Ordering::Acquire)
+}
+
 /// Color Level settable with `--color` flag
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
-pub enum ColorLevel {
+pub enum Color {
     Always,
     Never,
     #[default]
     Auto,
 }
-impl std::fmt::Display for ColorLevel {
+impl std::fmt::Display for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ColorLevel::Always => write!(f, "always"),
-            ColorLevel::Never => write!(f, "never"),
-            ColorLevel::Auto => write!(f, "auto"),
+            Self::Always => write!(f, "always"),
+            Self::Never => write!(f, "never"),
+            Self::Auto => write!(f, "auto"),
         }
     }
 }
-impl ColorLevel {
+impl Color {
     /// Get if color should be used. If `Auto`, returns if stdout is terminal.
     pub fn is_colored_for_stdout(self) -> bool {
         use std::io::IsTerminal;
         match self {
-            ColorLevel::Always => true,
-            ColorLevel::Never => false,
-            ColorLevel::Auto => std::io::stdout().is_terminal(),
+            Self::Always => true,
+            Self::Never => false,
+            Self::Auto => std::io::stdout().is_terminal(),
         }
     }
 
@@ -67,14 +84,14 @@ impl ColorLevel {
 /// Print level settable with `-v` and `-q` flags
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
-pub enum PrintLevel {
+pub enum Print {
     QuietQuiet,
     Quiet,
     Normal,
     Verbose,
     VerboseVerbose,
 }
-impl From<i8> for PrintLevel {
+impl From<i8> for Print {
     fn from(value: i8) -> Self {
         match value {
             ..=-2 => Self::QuietQuiet,
@@ -85,7 +102,7 @@ impl From<i8> for PrintLevel {
         }
     }
 }
-impl From<u8> for PrintLevel {
+impl From<u8> for Print {
     fn from(value: u8) -> Self {
         match value {
             0 => Self::QuietQuiet,
@@ -96,19 +113,19 @@ impl From<u8> for PrintLevel {
         }
     }
 }
-impl From<PrintLevel> for u8 {
-    fn from(value: PrintLevel) -> Self {
+impl From<Print> for u8 {
+    fn from(value: Print) -> Self {
         value as Self
     }
 }
-impl From<PrintLevel> for log::LevelFilter {
-    fn from(value: PrintLevel) -> Self {
+impl From<Print> for log::LevelFilter {
+    fn from(value: Print) -> Self {
         match value {
-            PrintLevel::QuietQuiet => log::LevelFilter::Off,
-            PrintLevel::Quiet => log::LevelFilter::Error,
-            PrintLevel::Normal => log::LevelFilter::Info,
-            PrintLevel::Verbose => log::LevelFilter::Debug,
-            PrintLevel::VerboseVerbose => log::LevelFilter::Trace,
+            Print::QuietQuiet => log::LevelFilter::Off,
+            Print::Quiet => log::LevelFilter::Error,
+            Print::Normal => log::LevelFilter::Info,
+            Print::Verbose => log::LevelFilter::Debug,
+            Print::VerboseVerbose => log::LevelFilter::Trace,
         }
     }
 }
@@ -116,7 +133,7 @@ impl From<PrintLevel> for log::LevelFilter {
 /// Prompt level set with `--yes`, `--interactive`, and `--non-interactive` flags
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum PromptLevel {
+pub enum Prompt {
     /// Show prompts interactively
     Interactive,
     /// Automatically answer "Yes" to all yes/no prompts, and `Auto` for regular prompts
@@ -124,7 +141,7 @@ pub enum PromptLevel {
     /// Do not allow prompts (non-interactive). Attempting to show prompt will error
     No,
 }
-impl From<u8> for PromptLevel {
+impl From<u8> for Prompt {
     fn from(value: u8) -> Self {
         match value {
             1 => Self::Yes,
@@ -133,8 +150,8 @@ impl From<u8> for PromptLevel {
         }
     }
 }
-impl From<PromptLevel> for u8 {
-    fn from(value: PromptLevel) -> Self {
+impl From<Prompt> for u8 {
+    fn from(value: Prompt) -> Self {
         value as Self
     }
 }
@@ -157,13 +174,13 @@ pub enum Lv {
 }
 impl Lv {
     /// Check if the current print level can print this message level
-    pub fn can_print(self, level: PrintLevel) -> bool {
+    pub fn can_print(self, level: Print) -> bool {
         match self {
             Lv::Off => false,
-            Lv::Error | Lv::Hint | Lv::Print => level != PrintLevel::QuietQuiet,
-            Lv::Warn | Lv::Info => level > PrintLevel::Quiet,
-            Lv::Debug => level > PrintLevel::Normal,
-            Lv::Trace => level == PrintLevel::VerboseVerbose,
+            Lv::Error | Lv::Hint | Lv::Print => level != Print::QuietQuiet,
+            Lv::Warn | Lv::Info => level > Print::Quiet,
+            Lv::Debug => level > Print::Normal,
+            Lv::Trace => level == Print::VerboseVerbose,
         }
     }
 }
@@ -197,3 +214,17 @@ impl From<Lv> for u8 {
         value as u8
     }
 }
+/// Error
+pub const E: Lv = Lv::Error;
+/// Hint
+pub const H: Lv = Lv::Hint;
+/// Print
+pub const P: Lv = Lv::Print;
+/// Warn
+pub const W: Lv = Lv::Warn;
+/// Info
+pub const I: Lv = Lv::Info;
+/// Debug
+pub const D: Lv = Lv::Debug;
+/// Trace
+pub const T: Lv = Lv::Trace;

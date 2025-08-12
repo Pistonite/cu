@@ -11,6 +11,14 @@ tasks:
       - task: cargo:clippy-package-feature
         vars:
           PACKAGE: cu
+          FEATURES: default
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: print
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
           FEATURES: cli
       - task: cargo:clippy-package-feature
         vars:
@@ -35,19 +43,22 @@ tasks:
       - task: cargo:clippy-package-feature
         vars:
           PACKAGE: cu
+          FEATURES: parse
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
+          FEATURES: json,yaml,toml
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: cu
           FEATURES: full
       - task: cargo:fmt-check
+      - cmd: echo "checking default feature"; grep "^default = \[\]$" Cargo.toml
 
   fix:
     cmds:
       - task: cargo:fmt-fix
 
-  dev-doc:
-    cmds:
-      - task: cargo:watch-serve-doc
-        vars:
-          CARGO_ARGS: --all-features
-          TOOLCHAIN: +nightly
 
   test:
     cmds:

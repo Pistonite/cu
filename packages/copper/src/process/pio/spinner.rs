@@ -4,7 +4,7 @@ use std::sync::Arc;
 use spin::mutex::SpinMutex;
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
-use crate::{Atomic, BoxedFuture, ProgressBar, print::Lv};
+use crate::{Atomic, BoxedFuture, ProgressBar, lv::Lv};
 
 use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
