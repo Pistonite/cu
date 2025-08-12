@@ -50,7 +50,6 @@ full = [
     "cli",
     "prompt",
     "process",
-    "parse",
     "json",
     "yaml",
     "toml",

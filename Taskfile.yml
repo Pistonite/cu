@@ -45,7 +45,7 @@ tasks:
   doc:
     cmds:
       # note: require nightly toolchain in CI
-      - cargo doc --no-deps --all-features
+      - cargo doc --no-deps --features full,nightly
       - cmd: >
           echo "Generating index redirect";
           echo "<!DOCTYPE html>" > target/doc/index.html;
