@@ -42,33 +42,11 @@ impl Pool {
         F::Output: Send + 'static,
     {
         let sem = Arc::clone(&self.0);
-        crate::co::spawn(Self::wrapped_future(sem, future))
-    }
-
-    /// Spawn a task using the active runtime
-    ///
-    /// The task is spawned with [`cu::co::co_spawn`](crate::co::co_spawn),
-    /// and will only start being executed when the pool
-    /// has availability (permits).
-    ///
-    /// Will panic if not inside a runtime context.
-    pub fn co_spawn<F>(&self, future: F) -> Handle<F::Output>
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        let sem = Arc::clone(&self.0);
-        crate::co::co_spawn(Self::wrapped_future(sem, future))
-    }
-
-    async fn wrapped_future<F>(sem: Arc<PoolInner>, future: F) -> F::Output
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        let _permit = sem.0.acquire().await.ok();
-        let result = future.await;
-        drop(_permit);
-        result
+        crate::co::spawn(async move {
+            let _permit = sem.0.acquire().await.ok();
+            let result = future.await;
+            drop(_permit);
+            result
+        })
     }
 }

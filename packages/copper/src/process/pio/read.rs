@@ -11,6 +11,7 @@ use super::{ChildOutConfig, ChildOutTask};
 ///
 /// # Example
 /// ```rust
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # #[cfg(unix)]
@@ -72,6 +73,7 @@ impl ChildOutTask for BufferTask {
 ///
 /// # Example
 /// ```rust
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # #[cfg(unix)]
@@ -148,11 +150,12 @@ async fn read_to_end(r: Result<ChildStdout, ChildStderr>) -> crate::Result<Vec<u
 ///
 /// # Example
 /// ```rust
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # #[cfg(unix)]
 /// # fn main() -> cu::Result<()> {
-/// let (child, mut lines, _) = cu::which("bash")?.command()
+/// let (child, mut lines) = cu::which("bash")?.command()
 ///     .args(["-c", r#"for i in {1..5}; do echo "Line $i"; done"# ])
 ///     .stdout(cu::pio::lines())
 ///     .stdie_null()
@@ -252,12 +255,13 @@ impl Iterator for LinesOutput {
 ///
 /// # Example
 /// ```rust
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # #[cfg(unix)]
 /// # #[cu::cli]
 /// # async fn main(_: cu::cli::Flags) -> cu::Result<()> {
-/// let (child, mut lines, _) = cu::which("bash")?.command()
+/// let (child, mut lines) = cu::which("bash")?.command()
 ///     .args(["-c", r#"for i in {1..5}; do echo "Line $i"; done"# ])
 ///     .stdout(cu::pio::co_lines())
 ///     .stdie_null()

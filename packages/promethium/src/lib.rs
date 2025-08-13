@@ -14,49 +14,40 @@
 //! the prelude import `use pm::pre::*`.
 
 mod util;
+#[allow(unused)]
 pub use util::*;
 
 // lib re-exports
 pub mod lib {
-    pub use syn;
-    pub use quote;
     pub use proc_macro2;
+    pub use quote;
+    pub use syn;
 }
 
 // type re-exports
-pub use quote::{format_ident, quote, quote_spanned, ToTokens};
-pub use syn::{Result, Error};
 pub use proc_macro2::{
-    Group as Group2,
-    Ident as Ident2,
-    LexError as LexError2,
-    Literal as Literal2,
-    Span as Span2,
-    TokenStream as TokenStream2,
-    Punct as Punct2,
-    Delimiter as Delimiter2,
-    Spacing as Spacing2,
-    TokenTree as TokenTree2,
+    Delimiter as Delimiter2, Group as Group2, Ident as Ident2, LexError as LexError2,
+    Literal as Literal2, Punct as Punct2, Spacing as Spacing2, Span as Span2,
+    TokenStream as TokenStream2, TokenTree as TokenTree2,
 };
+pub use quote::{ToTokens, format_ident, quote, quote_spanned};
+pub use syn::{Error, Result};
 
 #[cfg(feature = "proc-macro")]
 extern crate proc_macro;
 #[cfg(feature = "proc-macro")]
 pub use proc_macro::{
-    Group,
-    Ident,
-    LexError,
-    Literal, Punct, Span, TokenStream,
-    Delimiter, Spacing,
-    TokenTree,
+    Delimiter, Group, Ident, LexError, Literal, Punct, Spacing, Span, TokenStream, TokenTree,
 };
 
 // prelude traits
 pub mod pre {
-    pub use syn;
-    pub use crate::lib::quote::ToTokens as _;
-    pub use crate::TokenStream;
-    pub use crate::TokenStream2;
+    #[cfg(feature = "proc-macro")]
     pub use crate::Span;
     pub use crate::Span2;
+    #[cfg(feature = "proc-macro")]
+    pub use crate::TokenStream;
+    pub use crate::TokenStream2;
+    pub use crate::lib::quote::ToTokens as _;
+    pub use syn;
 }

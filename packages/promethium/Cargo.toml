@@ -1,7 +1,14 @@
 [package]
-name = "pm"
+name = "pistonite-pm"
 version = "0.1.0"
 edition = "2024"
+description = "Procedural Macro Common Utils"
+repository = "https://github.com/Pistonite/cu"
+license = "MIT"
+authors = ["Pistonight <pistonknight@outlook.com>"]
+exclude = [
+    "Taskfile.yml"
+]
 
 [dependencies]
 proc-macro2 = { version = "1.0.96", default-features = false }
@@ -24,4 +31,4 @@ proc-macro = [
     "proc-macro2/proc-macro",
     "syn/proc-macro"
 ]
-full = ["syn/full"]
+full = ["base", "syn/full"]

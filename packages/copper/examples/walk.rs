@@ -1,3 +1,5 @@
+use pistonite_cu as cu;
+
 #[cu::cli]
 fn main(_: cu::cli::Flags) -> cu::Result<()> {
     let mut src = cu::fs::walk("src")?;
