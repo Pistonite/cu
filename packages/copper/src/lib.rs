@@ -1,5 +1,8 @@
 //! Batteries-included common utils
 //!
+//! (If you are viewing this on docs.rs, please use the [self-hosted
+//! version](https://cu.pistonite.dev) instead)
+//!
 //! # Install
 //! Since crates.io does not have namespaces, this crate has a prefix.
 //! You should manually rename it to `cu`, as that's what the proc-macros
