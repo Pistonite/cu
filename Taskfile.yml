@@ -13,6 +13,7 @@ includes:
 
   cu:             {taskfile: ./packages/copper,             dir: ./packages/copper,             internal: true}
   cu-proc-macros: {taskfile: ./packages/copper-proc-macros, dir: ./packages/copper-proc-macros, internal: true}
+  pm:             {taskfile: ./packages/promethium,         dir: ./packages/promethium,         internal: true}
 
 tasks:
   install-cargo-extra-tools:
@@ -28,6 +29,7 @@ tasks:
 
   check:
     cmds:
+      - task: pm:check
       - task: cu-proc-macros:check
       - task: cu:check
 
@@ -53,3 +55,10 @@ tasks:
           echo '<meta http-equiv="refresh" content="0;url=https://pistonight.github.io/cu/cu/">' >> target/doc/index.html;
           echo "</head><body></body></html>" >> target/doc/index.html;
         silent: true
+
+  publish:
+    cmds:
+      # order matters
+      - task: pm:publish
+      - task: cu-proc-macros:publish
+      - task: cu:publish

@@ -5,10 +5,17 @@ setup CLI applications, like build scripts/test harness sort of stuff.
 
 Doc available at: https://pistonight.github.io/cu
 
-Features:
-- Thread-safe printing, progress bar and prompting integrated with `log` and `clap` (for setting verbosity)
-- Filesystem and Path handling with `anyhow` result types and reporting including.
+Since crates.io does not have namespaces, this crate has a prefix.
+You should manually rename it to `cu`, as that's what the proc-macros
+expect.
+```toml
+# Cargo.toml
+# ...
+[dependencies.cu]
+package = "pistonite-cu"
+version = "..." # check by running `cargo info pistonite-cu`
+features = [ "full" ] # see docs
 
-```
-cargo install cu --git https://github.com/Pistonight/cu
+# ...
+[dependencies]
 ```
