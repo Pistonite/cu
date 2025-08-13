@@ -12,6 +12,7 @@ exclude = [
 
 [dependencies.pm]
 package = "pistonite-pm"
+version = "0.1.0"
 path = "../promethium"
 features = ["full"]
 
