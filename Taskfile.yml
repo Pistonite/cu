@@ -52,7 +52,7 @@ tasks:
           echo "Generating index redirect";
           echo "<!DOCTYPE html>" > target/doc/index.html;
           echo "<html><head>" >> target/doc/index.html;
-          echo '<meta http-equiv="refresh" content="0;url=https://cu.pistonite.dev/pistonite-cu/">' >> target/doc/index.html;
+          echo '<meta http-equiv="refresh" content="0;url=https://cu.pistonite.dev/pistonite_cu/">' >> target/doc/index.html;
           echo "</head><body></body></html>" >> target/doc/index.html;
         silent: true
 
