@@ -4,6 +4,7 @@
 //! so you can use `clap` as if it's a dependency, without actually adding
 //! it to your `Cargo.toml`
 //! ```rust,no_run
+//! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //! use clap::Parser;
 //!
@@ -31,6 +32,7 @@
 //! to parse the flags and pass it to your main function.
 //! It also handles the `Result` returned back
 //! ```rust,no_run
+//! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //! // clap will be part of the prelude
 //! // when the `cli` feature is enabled
@@ -65,6 +67,7 @@
 //! description in the --help message, you can also use `cu::cli::Flags`
 //! directly in `main`:
 //! ```rust,no_run
+//! # use pistonite_cu as cu;
 //! #[cu::cli]
 //! fn main(args: cu::cli::Flags) -> cu::Result<()> {
 //!     Ok(())
@@ -124,6 +127,7 @@
 //! the current step. When `bar` is dropped, it will print a done message.
 //!
 //! ```rust,no_run
+//! # use pistonite_cu as cu;
 //! use std::time::Duration;
 //! {
 //!    let bar = cu::progress_bar(10, "This takes 2.5 seconds");
@@ -276,8 +280,8 @@ pub unsafe fn __run<
 #[cfg(feature = "coroutine")]
 #[doc(hidden)]
 pub unsafe fn co_run<
-    T: clap::Parser + AsRef<Flags>,
-    F: FnOnce(T) -> X,
+    T: clap::Parser + AsRef<Flags> + Send + 'static,
+    F: FnOnce(T) -> X + Send + 'static,
     X: Future<Output = crate::Result<()>> + Send + 'static,
 >(
     f: F,
@@ -289,8 +293,8 @@ pub unsafe fn co_run<
 #[cfg(feature = "coroutine")]
 #[doc(hidden)]
 pub unsafe fn __co_run<
-    T: clap::Parser,
-    F: FnOnce(T) -> X,
+    T: clap::Parser + Send + 'static,
+    F: FnOnce(T) -> X + Send + 'static,
     X: Future<Output = crate::Result<()>> + Send + 'static,
     FF: FnOnce(&T) -> &Flags,
 >(
@@ -299,7 +303,7 @@ pub unsafe fn __co_run<
 ) -> std::process::ExitCode {
     let start = std::time::Instant::now();
     let args = unsafe { parse_args_or_help::<T, FF>(flags) };
-    let result = crate::co::spawn(f(args)).join().flatten();
+    let result = crate::co::run(async move { f(args).await });
 
     handle_result(start, result)
 }

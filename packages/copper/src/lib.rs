@@ -1,5 +1,21 @@
 //! Batteries-included common utils
 //!
+//! # Install
+//! Since crates.io does not have namespaces, this crate has a prefix.
+//! You should manually rename it to `cu`, as that's what the proc-macros
+//! expect.
+//! ```toml
+//! # Cargo.toml
+//! # ...
+//! [dependencies.cu]
+//! package = "pistonite-cu"
+//! version = "..." # check by running `cargo info pistonite-cu`
+//! features = [ "full" ] # see docs
+//!
+//! # ...
+//! [dependencies]
+//! ```
+//!
 //! # General Principal
 //! `cu` tries to be as short as possible with imports. Common and misc
 //! utilities are exported directly by the crate and should be used
@@ -10,6 +26,7 @@
 //! The only time to use `use` to import from `cu`, is with the prelude module
 //! `pre`:
 //! ```rust
+//! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //! ```
 //! This imports traits like [`Context`] and [`PathExtension`] into scope.
@@ -49,12 +66,12 @@ pub mod fs;
 #[cfg(feature = "fs")]
 mod path;
 #[cfg(feature = "fs")]
-pub use path::PathExtension;
+pub use path::{PathExtension, PathExtensionOwned};
 
 #[cfg(feature = "cli")]
 pub mod cli;
 #[cfg(feature = "cli")]
-pub use cu_proc_macros::cli;
+pub use pistonite_cu_proc_macros::cli;
 
 mod async_;
 pub use async_::BoxedFuture;
@@ -80,9 +97,9 @@ pub use lv::{color_enabled, log_enabled};
 #[cfg(feature = "parse")]
 mod parse;
 #[cfg(feature = "parse")]
-pub use cu_proc_macros::Parse;
-#[cfg(feature = "parse")]
 pub use parse::*;
+#[cfg(feature = "parse")]
+pub use pistonite_cu_proc_macros::Parse;
 
 // Atomic helpers
 mod atomic;
@@ -110,8 +127,6 @@ pub mod __priv {
 pub mod lib {
     #[cfg(feature = "cli")]
     pub use clap;
-    #[cfg(feature = "serde")]
-    pub use serde;
 }
 
 /// Prelude imports
@@ -121,16 +136,18 @@ pub mod pre {
     pub use crate::ParseTo as _;
     #[cfg(feature = "fs")]
     pub use crate::PathExtension as _;
+    #[cfg(feature = "fs")]
+    pub use crate::PathExtensionOwned as _;
     #[cfg(feature = "process")]
     pub use crate::Spawn as _;
     #[cfg(feature = "json")]
     pub use crate::json;
     #[cfg(feature = "cli")]
     pub use crate::lib::clap;
-    #[cfg(feature = "serde")]
-    pub use crate::lib::serde::{self, Deserialize, Serialize};
     #[cfg(feature = "toml")]
     pub use crate::toml;
     #[cfg(feature = "yaml")]
     pub use crate::yaml;
+    #[cfg(feature = "serde")]
+    pub use ::serde::{Deserialize, Serialize};
 }

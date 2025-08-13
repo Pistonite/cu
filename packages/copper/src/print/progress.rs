@@ -8,6 +8,7 @@ use super::ansi;
 ///
 /// # Examples
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// let bar = cu::progress_bar(10, "10 steps");
 /// // update the current count and message
 /// let i = 1;

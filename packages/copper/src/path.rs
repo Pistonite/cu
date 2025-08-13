@@ -11,6 +11,9 @@ pub trait PathExtension {
     /// Get file name. Error if the file name is not UTF-8 or other error occurs
     fn file_name_str(&self) -> crate::Result<&str>;
 
+    /// Get the path as UTF-8, error if it's not UTF-8
+    fn as_utf8(&self) -> crate::Result<&str>;
+
     /// Check that the path exists, or fail with an error
     fn check_exists(&self) -> crate::Result<()>;
 
@@ -72,6 +75,15 @@ pub trait PathExtension {
     fn command(&self) -> crate::CommandBuilder;
 }
 
+/// Extension to paths
+///
+/// Most of these are related to file system, and not purely path processing.
+/// Therefore this is tied to the `fs` feature.
+pub trait PathExtensionOwned {
+    /// Get the path as UTF-8, error if it's not UTF-8
+    fn into_utf8(self) -> crate::Result<String>;
+}
+
 impl PathExtension for Path {
     fn file_name_str(&self) -> crate::Result<&str> {
         let file_name = self
@@ -84,6 +96,16 @@ impl PathExtension for Path {
             crate::bail!("file name is not valid UTF-8: {}", self.display());
         };
         Ok(file_name)
+    }
+
+    fn as_utf8(&self) -> crate::Result<&str> {
+        // to_str is ok on all platforms, because Rust internally
+        // represent OsStrings on Windows as WTF-8
+        // see https://doc.rust-lang.org/src/std/sys_common/wtf8.rs.html
+        let Some(path) = self.to_str() else {
+            crate::bail!("path is not valid UTF-8: {}", self.display());
+        };
+        Ok(path)
     }
 
     fn simplified(&self) -> &Path {
@@ -246,6 +268,9 @@ macro_rules! impl_for_as_ref_path {
             fn file_name_str(&self) -> crate::Result<&str> {
                 AsRef::<Path>::as_ref(self).file_name_str()
             }
+            fn as_utf8(&self) -> crate::Result<&str> {
+                AsRef::<Path>::as_ref(self).as_utf8()
+            }
             fn simplified(&self) -> &Path {
                 AsRef::<Path>::as_ref(self).simplified()
             }
@@ -273,3 +298,11 @@ macro_rules! impl_for_as_ref_path {
 }
 
 impl_for_as_ref_path!(PathBuf);
+
+impl PathExtensionOwned for PathBuf {
+    fn into_utf8(self) -> crate::Result<String> {
+        self.into_os_string()
+            .into_string()
+            .map_err(|e| crate::fmterr!("path is not valid UTF-8: {}", e.display()))
+    }
+}

@@ -1,6 +1,14 @@
 /// `serde` YAML integration via the `serde_yaml_ng` crate
 ///
+/// Since `serde` derives requires linking with `serde` crate,
+/// you have to add it to your `Cargo.toml`:
+/// ```toml
+/// [dependencies]
+/// serde = "1"
+/// ```
+///
 /// ```rust
+/// # use pistonite_cu as cu;
 /// use cu::pre::*; // with `serde` feature, Serialize and Deserialize are
 ///                 // part of the prelude
 ///

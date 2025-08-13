@@ -6,6 +6,7 @@ use crate::{Context as _, co};
 
 /// A child process spawned with [`Command`](crate::Command)
 pub struct Child {
+    pub(crate) name: String,
     pub(crate) inner: TokioChild,
     pub(crate) io_task: co::Handle<bool>,
 }
@@ -17,9 +18,9 @@ impl Child {
     /// This will block the current thread while trying to join the child.
     /// Use [`co_wait_nz`](Self::co_wait_nz) to avoid blocking if in async context.
     pub fn wait_nz(self) -> crate::Result<()> {
-        let status = self.wait()?;
+        let status = wait_internal(&self.name, self.inner, self.io_task)?;
         if !status.success() {
-            crate::bail!("child exited with non-zero status");
+            crate::bail!("{} exited with non-zero status", self.name);
         }
         Ok(())
     }
@@ -30,22 +31,9 @@ impl Child {
     /// # Blocking
     /// This will block the current thread while trying to join the child.
     /// Use [`co_wait`](Self::co_wait) to avoid blocking if in async context.
-    pub fn wait(mut self) -> crate::Result<ExitStatus> {
-        // consume the child by waiting
-        let wait_task = co::spawn(async move { self.inner.wait().await });
-        // ensure the IO tasks are finished first, since blocking
-        // on child could dead lock if the child is waiting for IO
-        let io_panicked = match self.io_task.join_maybe_aborted() {
-            Ok(Some(panicked)) => panicked,
-            Ok(None) => false, // aborted
-            Err(_) => true,
-        };
-        if io_panicked {
-            crate::warn!("some io tasks panicked while waiting for child process");
-        }
-        wait_task
-            .join()?
-            .context("io error while joining a child process")
+    #[inline(always)]
+    pub fn wait(self) -> crate::Result<ExitStatus> {
+        wait_internal(&self.name, self.inner, self.io_task)
     }
 
     /// Wait for the child asynchronously using the current tokio runtime,
@@ -54,9 +42,9 @@ impl Child {
     /// # Panic
     /// Will panic if called outside of a tokio runtime context
     pub async fn co_wait_nz(self) -> crate::Result<()> {
-        let status = self.co_wait().await?;
+        let status = co_wait_internal(&self.name, self.inner, self.io_task).await?;
         if !status.success() {
-            crate::bail!("child exited with non-zero status");
+            crate::bail!("{} exited with non-zero status", self.name);
         }
         Ok(())
     }
@@ -66,30 +54,60 @@ impl Child {
     ///
     /// # Panic
     /// Will panic if called outside of a tokio runtime context
-    pub async fn co_wait(mut self) -> crate::Result<ExitStatus> {
-        // consume the child by waiting
-        let wait_task = co::co_spawn(async move { self.inner.wait().await });
-        // ensure the IO tasks are finished first, since blocking
-        // on child could dead lock if the child is waiting for IO
-        let io_panicked = match self.io_task.co_join_maybe_aborted().await {
-            Ok(Some(panicked)) => panicked,
-            Ok(None) => false, // aborted
-            Err(_) => true,
-        };
-        if io_panicked {
-            crate::warn!("some io tasks panicked while waiting for child process");
-        }
-        wait_task
-            .co_join()
-            .await?
-            .context("io error while joining a child process")
+    #[inline(always)]
+    pub async fn co_wait(self) -> crate::Result<ExitStatus> {
+        co_wait_internal(&self.name, self.inner, self.io_task).await
     }
 
     /// Create a wait guard that will automatically wait for the child
     /// (and ignore the error) when going out of scope.
+    #[inline(always)]
     pub fn wait_guard(self) -> ChildWaitGuard {
         ChildWaitGuard { inner: Some(self) }
     }
+}
+
+fn wait_internal(
+    name: &str,
+    mut child: TokioChild,
+    io_task: co::Handle<bool>,
+) -> crate::Result<ExitStatus> {
+    // consume the child by waiting
+    let wait_task = co::spawn(async move { child.wait().await });
+    // ensure the IO tasks are finished first, since blocking
+    // on child could dead lock if the child is waiting for IO
+    let io_panicked = match io_task.join_maybe_aborted() {
+        Ok(Some(panicked)) => panicked,
+        Ok(None) => false, // aborted
+        Err(_) => true,
+    };
+    if io_panicked {
+        crate::warn!("some io tasks panicked while executing {name}");
+    }
+    crate::check!(wait_task.join()?, "io error while executing {name}")
+}
+
+async fn co_wait_internal(
+    name: &str,
+    mut child: TokioChild,
+    io_task: co::Handle<bool>,
+) -> crate::Result<ExitStatus> {
+    // consume the child by waiting
+    let wait_task = co::spawn(async move { child.wait().await });
+    // ensure the IO tasks are finished first, since blocking
+    // on child could dead lock if the child is waiting for IO
+    let io_panicked = match io_task.co_join_maybe_aborted().await {
+        Ok(Some(panicked)) => panicked,
+        Ok(None) => false, // aborted
+        Err(_) => true,
+    };
+    if io_panicked {
+        crate::warn!("some io tasks panicked while executing {name}");
+    }
+    crate::check!(
+        wait_task.co_join().await?,
+        "io error while executing {name}"
+    )
 }
 
 /// A guard that automatically calls `wait` on a child

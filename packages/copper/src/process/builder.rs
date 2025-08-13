@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
-use std::{path::PathBuf, process::ExitStatus};
+use std::path::{Path, PathBuf};
+use std::process::ExitStatus;
 
 use tokio::process::{Child as TokioChild, Command as TokioCommand};
 use tokio::task::JoinSet;
@@ -17,6 +18,7 @@ pub type CommandBuilder = Command<(), (), ()>;
 /// to create a `CommandBuilder`.
 ///
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use std::path::Path;
 ///
 /// use cu::pre::*;
@@ -68,6 +70,7 @@ impl CommandBuilder {
     /// you can also call `.command()` on it (remember to import prelude)
     ///
     /// ```rust
+    /// # use pistonite_cu as cu;
     /// use cu::pre::*;
     ///
     /// # fn main() -> cu::Result<()> {
@@ -275,6 +278,7 @@ impl<Out, Err, In> Command<Out, Err, In> {
     ///
     /// - If both `stdout` and `stderr` don't have handle, then the output is [`Child`]
     /// ```rust
+    /// # use pistonite_cu as cu;
     /// use cu::pre::*; // The prelude import is required for `spawn`
     ///
     /// # fn main() -> cu::Result<()> {
@@ -285,9 +289,25 @@ impl<Out, Err, In> Command<Out, Err, In> {
     ///    .spawn()?;
     /// # Ok(()) }
     /// ```
-    /// - Otherwise, the output is a 3-tuple ([`Child`], `Stdout`, `Stderr`),
-    ///   where `Stdout` and `Stderr` are the respective handle type for the output configured.
+    /// - If only `stdout` has a handle but not `stderr`, then the output is a 2-tuple ([`Child`],
+    ///   `Stdout), where `Stdout` is the respective handle type for the configured output.
     /// ```rust
+    /// # use pistonite_cu as cu;
+    /// use cu::pre::*; // The prelude import is required for `spawn`
+    ///
+    /// # fn main() -> cu::Result<()> {
+    /// let (child, lines) = cu::which("bash")?.command()
+    ///    .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"# ])
+    ///    .stdout(cu::pio::lines())
+    ///    .stdie_null()
+    ///    .spawn()?;
+    /// # Ok(()) }
+    /// ```
+    /// - Otherwise, the output is a 3-tuple ([`Child`], `Stdout`, `Stderr`),
+    ///   where `Stdout` and `Stderr` are the respective handle type for the output configured,
+    ///   and `Stdout` might be `()` if it does not have a handle
+    /// ```rust
+    /// # use pistonite_cu as cu;
     /// use cu::pre::*; // The prelude import is required for `spawn`
     ///
     /// # fn main() -> cu::Result<()> {
@@ -296,20 +316,6 @@ impl<Out, Err, In> Command<Out, Err, In> {
     ///    .stdout(cu::pio::lines())
     ///    .stderr(cu::pio::string())
     ///    .stdin_null()
-    ///    .spawn()?;
-    /// # Ok(()) }
-    /// ```
-    /// - If `Stderr` doesn't have a handle but `Stdout` does, a 2-tuple
-    ///   is also accepted.
-    /// ```rust
-    /// use cu::pre::*; // The prelude import is required for `spawn`
-    ///
-    /// # fn main() -> cu::Result<()> {
-    /// let (child, lines) = cu::which("bash")?.command()
-    /// // let (child, lines, _) also works
-    ///    .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"# ])
-    ///    .stdout(cu::pio::lines())
-    ///    .stdie_null()
     ///    .spawn()?;
     /// # Ok(()) }
     /// ```
@@ -444,7 +450,7 @@ impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfi
 
 #[rustfmt::skip]
 #[cfg(not(doc))]
-impl< Out: pio::ChildOutConfig<__Null=pio::__OCNonNull>, Err: pio::ChildOutConfig, In: pio::ChildInConfig> Spawn<Spawned![Out, Err]> for Command<Out, Err, In> {
+impl< Out: pio::ChildOutConfig, Err: pio::ChildOutConfig<__Null=pio::__OCNonNull>, In: pio::ChildInConfig> Spawn<Spawned![Out, Err]> for Command<Out, Err, In> {
     #[inline(always)]
     fn spawn(self) -> crate::Result<Spawned![Out, Err]> {
         spawn_internal(self)
@@ -570,20 +576,34 @@ fn post_spawn<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::Child
     <Out::Task as pio::ChildOutTask>::Output,
     <Err::Task as pio::ChildOutTask>::Output,
 )> {
-    let name = self_.name.as_deref();
+    let name = self_.name;
 
     let stdout = self_
         .stdout
-        .take(&mut child, name, true)
+        .take(&mut child, name.as_deref(), true)
         .context("failed to take child stdout")?;
     let stderr = self_
         .stderr
-        .take(&mut child, name, false)
+        .take(&mut child, name.as_deref(), false)
         .context("failed to take child stderr")?;
     let stdin = self_
         .stdin
         .take(&mut child)
         .context("failed to take child stdin")?;
+
+    let name = match name {
+        Some(x) => format!("[{x}]"),
+        None => {
+            let command = self_.command.as_std();
+            let program = Path::new(command.get_program())
+                .file_name()
+                .map(|x| x.display().to_string());
+            match program {
+                Some(x) => format!("program '{x}'"),
+                None => "child process".to_string(),
+            }
+        }
+    };
 
     // get the IO tasks
     use pio::ChildInTask as _;
@@ -616,6 +636,7 @@ fn post_spawn<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::Child
 
     Ok((
         Child {
+            name,
             inner: child,
             io_task,
         },

@@ -1,11 +1,17 @@
 [package]
-name = "cu-proc-macros"
+name = "pistonite-cu-proc-macros"
 version = "0.1.0"
 edition = "2024"
-description = "I cannot resist, after trying very hard"
+description = "Proc-macros for Cu"
+repository = "https://github.com/Pistonite/cu"
 license = "MIT"
+authors = ["Pistonight <pistonknight@outlook.com>"]
+exclude = [
+    "Taskfile.yml"
+]
 
 [dependencies.pm]
+package = "pistonite-pm"
 path = "../promethium"
 features = ["full"]
 

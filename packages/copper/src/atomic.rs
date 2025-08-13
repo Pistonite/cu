@@ -1,5 +1,43 @@
 /// An atomic wrapper with an underlying atomic storage and conversion to
-/// a type T
+/// a type T.
+///
+/// `Acquire` ordering is used for load and `Release` ordering is used for store.
+///
+/// A proc macro might be provided in the future to simplify declaring a compatible enum type.
+///
+/// ```rust
+/// # use pistonite_cu as cu;
+/// #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// #[repr(u8)]
+/// pub enum MyEnum {
+///    A,
+///    B,
+///    C,
+///    Invalid, //
+/// }
+/// impl From<u8> for MyEnum {
+///     fn from(value: u8) -> Self {
+///         match value {
+///             0 => Self::A,
+///             1 => Self::B,
+///             2 => Self::C,
+///             _ => Self::Invalid,
+///         }
+///     }
+/// }
+/// impl From<MyEnum> for u8 {
+///     fn from(value: MyEnum) -> Self {
+///         value as Self
+///     }
+/// }
+///
+/// # fn main() {
+/// let value: cu::Atomic<u8, MyEnum> = cu::Atomic::new_u8(MyEnum::A as u8);
+/// assert_eq!(MyEnum::A, value.get());
+/// value.set(MyEnum::C);
+/// assert_eq!(MyEnum::C, value.get());
+/// # }
+/// ```
 #[derive(Debug, Default)]
 pub struct Atomic<S, T>(S::Type, std::marker::PhantomData<T>)
 where

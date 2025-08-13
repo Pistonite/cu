@@ -1,4 +1,5 @@
 use cu::pre::*;
+use pistonite_cu as cu;
 
 #[cu::cli]
 async fn main(_: cu::cli::Flags) -> cu::Result<()> {
@@ -46,15 +47,15 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
         cu::info!("done");
         cu::hint!("cleaning stuff up since you know i don't want to manually delete it");
         std::fs::remove_dir_all("rust")?;
-        let handle1 = cu::co::co_spawn(async move {
+        let handle1 = cu::co::spawn(async move {
             cu::fs::co_rec_remove("botw").await?;
             cu::Ok(())
         });
-        let handle2 = cu::co::co_spawn(async move {
+        let handle2 = cu::co::spawn(async move {
             cu::fs::co_rec_remove("rust").await?;
             cu::Ok(())
         });
-        Some(cu::co::co_spawn(async move {
+        Some(cu::co::spawn(async move {
             handle1.co_join().await??;
             handle2.co_join().await??;
             cu::Ok(())
@@ -64,46 +65,25 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
     };
 
     // pipes, co
-    cu::co::co_spawn(async move {
-        let (hello, out, _) = cu::which("echo")?
-            .command()
-            .arg("Hello, world!")
-            .stdout(cu::pio::pipe())
-            .stdie_null()
-            .co_spawn()
-            .await?;
-        hello.co_wait_nz().await?;
-
-        cu::which("rev")?
-            .command()
-            .stdin(out)
-            .stdoe(cu::lv::I)
-            .name("rev")
-            .co_wait_nz()
-            .await?;
-        cu::Ok(())
-    })
-    .co_join()
-    .await??;
-
-    // capture
-    let (hello, out) = cu::which("cat")?
+    let (hello, out) = cu::which("echo")?
         .command()
-        .arg("Cargo.toml")
-        .stdout(cu::pio::string())
+        .arg("Hello, world!")
+        .stdout(cu::pio::pipe())
         .stdie_null()
         .co_spawn()
         .await?;
-
-    let x = out.co_join().await?;
-    cu::info!("capture output: {x:?}");
-    let x = x?;
-    // let x=String::from_utf8(x)?;
-    cu::info!("decoded: {x}");
     hello.co_wait_nz().await?;
 
+    cu::which("rev")?
+        .command()
+        .stdin(out)
+        .stdoe(cu::lv::I)
+        .name("rev")
+        .co_wait_nz()
+        .await?;
+
     // blocking line stream
-    let (child, lines, _) = cu::which("bash")?
+    let (child, lines) = cu::which("bash")?
         .command()
         .args(["-c", r#"for i in {1..5}; do echo "Line $i"; sleep 1; done"#])
         .stdout(cu::pio::lines())
@@ -131,6 +111,22 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
         cu::info!("{line:?}");
     }
     child2.co_wait_nz().await?;
+
+    // capture
+    let (hello, out) = cu::which("cat")?
+        .command()
+        .arg("Cargo.toml")
+        .stdout(cu::pio::string())
+        .stdie_null()
+        .co_spawn()
+        .await?;
+
+    let x = out.co_join().await?;
+    cu::info!("capture output: {x:?}");
+    let x = x?;
+    // let x=String::from_utf8(x)?;
+    cu::info!("decoded: {x}");
+    hello.co_wait_nz().await?;
 
     if let Some(cleanup) = cleanup {
         cleanup.co_join().await??

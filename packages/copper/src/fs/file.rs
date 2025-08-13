@@ -5,6 +5,7 @@ use crate::pre::*;
 /// `std::env::current_exe()` with error reporting
 ///
 /// ```rust
+/// # use pistonite_cu as cu;
 /// # fn main() -> cu::Result<()> {
 /// let path = cu::fs::current_exe()?;
 /// assert!(path.is_absolute());

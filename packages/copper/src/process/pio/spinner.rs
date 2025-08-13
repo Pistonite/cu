@@ -13,6 +13,7 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 /// # Example
 /// Spawn a `git-clone` process, and use a spinner to show progress updates.
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # fn main() -> cu::Result<()> {
@@ -38,6 +39,7 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 /// as normal messages.
 ///
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # fn main() -> cu::Result<()> {

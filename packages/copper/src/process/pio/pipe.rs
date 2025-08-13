@@ -10,6 +10,7 @@ use super::{ChildInConfig, ChildOutConfig, ChildOutTask};
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # fn main() -> cu::Result<()> {

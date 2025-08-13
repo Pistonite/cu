@@ -32,16 +32,81 @@ macro_rules! noimpl {
 /// and return the error.
 ///
 /// Prelude import is required to bring in the Context trait.
+///
+/// ```rust
+/// # use pistonite_cu as cu;
+/// use cu::pre::*;
+///
+/// fn some_fallable_func() -> cu::Result<String> {
+///     Ok("foo".to_string())
+/// }
+///
+/// fn main() -> cu::Result<()> {
+///     // this input is just to show the formatting
+///     let input: i32 = 42;
+///
+///     let foo = cu::check!(some_fallable_func(), "failed: {input}")?;
+///     assert_eq!(foo, "foo");
+///     // also log the error as we return the Err
+///     let foo = cu::check!(some_fallable_func(), error!("failed: {input}"))?;
+///     assert_eq!(foo, "foo");
+///
+///     Ok(())
+/// }
+/// ```
 #[macro_export]
 macro_rules! check {
-    ($result:expr, $msg:literal) => {
-        { $result }.context($msg)
-    };
+    ($result:expr, $mac:ident !( $($args:tt)* )) => {{
+        { $result }.with_context(|| $crate::fmtand!($mac!($($args)*)))
+    }};
     ($result:expr, $($args:tt)*) => {{
         { $result }.with_context(|| format!($($args)*))
     }};
-    ($result:expr, $mac:ident ! $($args:tt)*) => {{
-        { $result }.with_context(|| $crate::fmtand!($mac!($($args)*)))
+}
+
+/// Rethrow an `Err`, optionally with additional context
+///
+/// This is useful if the error path requires additional handling
+///
+/// Prelude import is required to bring in the Context trait.
+///
+/// ```rust
+/// # use pistonite_cu as cu;
+/// use cu::pre::*;
+///
+/// fn some_fallable_func() -> cu::Result<String> {
+///     Ok("foo".to_string())
+/// }
+///
+/// fn main() -> cu::Result<()> {
+///     // this input is just to show the formatting
+///     let input: i32 = 42;
+///
+///     let foo = match some_fallable_func() {
+///         Ok(x) => x,
+///         Err(e) => {
+///             // supposed some additional handling is needed,
+///             // like setting some error state...
+///
+///             cu::rethrow!(e, "failed: {input}");
+///         }
+///     };
+///
+///     assert_eq!(foo, "foo");
+///
+///     Ok(())
+/// }
+/// ```
+#[macro_export]
+macro_rules! rethrow {
+    ($result:expr) => {
+        return Err($result);
+    };
+    ($result:expr, $mac:ident !( $($args:tt)* )) => {{
+        return Err($result).context($crate::fmtand!($mac!($($args)*)));
+    }};
+    ($result:expr, $($args:tt)*) => {{
+        return Err($result).context(format!($($args)*));
     }};
 }
 
@@ -49,6 +114,7 @@ macro_rules! check {
 ///
 /// # Example
 /// ```rust
+/// # use pistonite_cu as cu;
 /// let x = cu::fmtand!(error!("found {} errors", 3));
 /// assert_eq!(x, "found 3 errors");
 /// ```
@@ -64,6 +130,7 @@ macro_rules! fmtand {
 ///
 /// # Example
 /// ```rust
+/// # use pistonite_cu as cu;
 /// # fn main() {
 /// fn fn_1() -> cu::Result<()> {
 ///     cu::bailand!(error!("found {} errors", 3));
@@ -87,6 +154,7 @@ macro_rules! bailand {
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// cu::panicand!(error!("found {} errors", 3));
 /// ```
 #[macro_export]

@@ -7,10 +7,12 @@
 /// The entry points to parsing are `cu::parse`, and `into_parsed()`.
 ///
 /// ```rust
+/// # use pistonite_cu as cu;
 /// use std::path::PathBuf;
 /// use cu::pre::*;
 ///
 /// # fn main() -> cu::Result<()> {
+/// # use pistonite_cu as cu;
 /// // bool: empty string, 0, 1, "true", or "false", case-insensitive
 /// let x = cu::parse::<bool>("0")?;
 /// assert_eq!(x, false);

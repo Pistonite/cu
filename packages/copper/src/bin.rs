@@ -12,6 +12,7 @@
 //! With `cu::bin`, you can register this logic once, then just use [`cu::which`](function@which)
 //! whenever you need to get the resolved path:
 //! ```rust,no_run
+//! # use pistonite_cu as cu;
 //! use std::path::PathBuf;
 //! use cu::pre::*;
 //!
@@ -50,10 +51,21 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, RwLock};
 
-use crate::PathExtension as _;
+use crate::pre::*;
 
 static BIN_PATHS: LazyLock<RwLock<BTreeMap<String, PathBuf>>> =
     LazyLock::new(|| RwLock::new(BTreeMap::new()));
+
+/// Get a previously cached path. Returns None if the path
+/// was never cached (either because it was never referenced,
+/// or because previous resolution failed)
+pub fn get(name: impl AsRef<str>) -> Option<PathBuf> {
+    let name = name.as_ref();
+    let paths = BIN_PATHS
+        .read()
+        .expect("could not lock global bin path map");
+    paths.get(name).map(|x| x.to_path_buf())
+}
 
 /// Check and set bin name to the specified path. Return the absolute path that is set.
 ///
@@ -64,6 +76,7 @@ static BIN_PATHS: LazyLock<RwLock<BTreeMap<String, PathBuf>>> =
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use std::path::PathBuf;
 ///
 /// # fn main() -> cu::Result<()> {

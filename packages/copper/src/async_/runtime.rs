@@ -5,6 +5,7 @@ use tokio::runtime::{Builder, Runtime};
 use tokio::task::{JoinError, JoinHandle};
 
 /// the current-thread runtime
+#[cfg(not(feature = "coroutine-heavy"))]
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
     Builder::new_current_thread()
         .enable_all()
@@ -31,6 +32,35 @@ static BACKGROUND_RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
     }
 });
 
+/// Get a reference of a runtime that contains the current thread
+fn foreground() -> &'static Runtime {
+    #[cfg(not(feature = "coroutine-heavy"))]
+    {
+        &RUNTIME
+    }
+    #[cfg(feature = "coroutine-heavy")]
+    {
+        &BACKGROUND_RUNTIME
+    }
+}
+
+/// Run an async task using the current thread.
+///
+/// To prevent misuse, this is only available without the `coroutine-heavy`
+/// feature. Consider this entry point to some async procedure, if most of
+/// your program is sync.
+///
+/// Use [`spawn`] or [`run`] to run async tasks using the background thread(s)
+/// in both light and heavy async use cases.
+#[inline]
+#[cfg(not(feature = "coroutine-heavy"))]
+pub fn block<F>(future: F) -> F::Output
+where
+    F: Future,
+{
+    RUNTIME.block_on(future)
+}
+
 /// Spawn a task onto the background runtime
 #[inline]
 pub fn spawn<F>(future: F) -> Handle<F::Output>
@@ -41,36 +71,25 @@ where
     Handle(BACKGROUND_RUNTIME.spawn(future))
 }
 
-/// Spawn a task onto the current runtime context. Will panic if not
-/// inside a runtime context
-#[inline]
-pub fn co_spawn<F>(future: F) -> Handle<F::Output>
-where
-    F: Future + Send + 'static,
-    F::Output: Send + 'static,
-{
-    Handle(tokio::spawn(future))
-}
-
-/// Run an async task using the current thread.
+/// Spawn a task onto the blocking pool of the background runtime
 ///
-/// If the task is heavy, consider using [`spawn`] to run
-/// it on a background thread
+/// Since the light context only has one background thread,
+/// this is only enabled in heavy context to prevent misuse.
 #[inline]
-pub fn run<F>(future: F) -> F::Output
+#[cfg(feature = "coroutine-heavy")]
+pub fn spawn_blocking<F, R>(func: F) -> Handle<F::Output>
 where
-    F: Future + Send + 'static,
-    F::Output: Send + 'static,
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
 {
-    RUNTIME.block_on(future)
+    Handle(BACKGROUND_RUNTIME.spawn_blocking(func))
 }
 
 /// Run an async task using the background runtime
 #[inline]
-pub fn run_bg<F>(future: F) -> F::Output
+pub fn run<F>(future: F) -> F::Output
 where
-    F: Future + Send + 'static,
-    F::Output: Send + 'static,
+    F: Future,
 {
     BACKGROUND_RUNTIME.block_on(future)
 }
@@ -110,11 +129,12 @@ impl<T> Handle<T> {
     /// If you want to handle the abort, use [`join_maybe_aborted`](Self::join_maybe_aborted)
     ///
     /// # Blocking
-    /// **Do not use this in an async context**, since it will potentially
-    /// block the runtime. Use [`co_join().await`](`Self::co_join`) instead.
+    /// **Do not use this in an async context**, since it will block the runtime,
+    /// and will panic if the thread is currently driving IO.
+    /// Use [`co_join().await`](`Self::co_join`) instead.
     #[inline]
     pub fn join(self) -> crate::Result<T> {
-        Self::handle_error(RUNTIME.block_on(self.0))
+        Self::handle_error(foreground().block_on(self.0))
     }
 
     /// Wait for the task asynchronously
@@ -133,11 +153,12 @@ impl<T> Handle<T> {
     /// Panics are caught by the runtime, and will be returned as an Err.
     ///
     /// # Blocking
-    /// **Do not use this in an async context**, since it will potentially
-    /// block the runtime. Use [`co_join_maybe_aborted().await`](`Self::co_join_maybe_aborted`) instead.
+    /// **Do not use this in an async context**, since it will block the runtime,
+    /// and will panic if the thread is currently driving IO.
+    /// Use [`co_join_maybe_aborted().await`](`Self::co_join_maybe_aborted`) instead.
     #[inline]
     pub fn join_maybe_aborted(self) -> crate::Result<Option<T>> {
-        Self::handle_error_maybe_aborted(RUNTIME.block_on(self.0))
+        Self::handle_error_maybe_aborted(foreground().block_on(self.0))
     }
 
     /// Like [`co_join`](Self::co_join), but returns `None` if the task was aborted.
@@ -232,8 +253,9 @@ impl<T> RobustHandle<T> {
     /// If you want to handle the abort, use [`join_maybe_aborted`](Self::join_maybe_aborted)
     ///
     /// # Blocking
-    /// **Do not use this in an async context**, since it will potentially
-    /// block the runtime. Use [`co_join().await`](`Self::co_join`) instead.
+    /// **Do not use this in an async context**, since it will block the runtime,
+    /// and will panic if the thread is currently driving IO.
+    /// Use [`co_join().await`](`Self::co_join`) instead.
     #[inline]
     pub fn join(self) -> crate::Result<T> {
         match self.join_maybe_aborted()? {
@@ -264,8 +286,9 @@ impl<T> RobustHandle<T> {
     /// If you want to access it, see [`join_maybe_aborted_robust`](Self::join_maybe_aborted_robust)
     ///
     /// # Blocking
-    /// **Do not use this in an async context**, since it will potentially
-    /// block the runtime. Use [`co_join_maybe_aborted().await`](`Self::co_join_maybe_aborted`) instead.
+    /// **Do not use this in an async context**, since it will block the runtime,
+    /// and will panic if the thread is currently driving IO.
+    /// Use [`co_join_maybe_aborted().await`](`Self::co_join_maybe_aborted`) instead.
     #[inline]
     pub fn join_maybe_aborted(self) -> crate::Result<Option<T>> {
         match self.join_maybe_aborted_robust()? {
@@ -305,6 +328,7 @@ impl<T> RobustHandle<T> {
     /// - Returns `Err` if join fails.
     ///
     /// ```rust
+    /// # use pistonite_cu as cu;
     /// use std::time::Duration;
     ///
     /// let handle = cu::co::spawn(async move {
@@ -329,10 +353,9 @@ impl<T> RobustHandle<T> {
     /// ```
     ///
     /// # Blocking
-    /// **Do not use this in an async context**, since it will potentially
-    /// block the runtime. Use [`co_join_maybe_aborted_robust().await`](`Self::co_join_maybe_aborted_robust`) instead.
+    /// Use [`co_join_maybe_aborted_robust().await`](`Self::co_join_maybe_aborted_robust`) instead.
     pub fn join_maybe_aborted_robust(self) -> crate::Result<Result<T, Option<T>>> {
-        Self::handle_error_maybe_aborted_robust(RUNTIME.block_on(self.inner.0), &self.aborted)
+        Self::handle_error_maybe_aborted_robust(foreground().block_on(self.inner.0), &self.aborted)
     }
 
     /// Wait for the task asynchronously

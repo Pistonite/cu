@@ -22,6 +22,7 @@
 //!
 //! ```rust
 //! use std::time::Duration;
+//! # use pistonite_cu as cu;
 //! #[cu::cli]
 //! async fn main(_: cu::cli::Flags) -> cu::Result<()> {
 //!     cu::info!("doing some work");
@@ -45,6 +46,7 @@
 //!
 //! For example, `cu` uses coroutines to drive inputs and outputs from a command:
 //! ```rust,no_run
+//! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //!
 //! #[cu::cli]
@@ -86,6 +88,7 @@
 //! since we are not doing any extra work.
 //!
 //! ```rust,no_run
+//! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //! #[cu::cli]
 //! async fn main(_: cu::cli::Flags) -> cu::Result<()> {
@@ -115,6 +118,9 @@
 //! }
 //! ```
 
-pub use crate::async_::{
-    AbortHandle, Handle, Pool, RobustAbortHandle, RobustHandle, co_spawn, run, run_bg, spawn,
-};
+pub use crate::async_::{AbortHandle, Handle, Pool, RobustAbortHandle, RobustHandle, run, spawn};
+
+#[cfg(not(feature = "coroutine-heavy"))]
+pub use crate::async_::block;
+#[cfg(feature = "coroutine-heavy")]
+pub use crate::async_::spawn_blocking;

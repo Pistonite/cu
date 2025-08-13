@@ -25,6 +25,7 @@ impl<F: FnOnce(&mut TokioCommand)> Config for __ConfigFn<F> {
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use std::path::Path;
 /// use cu::pre::*;
 ///
@@ -51,6 +52,7 @@ macro_rules! args {
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use std::path::Path;
 /// use cu::pre::*;
 ///
@@ -118,6 +120,7 @@ impl Config for ColorFlag {
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # fn main() -> cu::Result<()> {
@@ -139,6 +142,7 @@ pub fn color_flag() -> ColorFlag {
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # fn main() -> cu::Result<()> {
@@ -184,6 +188,7 @@ impl Config for WidthFlag {
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # fn main() -> cu::Result<()> {
@@ -205,6 +210,7 @@ pub fn width_flag() -> WidthFlag {
 ///
 /// # Example
 /// ```rust,no_run
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
 /// # fn main() -> cu::Result<()> {

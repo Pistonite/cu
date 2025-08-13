@@ -1,11 +1,17 @@
 [package]
-name = "cu"
-version = "0.3.0"
+name = "pistonite-cu"
+version = "0.3.1"
 edition = "2024"
+description = "Battery-included common utils to speed up development of rust tools"
+repository = "https://github.com/Pistonite/cu"
 license = "MIT"
+authors = ["Pistonight <pistonknight@outlook.com>"]
+exclude = [
+    "Taskfile.yml"
+]
 
 [dependencies]
-cu-proc-macros = { path = "../copper-proc-macros", optional = true }
+pistonite-cu-proc-macros = { path = "../copper-proc-macros", optional = true }
 
 anyhow = "1.0.98"
 log = "0.4.27"
@@ -56,7 +62,7 @@ full = [
 ]
 
 # Command Line Interface (enables integration with `clap` and command line entry points)
-cli = ["dep:clap", "dep:cu-proc-macros", "print"]
+cli = ["dep:clap", "dep:pistonite-cu-proc-macros", "print"]
 print = ["dep:env_filter", "dep:terminal_size", "dep:unicode-width"]
 # Utils to show prompt for user input in terminal
 prompt = ["print"]
@@ -73,7 +79,7 @@ process = [
 # Enable file system and path util
 fs = ["dep:which", "dep:pathdiff", "dep:dunce", "dep:filetime", "tokio?/fs"]
 # Enable parsing utils
-parse = ["dep:cu-proc-macros"]
+parse = ["dep:pistonite-cu-proc-macros"]
 serde = ["dep:serde"]
 json = ["parse", "serde", "dep:serde_json"]
 json-preserve-order = ["json", "serde_json/preserve_order"]

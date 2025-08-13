@@ -1,3 +1,4 @@
+use pistonite_cu as cu;
 use std::time::Duration;
 
 use cu::pre::*;
