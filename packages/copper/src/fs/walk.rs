@@ -46,7 +46,8 @@ impl<F> Walk<F>
 where
     F: for<'b> WalkShouldRecursePredicate<WalkEntry<'b>>,
 {
-    #[allow(clippy::should_implement_trait)] // lifetime
+    #[allow(clippy::should_implement_trait)]
+    // ^ iterator does not allow returning items referencing data from the iterator
     pub fn next(&mut self) -> Option<crate::Result<WalkEntry<'_>>> {
         loop {
             let dir = self.stack.last_mut()?;

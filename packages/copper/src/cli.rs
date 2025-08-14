@@ -357,14 +357,14 @@ fn get_colored_command<T: Parser>(color: bool) -> Command {
 fn handle_result(start: Instant, result: crate::Result<()>) -> std::process::ExitCode {
     let elapsed = start.elapsed().as_secs_f32();
     if let Err(e) = result {
-        crate::debug!("finished in {elapsed:.2}s");
         crate::error!("fatal: {e:?}");
         if std::env::var("RUST_BACKTRACE")
             .unwrap_or_default()
             .is_empty()
         {
-            crate::hint!("use -vv or set RUST_BACKTRACE=1 to get backtrace for the error above.");
+            crate::hint!("use -vv or set RUST_BACKTRACE=1 to display the error backtrace.");
         }
+        crate::info!("finished in {elapsed:.2}s");
         std::process::ExitCode::FAILURE
     } else {
         crate::info!("finished in {elapsed:.2}s");

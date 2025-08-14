@@ -8,3 +8,5 @@ mod write;
 pub use write::*;
 mod walk;
 pub use walk::*;
+mod glob;
+pub use glob::*;

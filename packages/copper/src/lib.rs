@@ -153,4 +153,7 @@ pub mod pre {
     pub use crate::yaml;
     #[cfg(feature = "serde")]
     pub use ::serde::{Deserialize, Serialize};
+
+    #[cfg(feature = "coroutine")]
+    pub use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _};
 }
