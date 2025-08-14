@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -28,6 +28,7 @@ which = {version = "8.0.0", optional = true }
 pathdiff = {version = "0.2.3", optional=true}
 spin = {version = "0.10.0", optional = true}
 filetime = { version = "0.2.25", optional = true}
+glob = { version = "0.3.3", optional = true }
 
 # serde
 serde = { version = "1.0.219", features = ["derive"], optional = true }
@@ -67,17 +68,23 @@ print = ["dep:env_filter", "dep:terminal_size", "dep:unicode-width"]
 # Utils to show prompt for user input in terminal
 prompt = ["print"]
 # Enable coroutine drivers, which allow interop with async
-coroutine = ["dep:tokio", "tokio/sync"]
+coroutine = [
+    "dep:tokio",
+    "tokio/sync", "tokio/io-util", "tokio/io-std"
+]
 # Enable heavy coroutine drived by multi-threaded tokio runtime
 coroutine-heavy = ["coroutine"]
 # Enable spawning child processes
 process = [
     "coroutine", "fs",
     "dep:spin",
-    "tokio/process", "tokio/io-std", "tokio/io-util"
+    "tokio/process"
 ]
 # Enable file system and path util
-fs = ["dep:which", "dep:pathdiff", "dep:dunce", "dep:filetime", "tokio?/fs"]
+fs = [
+    "dep:which", "dep:pathdiff", "dep:dunce", "dep:filetime", "dep:glob",
+    "tokio?/fs"
+]
 # Enable parsing utils
 parse = ["dep:pistonite-cu-proc-macros"]
 serde = ["dep:serde"]
@@ -94,6 +101,7 @@ nightly = []
 # Static (compile-time) logging toggles
 release-nolog= ["log/release_max_level_off"]
 release-nodebuglog = ["log/release_max_level_info"]
+glob = ["dep:glob"]
 
 [[example]]
 name = "print"
