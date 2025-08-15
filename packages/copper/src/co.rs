@@ -118,7 +118,10 @@
 //! }
 //! ```
 
-pub use crate::async_::{AbortHandle, Handle, Pool, RobustAbortHandle, RobustHandle, run, spawn};
+pub use crate::async_::{
+    AbortHandle, Handle, Pool, RobustAbortHandle, RobustHandle, Set, pool, run, set, set_flatten,
+    spawn,
+};
 
 #[cfg(not(feature = "coroutine-heavy"))]
 pub use crate::async_::block;

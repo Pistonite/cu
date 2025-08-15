@@ -1,4 +1,3 @@
-use std::mem::MaybeUninit;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -96,12 +95,16 @@ impl Drop for ProgressBar {
     }
 }
 impl ProgressBar {
-    pub fn new(print_done: bool, total: usize, prefix: String) -> Self {
+    fn new(print_done: bool, total: usize, prefix: String) -> Self {
         Self {
             print_done,
             inner: Mutex::new(ProgressBarState::new(total, prefix)),
         }
     }
+    /// Set the counter and message of the progress bar.
+    ///
+    /// Typically, this is done throught the [`cu::progress`](crate::progress)
+    /// macro instead of calling this directly
     pub fn set(self: &Arc<Self>, current: usize, message: Option<String>) {
         if let Ok(mut bar) = self.inner.lock() {
             bar.current = current;
@@ -110,9 +113,20 @@ impl ProgressBar {
             }
         }
     }
+    /// Set the message of the progress bar, without changing counter.
+    ///
+    /// Typically, this is done throught the [`cu::progress`](crate::progress)
+    /// macro instead of calling this directly
     pub fn set_message(self: &Arc<Self>, message: String) {
         if let Ok(mut bar) = self.inner.lock() {
             bar.message = message;
+        }
+    }
+    /// Set the total counter. This can be used in cases where the total
+    /// count isn't known from the beginning.
+    pub fn set_total(self: &Arc<Self>, total: usize) {
+        if let Ok(mut bar) = self.inner.lock() {
+            bar.set_total(total);
         }
     }
     pub(crate) fn format(
@@ -149,24 +163,11 @@ struct ProgressBarState {
     /// Message to display, usually indicating what the current action is
     message: String,
     /// If bounded, used for estimating the ETA
-    /// using MaybeUninit to save a os call for unbounded
-    started: MaybeUninit<Instant>,
-}
-impl Drop for ProgressBarState {
-    fn drop(&mut self) {
-        if self.total != 0 {
-            unsafe { self.started.assume_init_drop() }
-        }
-    }
+    started: Instant,
 }
 
 impl ProgressBarState {
     pub(crate) fn new(total: usize, prefix: String) -> Self {
-        let started = if total == 0 {
-            MaybeUninit::uninit()
-        } else {
-            MaybeUninit::new(Instant::now())
-        };
         Self {
             total,
             current: 0,
@@ -174,10 +175,14 @@ impl ProgressBarState {
             last_eta_tick: 0,
             previous_eta: 0f64,
             should_show_eta: false,
-            started,
+            started: Instant::now(),
             prefix,
             message: String::new(),
         }
+    }
+    pub(crate) fn set_total(&mut self, total: usize) {
+        self.total = total;
+        self.current = self.current.min(total);
     }
     pub(crate) fn is_unbounded(&self) -> bool {
         self.total == 0
@@ -249,7 +254,7 @@ impl ProgressBarState {
             out.push(c);
         }
         if !self.is_unbounded() && self.current > 0 {
-            let start = unsafe { self.started.assume_init_read() };
+            let start = self.started;
             let elapsed = (now - start).as_secs_f64();
             // show percentage/ETA if the progress takes more than 2s
             if elapsed > 2f64 && self.current <= self.total {
