@@ -1,14 +1,22 @@
-use std::pin::Pin;
-
-#[cfg(feature = "coroutine")]
 mod pool;
-#[cfg(feature = "coroutine")]
 pub use pool::*;
-
-#[cfg(feature = "coroutine")]
 mod runtime;
-#[cfg(feature = "coroutine")]
 pub use runtime::*;
+mod handle;
+pub use handle::*;
 
-/// Alias for a boxed future
-pub type BoxedFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
+/// return Ok if the error is abort
+pub(crate) fn handle_join_error(e: tokio::task::JoinError) -> crate::Result<()> {
+    let e = match e.try_into_panic() {
+        Ok(panic) => {
+            let info = crate::best_effort_panic_info(&panic);
+            crate::bail!("task panicked: {info}");
+        }
+        Err(e) => e,
+    };
+    if e.is_cancelled() {
+        Ok(())
+    } else {
+        crate::bail!("failed to join task due to unknown reason: {e:?}")
+    }
+}

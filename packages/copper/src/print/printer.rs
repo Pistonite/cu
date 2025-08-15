@@ -153,7 +153,7 @@ impl Printer {
 
     /// Spawn a progress bar, starting a print task if not already
     pub(crate) fn add_progress_bar(&mut self, bar: &Arc<ProgressBar>) {
-        if lv::PRINT_LEVEL.get() < lv::Print::Normal {
+        if lv::PRINT_LEVEL.get() < lv::Print::Quiet {
             return;
         }
         if self.bar_target.is_none() {

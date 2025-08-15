@@ -76,8 +76,10 @@ pub mod cli;
 #[cfg(feature = "cli")]
 pub use pistonite_cu_proc_macros::cli;
 
+#[cfg(feature = "coroutine")]
 mod async_;
-pub use async_::BoxedFuture;
+/// Alias for a boxed future
+pub type BoxedFuture<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 #[cfg(feature = "coroutine")]
 pub mod co;
 
@@ -113,7 +115,7 @@ mod misc;
 pub use misc::*;
 
 // re-exports from libraries
-pub use anyhow::{Context, Ok, Result, anyhow as fmterr, bail, ensure};
+pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail, ensure};
 pub use log::{debug, error, info, trace, warn};
 #[cfg(feature = "coroutine")]
 pub use tokio::{join, try_join};
