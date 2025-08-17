@@ -96,7 +96,7 @@ pub use print::{
 /// Printing level values
 pub mod lv;
 #[doc(inline)]
-pub use lv::{color_enabled, log_enabled};
+pub use lv::{color_enabled, disable_print_time, disable_trace_hint, log_enabled};
 
 /// Parsing utilities
 #[cfg(feature = "parse")]
