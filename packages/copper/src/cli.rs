@@ -358,16 +358,22 @@ fn handle_result(start: Instant, result: crate::Result<()>) -> std::process::Exi
     let elapsed = start.elapsed().as_secs_f32();
     if let Err(e) = result {
         crate::error!("fatal: {e:?}");
-        if std::env::var("RUST_BACKTRACE")
-            .unwrap_or_default()
-            .is_empty()
-        {
-            crate::hint!("use -vv or set RUST_BACKTRACE=1 to display the error backtrace.");
+        if crate::lv::is_trace_hint_enabled() {
+            if std::env::var("RUST_BACKTRACE")
+                .unwrap_or_default()
+                .is_empty()
+            {
+                crate::hint!("use -vv or set RUST_BACKTRACE=1 to display the error backtrace.");
+            }
         }
-        crate::info!("finished in {elapsed:.2}s");
+        if crate::lv::is_print_time_enabled() {
+            crate::info!("finished in {elapsed:.2}s");
+        }
         std::process::ExitCode::FAILURE
     } else {
-        crate::info!("finished in {elapsed:.2}s");
+        if crate::lv::is_print_time_enabled() {
+            crate::info!("finished in {elapsed:.2}s");
+        }
         std::process::ExitCode::SUCCESS
     }
 }

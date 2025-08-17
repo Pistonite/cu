@@ -150,6 +150,33 @@ macro_rules! bailand {
         $crate::bail!(s);
     }}
 }
+
+/// Return an error, expecting the error will eventually
+/// be propagated as a fatal error to the user, as an FYI.
+///
+/// This means the error is an expected error, due to invalid
+/// input, for example.
+///
+/// This will hide the "use -vv for trace" hint message.
+///
+/// ```rust
+/// # use pistonite_cu as cu;
+/// fn foo() -> cu::Result<()> {
+///     cu::bailfyi!("input is invalid");
+/// }
+///
+/// assert!(foo().is_err());
+/// // exiting will not print the "show trace hint"
+/// ```
+///
+#[macro_export]
+macro_rules! bailfyi {
+    ($($arg:tt)*) => {{
+        $crate::lv::disable_trace_hint();
+        $crate::bail!($($arg)*);
+    }}
+}
+
 /// Invoke a print macro, then panic with the same message
 ///
 /// # Example

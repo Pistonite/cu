@@ -15,6 +15,35 @@ pub fn color_enabled() -> bool {
     USE_COLOR.load(Ordering::Acquire)
 }
 
+static ENABLE_TRACE_HINT: AtomicBool = AtomicBool::new(true);
+static ENABLE_PRINT_TIME: AtomicBool = AtomicBool::new(true);
+
+/// Disable printing the trace hint line if the CLI entry point returns an error
+///
+/// By default, the hint is displayed if `RUST_BACKTRACE` env var is not set
+#[inline(always)]
+pub fn disable_trace_hint() {
+    ENABLE_TRACE_HINT.store(false, Ordering::Release);
+}
+
+/// Check if the "use -vv to display backtrace" will be printed on error
+#[inline(always)]
+pub fn is_trace_hint_enabled() -> bool {
+    ENABLE_TRACE_HINT.load(Ordering::Acquire)
+}
+
+/// Disable printing the time took to run the command
+#[inline(always)]
+pub fn disable_print_time() {
+    ENABLE_PRINT_TIME.store(false, Ordering::Release);
+}
+
+/// Check if the "finished in TIME" line will be printed on exit
+#[inline(always)]
+pub fn is_print_time_enabled() -> bool {
+    ENABLE_PRINT_TIME.load(Ordering::Acquire)
+}
+
 /// Color Level settable with `--color` flag
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]

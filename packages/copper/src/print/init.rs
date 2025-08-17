@@ -93,7 +93,12 @@ pub fn init_print_options(color: lv::Color, level: lv::Print, prompt: Option<lv:
                 let mut message = String::new();
                 message.push('[');
                 if let Some(p) = record.module_path() {
-                    message.push_str(p);
+                    // aliased crate, use the shorthand
+                    if let Some(rest) = p.strip_prefix("pistonite_") {
+                        message.push_str(rest);
+                    } else {
+                        message.push_str(p);
+                    }
                     message.push(' ');
                 }
                 if let Some(f) = record.file() {
