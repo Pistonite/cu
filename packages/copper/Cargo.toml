@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
