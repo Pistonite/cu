@@ -39,7 +39,12 @@
 //! [`stderr`]: super::Command::stderr
 //!
 //! # Presets
-//! A preset 
+//! Presets may apply more than just IO configuration, such as
+//! adding additional arguments or environments.
+//!
+//! - [`cu::pio::cargo()`]: Progress for a `cargo build` command.
+//!
+//! [`cu::pio::cargo()`]: function@cargo
 //!
 use std::process::Stdio;
 
@@ -50,15 +55,17 @@ use crate::BoxedFuture;
 mod pipe;
 mod read;
 
+#[cfg(all(feature = "print", feature = "json"))]
+mod cargo_preset;
 #[cfg(feature = "print")]
 mod print;
 #[cfg(feature = "print")]
 mod spinner;
-#[cfg(all(feature = "print", feature = "json"))]
-mod cargo_preset;
 
 /// internal task types used in trait implementations
 pub mod config {
+    #[cfg(all(feature = "print", feature = "json"))]
+    pub use super::cargo_preset::Cargo;
     pub use super::pipe::Pipe;
     pub use super::read::Buffer;
     pub use super::read::BufferString as String;
@@ -66,12 +73,12 @@ pub mod config {
     pub use super::read::Lines;
     #[cfg(feature = "print")]
     pub use super::spinner::Spinner;
-    #[cfg(all(feature = "print", feature = "json"))]
-    pub use super::cargo_preset::Cargo;
 }
 
 /// internal task types used in trait implementations
 pub mod task {
+    #[cfg(all(feature = "print", feature = "json"))]
+    pub use super::cargo_preset::CargoTask as Cargo;
     pub use super::pipe::PipeTask as Pipe;
     #[cfg(feature = "print")]
     pub use super::print::PrintTask as Print;
@@ -81,8 +88,6 @@ pub mod task {
     pub use super::read::LinesTask as Lines;
     #[cfg(feature = "print")]
     pub use super::spinner::SpinnerTask as Spinner;
-    #[cfg(all(feature = "print", feature = "json"))]
-    pub use super::cargo_preset::CargoTask as Cargo;
 }
 
 /// internal output types used in trait implementations
@@ -95,12 +100,12 @@ pub mod output {
 // internal re-exports
 pub use output::{CoLines, Lines, Pipe};
 // factory re-exports
+#[cfg(all(feature = "print", feature = "json"))]
+pub use cargo_preset::cargo;
 pub use pipe::pipe;
 pub use read::{buffer, co_lines, lines, string};
 #[cfg(feature = "print")]
 pub use spinner::spinner;
-#[cfg(all(feature = "print", feature = "json"))]
-pub use cargo_preset::cargo;
 
 #[cfg(feature = "print")]
 mod print_driver;
@@ -270,19 +275,19 @@ pub(crate) fn take_child_out(
         Ok(Err(stderr))
     }
 }
-pub(crate) fn take_child_stdout(
-    child: &mut TokioChild,
-) -> crate::Result<ChildStdout> {
+pub(crate) fn take_child_stdout(child: &mut TokioChild) -> crate::Result<ChildStdout> {
     let Some(stdout) = child.stdout.take() else {
-        crate::bail!("failed to take stdout from child, possibly due to conflicting IO configuration.");
+        crate::bail!(
+            "failed to take stdout from child, possibly due to conflicting IO configuration."
+        );
     };
     Ok(stdout)
 }
-pub(crate) fn take_child_stderr(
-    child: &mut TokioChild,
-) -> crate::Result<ChildStderr> {
+pub(crate) fn take_child_stderr(child: &mut TokioChild) -> crate::Result<ChildStderr> {
     let Some(stdout) = child.stderr.take() else {
-        crate::bail!("failed to take stderr from child, possibly due to conflicting IO configuration.");
+        crate::bail!(
+            "failed to take stderr from child, possibly due to conflicting IO configuration."
+        );
     };
     Ok(stdout)
 }

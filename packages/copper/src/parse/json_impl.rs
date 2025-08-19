@@ -39,7 +39,7 @@ pub mod json {
         type Output = T;
 
         fn parse_borrowed(x: &str) -> crate::Result<Self::Output> {
-parse(x)
+            parse(x)
         }
 
         fn parse_read(x: impl std::io::Read) -> crate::Result<Self::Output> {

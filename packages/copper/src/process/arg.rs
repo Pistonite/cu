@@ -10,7 +10,7 @@ pub trait Config {
 pub trait Preset {
     type Output;
 
-    fn configure< O, E, I, >(self, command: crate::Command<O, E, I>) -> Self::Output;
+    fn configure<O, E, I>(self, command: crate::Command<O, E, I>) -> Self::Output;
 }
 
 #[doc(hidden)]

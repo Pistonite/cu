@@ -32,6 +32,23 @@ macro_rules! progress {
     }};
 }
 
+/// Signify the progress bar is done, with a custom done message
+///
+/// # Examples
+/// ```rust,no_run
+/// # use pistonite_cu as cu;
+/// let bar = cu::progress_bar(10, "10 steps");
+/// cu::progress!(&bar, 1, "doing step {}", 1);
+/// cu::progress_done!(&bar, "this is {}", "done!");
+/// ```
+#[macro_export]
+macro_rules! progress_done {
+    ($bar:expr, $($fmt_args:tt)*) => {{
+        let message = format!($($fmt_args)*);
+        $crate::ProgressBar::set_done_message($bar, message);
+    }};
+}
+
 /// Create a progress bar
 pub fn progress_bar(total: usize, message: impl Into<String>) -> Arc<ProgressBar> {
     let bar = Arc::new(ProgressBar::new(true, total, message.into()));
@@ -75,15 +92,26 @@ pub struct ProgressBar {
 }
 impl Drop for ProgressBar {
     fn drop(&mut self) {
-        let (total, message) = {
+        let (total, message, done_message) = {
             match self.inner.lock() {
-                Ok(mut bar) => (bar.total, std::mem::take(&mut bar.prefix)),
-                Err(_) => (0, String::new()),
+                Ok(mut bar) => (
+                    bar.total,
+                    std::mem::take(&mut bar.prefix),
+                    std::mem::take(&mut bar.done_message),
+                ),
+                Err(_) => (0, String::new(), None),
             }
         };
         let handle = if let Ok(mut x) = super::PRINTER.lock() {
             if self.print_done {
-                x.print_bar_done(&format_bar_done(total, &message));
+                match done_message {
+                    None => {
+                        x.print_bar_done(&format_bar_done(total, &message));
+                    }
+                    Some(message) => {
+                        x.print_bar_done(&format_bar_done_custom(total, &message));
+                    }
+                }
             }
             x.take_print_task_if_should_join()
         } else {
@@ -129,6 +157,16 @@ impl ProgressBar {
             bar.set_total(total);
         }
     }
+
+    /// Override the message printed when done.
+    ///
+    /// Typically, this is done throught the [`cu::progress_done`](crate::progress_done)
+    /// macro instead of calling this directly
+    pub fn set_done_message(self: &Arc<Self>, message: String) {
+        if let Ok(mut bar) = self.inner.lock() {
+            bar.done_message = Some(message);
+        }
+    }
     pub(crate) fn format(
         &self,
         width: usize,
@@ -164,6 +202,8 @@ struct ProgressBarState {
     message: String,
     /// If bounded, used for estimating the ETA
     started: Instant,
+    /// If set, print this message when done instead of the default done message
+    done_message: Option<String>,
 }
 
 impl ProgressBarState {
@@ -178,6 +218,7 @@ impl ProgressBarState {
             started: Instant::now(),
             prefix,
             message: String::new(),
+            done_message: None,
         }
     }
     pub(crate) fn set_total(&mut self, total: usize) {
@@ -365,5 +406,13 @@ fn format_bar_done(total: usize, message: &str) -> String {
         } else {
             format!("\u{283f}][{total}/{total}] {message}: done")
         }
+    }
+}
+
+fn format_bar_done_custom(total: usize, message: &str) -> String {
+    if total == 0 {
+        format!("\u{283f}] {message}")
+    } else {
+        format!("\u{283f}][{total}/{total}] {message}")
     }
 }

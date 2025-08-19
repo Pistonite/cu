@@ -41,7 +41,7 @@ pub fn glob(pattern: &str) -> crate::Result<Glob> {
     Ok(Glob(iter))
 }
 
-/// Iterator for [`glob`] and [`glob_from`]
+/// Iterator for [`glob`](function@glob) and [`glob_from`]
 ///
 /// This is a thin wrapper for rust-lang's `glob` crate
 /// that converts the error to anyhow.
