@@ -37,12 +37,7 @@ pub mod yaml {
         type Output = T;
 
         fn parse_borrowed(x: &str) -> crate::Result<Self::Output> {
-            serde_yaml_ng::from_str(x).with_context(|| {
-                format!(
-                    "failed to parse input as yaml into {}",
-                    std::any::type_name::<T>()
-                )
-            })
+            parse(x)
         }
 
         fn parse_read(x: impl std::io::Read) -> crate::Result<Self::Output> {
@@ -57,8 +52,13 @@ pub mod yaml {
 
     /// Parse value from a YAML `&str`
     #[inline(always)]
-    pub fn parse<T: for<'a> Deserialize<'a>>(x: &str) -> crate::Result<T> {
-        Yaml::<T>::parse_borrowed(x)
+    pub fn parse<'a, T: Deserialize<'a>>(x: &'a str) -> crate::Result<T> {
+        serde_yaml_ng::from_str(x).with_context(|| {
+            format!(
+                "failed to parse input as yaml into {}",
+                std::any::type_name::<T>()
+            )
+        })
     }
 
     /// Parse value from a reader that yields YAML

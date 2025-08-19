@@ -38,6 +38,8 @@
 //! [`stdout`]: super::Command::stdout
 //! [`stderr`]: super::Command::stderr
 //!
+//! # Presets
+//! A preset 
 //!
 use std::process::Stdio;
 
@@ -64,6 +66,8 @@ pub mod config {
     pub use super::read::Lines;
     #[cfg(feature = "print")]
     pub use super::spinner::Spinner;
+    #[cfg(all(feature = "print", feature = "json"))]
+    pub use super::cargo_preset::Cargo;
 }
 
 /// internal task types used in trait implementations
@@ -77,6 +81,8 @@ pub mod task {
     pub use super::read::LinesTask as Lines;
     #[cfg(feature = "print")]
     pub use super::spinner::SpinnerTask as Spinner;
+    #[cfg(all(feature = "print", feature = "json"))]
+    pub use super::cargo_preset::CargoTask as Cargo;
 }
 
 /// internal output types used in trait implementations
@@ -93,6 +99,8 @@ pub use pipe::pipe;
 pub use read::{buffer, co_lines, lines, string};
 #[cfg(feature = "print")]
 pub use spinner::spinner;
+#[cfg(all(feature = "print", feature = "json"))]
+pub use cargo_preset::cargo;
 
 #[cfg(feature = "print")]
 mod print_driver;
@@ -266,7 +274,7 @@ pub(crate) fn take_child_stdout(
     child: &mut TokioChild,
 ) -> crate::Result<ChildStdout> {
     let Some(stdout) = child.stdout.take() else {
-        crate::bail!("unexpected: failed to take stdout from child");
+        crate::bail!("failed to take stdout from child, possibly due to conflicting IO configuration.");
     };
     Ok(stdout)
 }
@@ -274,7 +282,7 @@ pub(crate) fn take_child_stderr(
     child: &mut TokioChild,
 ) -> crate::Result<ChildStderr> {
     let Some(stdout) = child.stderr.take() else {
-        crate::bail!("unexpected: failed to take stderr from child");
+        crate::bail!("failed to take stderr from child, possibly due to conflicting IO configuration.");
     };
     Ok(stdout)
 }

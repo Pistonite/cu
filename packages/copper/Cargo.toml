@@ -113,3 +113,7 @@ required-features = ["prompt", "cli", "process"]
 [[example]]
 name = "walk"
 required-features = ["fs", "cli"]
+
+[[example]]
+name = "cargo"
+required-features = ["process", "cli", "json"]
