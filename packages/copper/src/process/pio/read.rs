@@ -148,6 +148,9 @@ async fn read_to_end(r: Result<ChildStdout, ChildStderr>) -> crate::Result<Vec<u
 /// The items will be available for read as soon as they are piped from the child,
 /// without having to wait for the child to finish first.
 ///
+/// Note that for small outputs, it's usually better to simply use [`string()`]
+/// and call `.lines()` on the result.
+///
 /// # Example
 /// ```rust
 /// # use pistonite_cu as cu;
@@ -252,6 +255,9 @@ impl Iterator for LinesOutput {
 ///
 /// The items will be available for read as soon as they are piped from the child,
 /// without having to wait for the child to finish first.
+///
+/// Note that for small outputs, it's usually better to simply use [`string()`]
+/// and call `.lines()` on the result.
 ///
 /// # Example
 /// ```rust

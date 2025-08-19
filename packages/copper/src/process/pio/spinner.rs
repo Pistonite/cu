@@ -163,7 +163,9 @@ impl SpinnerTask {
         let bar = self.bar;
         let lv = self.lv;
         let prefix = self.prefix;
-        let mut driver = Driver::new(self.out, self.err, true);
+        // if we are printing, then let the driver only return the last
+        // line if more than one line is found
+        let mut driver = Driver::new(self.out, self.err, lv == Lv::Off);
         loop {
             match driver.next().await {
                 DriverOutput::Line(line) => {

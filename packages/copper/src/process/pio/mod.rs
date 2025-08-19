@@ -46,11 +46,14 @@ use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as T
 use crate::BoxedFuture;
 
 mod pipe;
+mod read;
+
 #[cfg(feature = "print")]
 mod print;
-mod read;
 #[cfg(feature = "print")]
 mod spinner;
+#[cfg(all(feature = "print", feature = "json"))]
+mod cargo_preset;
 
 /// internal task types used in trait implementations
 pub mod config {
@@ -252,14 +255,26 @@ pub(crate) fn take_child_out(
     is_out: bool,
 ) -> crate::Result<Result<ChildStdout, ChildStderr>> {
     if is_out {
-        let Some(stdout) = child.stdout.take() else {
-            crate::bail!("unexpected: failed to take stdout from child");
-        };
+        let stdout = take_child_stdout(child)?;
         Ok(Ok(stdout))
     } else {
-        let Some(stderr) = child.stderr.take() else {
-            crate::bail!("unexpected: failed to take stderr from child");
-        };
+        let stderr = take_child_stderr(child)?;
         Ok(Err(stderr))
     }
+}
+pub(crate) fn take_child_stdout(
+    child: &mut TokioChild,
+) -> crate::Result<ChildStdout> {
+    let Some(stdout) = child.stdout.take() else {
+        crate::bail!("unexpected: failed to take stdout from child");
+    };
+    Ok(stdout)
+}
+pub(crate) fn take_child_stderr(
+    child: &mut TokioChild,
+) -> crate::Result<ChildStderr> {
+    let Some(stdout) = child.stderr.take() else {
+        crate::bail!("unexpected: failed to take stderr from child");
+    };
+    Ok(stdout)
 }

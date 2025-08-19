@@ -5,7 +5,7 @@ use std::process::ExitStatus;
 use tokio::process::{Child as TokioChild, Command as TokioCommand};
 use tokio::task::JoinSet;
 
-use super::{Child, Config};
+use super::{Child, Config, Preset};
 
 use crate::{Context as _, PathExtension as _, co, pio};
 
@@ -259,6 +259,14 @@ impl<Out, Err, In> Command<Out, Err, In> {
     #[inline(always)]
     pub fn all_null(self) -> Command<pio::Null, pio::Null, pio::Null> {
         self.stdin_null().stdout_null().stderr_null()
+    }
+
+    /// Apply a preset for the child command's input and output.
+    ///
+    /// See [`pio`] for available IO presets.
+    #[inline(always)]
+    pub fn preset<P: Preset>(self, preset: P) -> P::Output {
+        preset.configure(self)
     }
 
     /// Spawn the child and run the child's IO tasks in the background. **Note that
