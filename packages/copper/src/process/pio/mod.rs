@@ -38,6 +38,13 @@
 //! [`stdout`]: super::Command::stdout
 //! [`stderr`]: super::Command::stderr
 //!
+//! # Presets
+//! Presets may apply more than just IO configuration, such as
+//! adding additional arguments or environments.
+//!
+//! - [`cu::pio::cargo()`]: Progress for a `cargo build` command.
+//!
+//! [`cu::pio::cargo()`]: function@cargo
 //!
 use std::process::Stdio;
 
@@ -46,14 +53,19 @@ use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as T
 use crate::BoxedFuture;
 
 mod pipe;
+mod read;
+
+#[cfg(all(feature = "print", feature = "json"))]
+mod cargo_preset;
 #[cfg(feature = "print")]
 mod print;
-mod read;
 #[cfg(feature = "print")]
 mod spinner;
 
 /// internal task types used in trait implementations
 pub mod config {
+    #[cfg(all(feature = "print", feature = "json"))]
+    pub use super::cargo_preset::Cargo;
     pub use super::pipe::Pipe;
     pub use super::read::Buffer;
     pub use super::read::BufferString as String;
@@ -65,6 +77,8 @@ pub mod config {
 
 /// internal task types used in trait implementations
 pub mod task {
+    #[cfg(all(feature = "print", feature = "json"))]
+    pub use super::cargo_preset::CargoTask as Cargo;
     pub use super::pipe::PipeTask as Pipe;
     #[cfg(feature = "print")]
     pub use super::print::PrintTask as Print;
@@ -86,6 +100,8 @@ pub mod output {
 // internal re-exports
 pub use output::{CoLines, Lines, Pipe};
 // factory re-exports
+#[cfg(all(feature = "print", feature = "json"))]
+pub use cargo_preset::cargo;
 pub use pipe::pipe;
 pub use read::{buffer, co_lines, lines, string};
 #[cfg(feature = "print")]
@@ -252,14 +268,26 @@ pub(crate) fn take_child_out(
     is_out: bool,
 ) -> crate::Result<Result<ChildStdout, ChildStderr>> {
     if is_out {
-        let Some(stdout) = child.stdout.take() else {
-            crate::bail!("unexpected: failed to take stdout from child");
-        };
+        let stdout = take_child_stdout(child)?;
         Ok(Ok(stdout))
     } else {
-        let Some(stderr) = child.stderr.take() else {
-            crate::bail!("unexpected: failed to take stderr from child");
-        };
+        let stderr = take_child_stderr(child)?;
         Ok(Err(stderr))
     }
+}
+pub(crate) fn take_child_stdout(child: &mut TokioChild) -> crate::Result<ChildStdout> {
+    let Some(stdout) = child.stdout.take() else {
+        crate::bail!(
+            "failed to take stdout from child, possibly due to conflicting IO configuration."
+        );
+    };
+    Ok(stdout)
+}
+pub(crate) fn take_child_stderr(child: &mut TokioChild) -> crate::Result<ChildStderr> {
+    let Some(stdout) = child.stderr.take() else {
+        crate::bail!(
+            "failed to take stderr from child, possibly due to conflicting IO configuration."
+        );
+    };
+    Ok(stdout)
 }

@@ -39,12 +39,7 @@ pub mod json {
         type Output = T;
 
         fn parse_borrowed(x: &str) -> crate::Result<Self::Output> {
-            serde_json::from_str(x).with_context(|| {
-                format!(
-                    "failed to parse input as json into {}",
-                    std::any::type_name::<T>()
-                )
-            })
+            parse(x)
         }
 
         fn parse_read(x: impl std::io::Read) -> crate::Result<Self::Output> {
@@ -59,8 +54,13 @@ pub mod json {
 
     /// Parse value from a JSON `&str`
     #[inline(always)]
-    pub fn parse<T: for<'a> Deserialize<'a>>(x: &str) -> crate::Result<T> {
-        Json::<T>::parse_borrowed(x)
+    pub fn parse<'a, T: Deserialize<'a>>(x: &'a str) -> crate::Result<T> {
+        serde_json::from_str(x).with_context(|| {
+            format!(
+                "failed to parse input as json into {}",
+                std::any::type_name::<T>()
+            )
+        })
     }
 
     /// Parse value from a reader that yields JSON

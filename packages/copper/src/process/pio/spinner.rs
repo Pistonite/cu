@@ -25,6 +25,7 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 ///     // use spinner to show the bar
 ///     .stderr(cu::pio::spinner("cloning example1"))
 ///     .stdin_null()
+///     .spawn()?.0
 ///     .wait_nz()?;
 /// # Ok(()) }
 /// ```
@@ -50,13 +51,15 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 ///     // an info message
 ///     .stdoe(cu::pio::spinner("cloning example1").info())
 ///     .stdin_null()
+///     .spawn()?.0
 ///     .wait_nz()?;
 /// # Ok(()) }
 /// ```
 ///
-/// # Merging streams
-/// You can `clone` a spinner config to direct multiple streams to use the same
-/// progress bar.
+/// # Output
+/// The progress bar handle is returned when you `spawn` the child.
+/// If the stdout and stderr are configured to the same spinner, then either
+/// handle can be used to update the bar.
 pub fn spinner(name: impl Into<String>) -> Spinner {
     Spinner {
         prefix: name.into(),
@@ -108,7 +111,7 @@ pub struct SpinnerTask {
 }
 impl ChildOutConfig for Spinner {
     type Task = SpinnerTask;
-    type __Null = super::__OCNull;
+    type __Null = super::__OCNonNull;
     fn configure_stdout(&mut self, command: &mut TokioCommand) {
         command.stdout(Stdio::piped());
     }
@@ -152,10 +155,11 @@ impl ChildOutConfig for Spinner {
     }
 }
 impl ChildOutTask for SpinnerTask {
-    type Output = ();
+    type Output = Arc<ProgressBar>;
 
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output) {
-        (Some(Box::pin(self.main())), ())
+        let bar = Arc::clone(&self.bar);
+        (Some(Box::pin(self.main())), bar)
     }
 }
 impl SpinnerTask {
@@ -163,7 +167,9 @@ impl SpinnerTask {
         let bar = self.bar;
         let lv = self.lv;
         let prefix = self.prefix;
-        let mut driver = Driver::new(self.out, self.err, true);
+        // if we are printing, then let the driver only return the last
+        // line if more than one line is found
+        let mut driver = Driver::new(self.out, self.err, lv == Lv::Off);
         loop {
             match driver.next().await {
                 DriverOutput::Line(line) => {

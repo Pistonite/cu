@@ -28,7 +28,8 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
             .stdoe(cu::pio::spinner("cloning botw"))
             .stdin_null()
             .co_spawn()
-            .await?;
+            .await?
+            .0;
         let child2 = cu::which("git")?
             .command()
             .args([
@@ -41,7 +42,8 @@ async fn main(_: cu::cli::Flags) -> cu::Result<()> {
             .stdoe(cu::pio::spinner("cloning rust").info())
             .stdin_null()
             .co_spawn()
-            .await?;
+            .await?
+            .0;
         child.co_wait_nz().await?;
         child2.co_wait_nz().await?;
         cu::info!("done");

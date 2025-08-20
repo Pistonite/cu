@@ -58,13 +58,13 @@
 //!     // use a progress bar to display progress, and print other
 //!     // messages as info
 //!         .stdoe(cu::pio::spinner("cloning example1").info())
-//!         .spawn()?;
+//!         .spawn()?.0;
 //!     // same configuration
 //!     let child2 = git.command()
 //!         .args(["clone", "https://example2.git", "dest2", "--progress"])
 //!         .stdin_null()
 //!         .stdoe(cu::pio::spinner("cloning example2").info())
-//!         .spawn()?;
+//!         .spawn()?.0;
 //!    
 //!     // Both childs are now running as separate processes in the OS.
 //!     // Also, IO from both childs are drived by the same background thread.
@@ -100,7 +100,7 @@
 //!         // using co_spawn() will do the work needed at spawn time
 //!         // using the current async context, instead of off-loading
 //!         // it to a background thread.
-//!         .co_spawn().await?;
+//!         .co_spawn().await?.0;
 //!         // however, note that the IO work, once spawned, are still
 //!         // driven by a background thread regardless of which spawn API
 //!         // is used
@@ -109,7 +109,7 @@
 //!         .args(["clone", "https://example2.git", "dest2", "--progress"])
 //!         .stdin_null()
 //!         .stdoe(cu::pio::spinner("cloning example2").info())
-//!         .co_spawn().await?;
+//!         .co_spawn().await?.0;
 //!    
 //!     child1.co_wait_nz().await?;
 //!     child2.co_wait_nz().await?;

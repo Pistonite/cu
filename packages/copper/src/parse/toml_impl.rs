@@ -49,19 +49,19 @@ pub mod toml {
         type Output = T;
 
         fn parse_borrowed(x: &str) -> crate::Result<Self::Output> {
-            ::toml::from_str(x).with_context(|| {
-                format!(
-                    "failed to parse input as toml into {}",
-                    std::any::type_name::<T>()
-                )
-            })
+            parse(x)
         }
     }
 
     /// Parse value from a TOML `&str`
     #[inline(always)]
-    pub fn parse<T: for<'a> Deserialize<'a>>(x: &str) -> crate::Result<T> {
-        Toml::<T>::parse_borrowed(x)
+    pub fn parse<'a, T: Deserialize<'a>>(x: &'a str) -> crate::Result<T> {
+        ::toml::from_str(x).with_context(|| {
+            format!(
+                "failed to parse input as toml into {}",
+                std::any::type_name::<T>()
+            )
+        })
     }
 
     /// Parse value from a reader that yields TOML

@@ -7,6 +7,13 @@ pub trait Config {
 }
 
 #[doc(hidden)]
+pub trait Preset {
+    type Output;
+
+    fn configure<O, E, I>(self, command: crate::Command<O, E, I>) -> Self::Output;
+}
+
+#[doc(hidden)]
 pub struct __ConfigFn<F>(pub F)
 where
     F: FnOnce(&mut TokioCommand);
