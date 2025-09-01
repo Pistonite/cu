@@ -252,13 +252,19 @@ impl Printer {
     }
 
     /// Format and print a progress bar done message
-    pub(crate) fn print_bar_done(&mut self, message: &str) {
+    pub(crate) fn print_bar_done(&mut self, message: &str, is_progress_complete: bool) {
         if lv::PRINT_LEVEL.get() < lv::Print::Normal {
             return;
         }
-        self.format_buffer
-            .reset(self.colors.gray, self.colors.green);
-        self.format_buffer.push_control(self.colors.green);
+        if is_progress_complete {
+            self.format_buffer
+                .reset(self.colors.gray, self.colors.green);
+            self.format_buffer.push_control(self.colors.green);
+        } else {
+            self.format_buffer
+                .reset(self.colors.gray, self.colors.yellow);
+            self.format_buffer.push_control(self.colors.yellow);
+        }
         self.format_buffer.push_str(message);
         self.format_buffer.end();
         self.print_format_buffer();

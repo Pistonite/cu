@@ -132,6 +132,8 @@ pub mod __priv {
 pub mod lib {
     #[cfg(feature = "cli")]
     pub use clap;
+    #[cfg(feature = "derive")]
+    pub use derive_more;
 }
 
 /// Prelude imports
@@ -155,6 +157,16 @@ pub mod pre {
     pub use crate::yaml;
     #[cfg(feature = "serde")]
     pub use ::serde::{Deserialize, Serialize};
+
+    #[cfg(feature = "derive")]
+    pub use crate::lib::derive_more;
+    #[cfg(feature = "derive")]
+    pub use crate::lib::derive_more::{
+        AsMut, AsRef, Binary as DisplayBinary, Constructor, Debug as DebugCustom, Deref, DerefMut,
+        Display, From, Index, IndexMut, Into, IntoIterator, IsVariant, LowerExp as DisplayLowerExp,
+        LowerHex as DisplayLowerHex, Octal as DisplayOctal, Pointer as DisplayPointer,
+        UpperExp as DisplayUpperExp, UpperHex as DisplayUpperHex,
+    };
 
     #[cfg(feature = "coroutine")]
     pub use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _};

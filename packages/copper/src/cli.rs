@@ -333,21 +333,21 @@ fn parse_args<T: Parser>() -> T {
 }
 
 fn get_colored_command<T: Parser>(color: bool) -> Command {
-    use clap::builder::styling::{AnsiColor, Effects, Styles};
+    use clap::builder::styling::{AnsiColor, Styles};
     let command = <T as CommandFactory>::command();
     if color {
         // Modified version of Cargo's color style
         // [source](https://github.com/crate-ci/clap-cargo/blob/master/src/style.rs)
         command.styles(
             Styles::styled()
-                .header(AnsiColor::Yellow.on_default().effects(Effects::BOLD))
-                .usage(AnsiColor::Red.on_default().effects(Effects::BOLD))
-                .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+                .header(AnsiColor::BrightYellow.on_default())
+                .usage(AnsiColor::BrightRed.on_default())
+                .literal(AnsiColor::BrightCyan.on_default())
                 .placeholder(AnsiColor::Cyan.on_default())
-                .error(AnsiColor::Red.on_default().effects(Effects::BOLD))
-                .valid(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
-                .invalid(AnsiColor::Yellow.on_default().effects(Effects::BOLD))
-                .context(AnsiColor::Yellow.on_default().effects(Effects::BOLD)),
+                .error(AnsiColor::BrightRed.on_default())
+                .valid(AnsiColor::BrightCyan.on_default())
+                .invalid(AnsiColor::BrightYellow.on_default())
+                .context(AnsiColor::BrightYellow.on_default()),
         )
     } else {
         command.styles(Styles::plain())
