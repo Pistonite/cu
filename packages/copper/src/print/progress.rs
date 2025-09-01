@@ -92,24 +92,32 @@ pub struct ProgressBar {
 }
 impl Drop for ProgressBar {
     fn drop(&mut self) {
-        let (total, message, done_message) = {
+        let (current, total, message, done_message) = {
             match self.inner.lock() {
                 Ok(mut bar) => (
+                    bar.current,
                     bar.total,
                     std::mem::take(&mut bar.prefix),
                     std::mem::take(&mut bar.done_message),
                 ),
-                Err(_) => (0, String::new(), None),
+                Err(_) => (0, 0, String::new(), None),
             }
         };
         let handle = if let Ok(mut x) = super::PRINTER.lock() {
             if self.print_done {
+                let is_progress_complete = current >= total;
                 match done_message {
                     None => {
-                        x.print_bar_done(&format_bar_done(total, &message));
+                        x.print_bar_done(
+                            &format_bar_done(current, total, &message),
+                            is_progress_complete,
+                        );
                     }
                     Some(message) => {
-                        x.print_bar_done(&format_bar_done_custom(total, &message));
+                        x.print_bar_done(
+                            &format_bar_done_custom(current, total, &message),
+                            is_progress_complete,
+                        );
                     }
                 }
             }
@@ -164,6 +172,7 @@ impl ProgressBar {
     /// macro instead of calling this directly
     pub fn set_done_message(self: &Arc<Self>, message: String) {
         if let Ok(mut bar) = self.inner.lock() {
+            bar.current = bar.total;
             bar.done_message = Some(message);
         }
     }
@@ -393,7 +402,7 @@ impl ProgressBarState {
     }
 }
 
-fn format_bar_done(total: usize, message: &str) -> String {
+fn format_bar_done(current: usize, total: usize, message: &str) -> String {
     if total == 0 {
         if message.is_empty() {
             "\u{283f}] done".to_string()
@@ -401,18 +410,23 @@ fn format_bar_done(total: usize, message: &str) -> String {
             format!("\u{283f}] {message}: done")
         }
     } else {
-        if message.is_empty() {
-            format!("\u{283f}][{total}/{total}] done")
+        let done_word = if current >= total {
+            "done"
         } else {
-            format!("\u{283f}][{total}/{total}] {message}: done")
+            "interrupted"
+        };
+        if message.is_empty() {
+            format!("\u{283f}][{current}/{total}] {done_word}")
+        } else {
+            format!("\u{283f}][{current}/{total}] {message}: {done_word}")
         }
     }
 }
 
-fn format_bar_done_custom(total: usize, message: &str) -> String {
+fn format_bar_done_custom(current: usize, total: usize, message: &str) -> String {
     if total == 0 {
         format!("\u{283f}] {message}")
     } else {
-        format!("\u{283f}][{total}/{total}] {message}")
+        format!("\u{283f}][{current}/{total}] {message}")
     }
 }

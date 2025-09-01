@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -38,6 +38,9 @@ serde_json = { version = "1.0.142", optional = true }
 serde_yaml_ng = { version = "0.10.0", optional = true }
 toml = { version = "0.9.5", optional = true }
 
+# derive
+derive_more = { version = "2.0.1", features = ["full"], optional = true }
+
 # coroutine
 num_cpus = { version = "1.17.0", optional = true }
 [dependencies.tokio]
@@ -58,6 +61,7 @@ full = [
     "json",
     "yaml",
     "toml",
+    "derive",
 ]
 
 # Command Line Interface (enables integration with `clap` and command line entry points)
@@ -99,8 +103,7 @@ nightly = []
 # Static (compile-time) logging toggles
 release-nolog= ["log/release_max_level_off"]
 release-nodebuglog = ["log/release_max_level_info"]
-glob = ["dep:glob"]
-regex = ["dep:regex"]
+derive = ["dep:derive_more"]
 
 [[example]]
 name = "print"

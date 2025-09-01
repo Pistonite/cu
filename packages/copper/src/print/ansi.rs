@@ -22,12 +22,12 @@ static NOCOLOR: Colors = Colors {
 
 static COLOR: Colors = Colors {
     reset: "\x1b[0m",
-    yellow: "\x1b[1;33m",
-    red: "\x1b[1;31m",
-    gray: "\x1b[1;30m",
-    magenta: "\x1b[1;35m",
-    cyan: "\x1b[1;36m",
-    green: "\x1b[1;32m",
+    yellow: "\x1b[93m",
+    red: "\x1b[91m",
+    gray: "\x1b[90m",
+    magenta: "\x1b[95m",
+    cyan: "\x1b[96m",
+    green: "\x1b[92m",
 };
 
 #[inline]
