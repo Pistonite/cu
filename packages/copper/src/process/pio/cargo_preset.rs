@@ -204,16 +204,13 @@ impl CargoTask {
 
         crate::progress!(&self.bar, (), "preparing");
 
-        let mut state = PrintState {
-            error_lv: self.error_lv,
-            warning_lv: self.warning_lv,
-            other_lv: self.other_lv,
-            bar: self.bar,
-            done_count: 0,
-            in_progress: Default::default(),
-            buf: Default::default(),
-            diagnostic_hook: self.diagnostic_hook,
-        };
+        let mut state = PrintState::new(
+            self.error_lv,
+            self.warning_lv,
+            self.other_lv,
+            self.bar,
+            self.diagnostic_hook,
+        );
 
         loop {
             let read_res = match (&mut out_lines, &mut err_lines) {
@@ -260,9 +257,29 @@ struct PrintState {
     in_progress: BTreeSet<String>,
     buf: String,
     diagnostic_hook: Option<DianogsticHook>,
+    stderr_printing_message_lv: Option<Lv>,
 }
 
 impl PrintState {
+    fn new(
+        error_lv: Lv,
+        warning_lv: Lv,
+        other_lv: Lv,
+        bar: Arc<ProgressBar>,
+        diagnostic_hook: Option<DianogsticHook>,
+    ) -> Self {
+        Self {
+            error_lv,
+            warning_lv,
+            other_lv,
+            bar,
+            done_count: 0,
+            in_progress: Default::default(),
+            buf: Default::default(),
+            diagnostic_hook,
+            stderr_printing_message_lv: None,
+        }
+    }
     fn handle_stdout(&mut self, line: &str) {
         // only handle json output from stdout
         if !line.starts_with('{') {
@@ -343,10 +360,39 @@ impl PrintState {
         static STATUS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new("^((\x1b[^m]*m)|\\s)*(Compiling|Checking)((\x1b[^m]*m)|\\s)*").unwrap()
         });
-        crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
+        static ERROR_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new("^((\x1b[^m]*m)|\\s)*error").unwrap());
+        static WARNING_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new("^((\x1b[^m]*m)|\\s)*warning").unwrap());
         let Some(m) = STATUS_REGEX.find(line) else {
+            // some error/warning messages aren't emited to stdout,
+            // so we use a regex to match and print them
+            if let Some(lv) = self.stderr_printing_message_lv {
+                // since the message might be multi-line, we
+                // keep printing until a status message is matched
+                crate::__priv::__print_with_level(lv, format_args!("{line}"));
+                return;
+            }
+            // check if the message matches error/warning
+            if ERROR_REGEX.is_match(line) {
+                crate::__priv::__print_with_level(self.error_lv, format_args!("{line}"));
+                self.stderr_printing_message_lv = Some(self.error_lv);
+                return;
+            }
+            if WARNING_REGEX.is_match(line) {
+                crate::__priv::__print_with_level(self.warning_lv, format_args!("{line}"));
+                self.stderr_printing_message_lv = Some(self.warning_lv);
+                return;
+            }
+            // print as other message
+            crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
             return;
         };
+        // print the status message as other, and clear the error/warning message state
+        crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
+        self.stderr_printing_message_lv = None;
+
+        // process the status message
         let line = &line[m.end()..].trim();
         // crate name can't have space (right?)
         let crate_name = match line.find(' ') {
