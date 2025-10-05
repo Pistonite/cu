@@ -45,7 +45,6 @@
 //!   Enable parsing utilities, and additional support for common formats. See
 //!   [`Parse`](trait@Parse).
 
-#![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_auto_cfg))]
 #![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_cfg))]
 
 #[cfg(feature = "process")]
