@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use super::Time;
+
 use crate::pre::*;
 
 /// `std::env::current_exe()` with error reporting
@@ -92,4 +94,34 @@ pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> crate::Result<u64> 
         }
         Ok(_) => Ok(size),
     }
+}
+
+/// Get the modified time for a file.
+///
+/// If the file doesn't exist, None is returned
+pub fn get_mtime(path: impl AsRef<Path>) -> crate::Result<Option<Time>> {
+    let path = path.as_ref();
+    match path.metadata() {
+        Ok(meta) => Ok(Some(Time::from_last_modification_time(&meta))),
+        Err(e) => {
+            if !path.exists() {
+                return Ok(None);
+            }
+            crate::rethrow!(
+                e,
+                "failed to get modification time for '{}'",
+                path.display()
+            );
+        }
+    }
+}
+
+/// Set the modified time for a file
+pub fn set_mtime(path: impl AsRef<Path>, time: Time) -> crate::Result<()> {
+    let path = path.as_ref();
+    crate::check!(
+        filetime::set_file_mtime(path, time),
+        "failed to set modification time for '{}'",
+        path.display()
+    )
 }

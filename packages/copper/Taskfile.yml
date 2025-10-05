@@ -67,4 +67,5 @@ tasks:
       - cargo test --features full
   publish:
     cmds:
-      - cargo publish
+      - cmd: cargo publish
+        ignore_error: true

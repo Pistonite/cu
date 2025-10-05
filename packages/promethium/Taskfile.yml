@@ -14,4 +14,5 @@ tasks:
       - task: cargo:fmt-fix
   publish:
     cmds:
-      - cargo publish
+      - cmd: cargo publish
+        ignore_error: true

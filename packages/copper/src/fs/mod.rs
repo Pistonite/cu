@@ -10,3 +10,5 @@ mod walk;
 pub use walk::*;
 mod glob;
 pub use glob::*;
+
+pub use filetime::FileTime as Time;
