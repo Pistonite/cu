@@ -23,7 +23,7 @@ where
     // reserve with initial capacity
     #[allow(clippy::vec_init_then_push)]
     let mut stack = Vec::with_capacity(4);
-    stack.push(reader);
+    stack.push((reader, 1));
     Ok(Walk {
         root: path,
         rel_containing: PathBuf::new(),
@@ -37,7 +37,8 @@ pub struct Walk<F = AlwaysRecurse> {
     /// of the current entry, relative from the root of the walk
     rel_containing: PathBuf,
     /// last element of the stack is the current directory being read
-    stack: Vec<std::fs::ReadDir>,
+    /// (dir, depth)
+    stack: Vec<(std::fs::ReadDir, usize)>,
 
     should_recurse: F,
 }
@@ -50,7 +51,7 @@ where
     // ^ iterator does not allow returning items referencing data from the iterator
     pub fn next(&mut self) -> Option<crate::Result<WalkEntry<'_>>> {
         loop {
-            let dir = self.stack.last_mut()?;
+            let (dir, depth) = self.stack.last_mut()?;
             // find next item in the current dir
             let entry = match dir.next() {
                 None => {
@@ -77,12 +78,14 @@ where
                 Ok(x) => x,
             };
             let file_name = entry.file_name();
+            let depth = *depth;
             if file_type.is_dir() {
                 let entry = WalkEntry {
                     root: &self.root,
                     file_type,
                     rel_containing: &self.rel_containing,
                     file_name,
+                    depth,
                     entry,
                 };
                 if !self.should_recurse.should_recurse(&entry) {
@@ -104,7 +107,7 @@ where
                     Ok(read_dir) => read_dir,
                 };
 
-                self.stack.push(read_dir);
+                self.stack.push((read_dir, depth + 1));
                 continue;
             }
             let entry = WalkEntry {
@@ -112,6 +115,7 @@ where
                 file_type,
                 rel_containing: &self.rel_containing,
                 file_name,
+                depth,
                 entry,
             };
             return Some(Ok(entry));
@@ -129,6 +133,13 @@ pub struct WalkEntry<'a> {
     pub rel_containing: &'a Path,
     /// File name of the current entry being visited
     pub file_name: OsString,
+
+    /// Depth of the current entry, compared to root.
+    /// This equals the number of segments in the relative path,
+    /// minimum 1 (when the entry is directly under root).
+    pub depth: usize,
+
+    /// Inner entry
     entry: std::fs::DirEntry,
 }
 impl WalkEntry<'_> {

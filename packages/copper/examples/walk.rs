@@ -6,7 +6,12 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
     cu::set_thread_print_name("walk");
     while let Some(entry) = src.next() {
         let entry = entry?;
-        cu::info!("{} {}", entry.path().display(), entry.rel_path().display(),)
+        cu::info!(
+            "{} {} {}",
+            entry.depth,
+            entry.path().display(),
+            entry.rel_path().display(),
+        )
     }
 
     cu::set_thread_print_name("glob");
