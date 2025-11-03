@@ -104,6 +104,8 @@ mod parse;
 pub use parse::*;
 #[cfg(feature = "parse")]
 pub use pistonite_cu_proc_macros::Parse;
+mod env_var;
+pub use env_var::*;
 
 // Atomic helpers
 mod atomic;

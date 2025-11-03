@@ -1,4 +1,6 @@
+#[cfg(feature = "parse")] // cfg needed to show up in doc
 mod base;
+#[cfg(feature = "parse")] // cfg needed to show up in doc
 pub use base::*;
 mod base_impl;
 

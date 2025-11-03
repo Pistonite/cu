@@ -4,7 +4,8 @@
 ///
 /// Everything only works with UTF-8.
 ///
-/// The entry points to parsing are `cu::parse`, and `into_parsed()`.
+/// The entry points to parsing are [`cu::parse::<T>`](crate::parse), and `"...".parse_to::<T>()`.
+/// Use whichever is more readable or preferrable at the call sites.
 ///
 /// ```rust
 /// # use pistonite_cu as cu;
@@ -33,7 +34,7 @@
 /// ```
 ///
 /// If the value is owned, you can use `parse_owned` instead of `parse`.
-/// For readers, use `cu::read` or `cu::co_read` for async readers.
+/// For readers, use [`cu::read`] or [`cu::co_read`] for async readers.
 ///
 /// # From Owned and Read
 /// When possible, implementation of parsing from a `io::Read` is provided
@@ -58,6 +59,8 @@
 /// [`json`]: module@crate::json
 /// [`yaml`]: module@crate::yaml
 /// [`toml`]: module@crate::toml
+/// [`cu::read`]: crate::read
+/// [`cu::co_read`]: crate::co_read
 pub trait Parse
 where
     Self: Sized,
