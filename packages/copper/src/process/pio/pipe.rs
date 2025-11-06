@@ -27,6 +27,7 @@ use super::{ChildInConfig, ChildOutConfig, ChildOutTask};
 /// hello.wait_nz()?;
 /// # Ok(()) }
 /// ```
+#[inline(always)]
 pub fn pipe() -> Pipe {
     Pipe
 }
