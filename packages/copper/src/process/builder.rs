@@ -3,9 +3,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 
 use tokio::process::{Child as TokioChild, Command as TokioCommand};
-use tokio::task::JoinSet;
 
-use super::{Child, Config, Preset};
+use super::{Child, ChildIo, Config, Preset};
 
 use crate::{Context as _, PathExtension as _, co, pio};
 
@@ -620,33 +619,13 @@ fn post_spawn<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::Child
     let (stderr_future, stderr) = stderr.run();
     let stdin_future = stdin.run();
 
-    let combined_future = async move {
-        let mut j = JoinSet::new();
-        if let Some(x) = stdin_future {
-            j.spawn(x);
-        }
-        if let Some(x) = stdout_future {
-            j.spawn(x);
-        }
-        if let Some(x) = stderr_future {
-            j.spawn(x);
-        }
-        let mut panicked = false;
-        while let Some(x) = j.join_next().await {
-            // could not join because panicked
-            if x.is_err() {
-                panicked = true;
-            }
-        }
-        panicked
-    };
-    let io_task = co::spawn(combined_future);
+    let io = ChildIo::start(stdin_future, stdout_future, stderr_future);
 
     Ok((
         Child {
             name,
             inner: child,
-            io_task,
+            io,
         },
         stdout,
         stderr,

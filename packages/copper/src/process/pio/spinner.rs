@@ -60,6 +60,7 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 /// The progress bar handle is returned when you `spawn` the child.
 /// If the stdout and stderr are configured to the same spinner, then either
 /// handle can be used to update the bar.
+#[inline(always)]
 pub fn spinner(name: impl Into<String>) -> Spinner {
     Spinner {
         prefix: name.into(),

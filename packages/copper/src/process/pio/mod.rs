@@ -22,6 +22,7 @@
 //! - [`cu::pio::string()`]: Buffer the output as a `String`.
 //! - [`cu::pio::lines()`]: Get a reader that can read the output line-by-line.
 //!   - See [`cu::pio::co_lines()`] for using an async reader.
+//! - [`cu::pio::write(buf)`]: Write an in-memory buffer to child's stdin
 //!
 //!
 //! [`cu::pio::null()`]: null
@@ -33,6 +34,7 @@
 //! [`cu::pio::string()`]: function@string
 //! [`cu::pio::lines()`]: function@lines
 //! [`cu::pio::co_lines()`]: function@co_lines
+//! [`cu::pio::write(buf)`]: function@write
 //! [`Command`]: super::Command
 //! [`stdin`]: super::Command::stdin
 //! [`stdout`]: super::Command::stdout
@@ -54,6 +56,7 @@ use crate::BoxedFuture;
 
 mod pipe;
 mod read;
+mod write;
 
 #[cfg(all(feature = "print", feature = "json"))]
 mod cargo_preset;
@@ -73,6 +76,7 @@ pub mod config {
     pub use super::read::Lines;
     #[cfg(feature = "print")]
     pub use super::spinner::Spinner;
+    pub use super::write::Write;
 }
 
 /// internal task types used in trait implementations
@@ -88,6 +92,7 @@ pub mod task {
     pub use super::read::LinesTask as Lines;
     #[cfg(feature = "print")]
     pub use super::spinner::SpinnerTask as Spinner;
+    pub use super::write::WriteTask as Write;
 }
 
 /// internal output types used in trait implementations
@@ -106,6 +111,7 @@ pub use pipe::pipe;
 pub use read::{buffer, co_lines, lines, string};
 #[cfg(feature = "print")]
 pub use spinner::spinner;
+pub use write::write;
 
 #[cfg(feature = "print")]
 mod print_driver;
@@ -183,7 +189,7 @@ pub trait ChildInTask {
     ///
     /// Return a future that will be spawned internally to drive writing
     /// data to the child.
-    fn run(self) -> Option<BoxedFuture<()>>;
+    fn run(self) -> Option<BoxedFuture<crate::Result<()>>>;
 }
 impl ChildOutTask for () {
     type Output = ();
@@ -192,7 +198,7 @@ impl ChildOutTask for () {
     }
 }
 impl ChildInTask for () {
-    fn run(self) -> Option<BoxedFuture<()>> {
+    fn run(self) -> Option<BoxedFuture<crate::Result<()>>> {
         None
     }
 }

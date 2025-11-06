@@ -25,6 +25,7 @@ use super::{ChildOutConfig, ChildOutTask};
 /// assert_eq!(b"Hello, world!\n".to_vec(), out.join()??);
 /// # Ok(()) }
 /// ```
+#[inline(always)]
 pub fn buffer() -> Buffer {
     Buffer
 }
@@ -87,6 +88,7 @@ impl ChildOutTask for BufferTask {
 /// assert_eq!("Hello, world!\n", out.join()??);
 /// # Ok(()) }
 /// ```
+#[inline(always)]
 pub fn string() -> BufferString {
     BufferString
 }
@@ -178,6 +180,7 @@ async fn read_to_end(r: Result<ChildStdout, ChildStderr>) -> crate::Result<Vec<u
 /// # Blocking
 /// Since the iterator blocks the thread while waiting for the next line
 /// to be available, use [`co_lines`] when in an async context.
+#[inline(always)]
 pub fn lines() -> Lines {
     Lines
 }
@@ -283,6 +286,7 @@ impl Iterator for LinesOutput {
 /// child.co_wait_nz().await?;
 /// # Ok(())}
 /// ```
+#[inline(always)]
 pub fn co_lines() -> CoLines {
     CoLines
 }
