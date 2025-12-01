@@ -15,5 +15,7 @@ fn main(_: Args) -> cu::Result<()> {
     // type for pw is ZeroWhenDropString
     let pw = cu::prompt_password!("password")?;
     cu::info!("password is: {pw}");
+    let pw2 = cu::prompt_legal_password!("legal password")?;
+    cu::info!("password is: {pw2}");
     Ok(())
 }

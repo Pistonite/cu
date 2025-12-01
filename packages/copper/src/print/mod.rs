@@ -14,3 +14,5 @@ mod prompt;
 pub use prompt::*;
 #[cfg(feature = "prompt-password")]
 mod prompt_password;
+#[cfg(feature = "prompt-password")]
+pub use prompt_password::check_password_legality;

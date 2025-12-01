@@ -575,12 +575,12 @@ fn prompt_task(
             } else {
                 std::io::stdin()
                     .read_line(&mut buf)
-                    .map(|_| buf.clone().into())
+                    .map(|_| buf.trim().to_string().into())
             };
             #[cfg(not(feature = "prompt-password"))]
             let result = std::io::stdin()
                 .read_line(&mut buf)
-                .map(|_| buf.clone().into());
+                .map(|_| buf.trim().to_string().into());
             let _ = send.send(result);
             let Ok(mut printer) = super::PRINTER.lock() else {
                 break;
