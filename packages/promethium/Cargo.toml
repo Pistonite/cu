@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-pm"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 description = "Procedural Macro Common Utils"
 repository = "https://github.com/Pistonite/cu"
