@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use super::{FormatBuffer, ProgressBar, ansi};
 
-use crate::{lv, ZeroWhenDropString};
+use crate::{ZeroWhenDropString, lv};
 
 /// Print something
 ///
@@ -573,10 +573,14 @@ fn prompt_task(
             let result = if _is_password {
                 super::prompt_password::read_password()
             } else {
-                std::io::stdin().read_line(&mut buf).map(|_| buf.clone().into())
+                std::io::stdin()
+                    .read_line(&mut buf)
+                    .map(|_| buf.clone().into())
             };
             #[cfg(not(feature = "prompt-password"))]
-            let result = std::io::stdin().read_line(&mut buf).map(|_| buf.clone().into());
+            let result = std::io::stdin()
+                .read_line(&mut buf)
+                .map(|_| buf.clone().into());
             let _ = send.send(result);
             let Ok(mut printer) = super::PRINTER.lock() else {
                 break;

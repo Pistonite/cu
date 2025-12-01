@@ -91,7 +91,10 @@ pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     }
 }
 
-pub fn __prompt(message: std::fmt::Arguments<'_>, is_password: bool) -> crate::Result<crate::ZeroWhenDropString> {
+pub fn __prompt(
+    message: std::fmt::Arguments<'_>,
+    is_password: bool,
+) -> crate::Result<crate::ZeroWhenDropString> {
     if let lv::Prompt::No = PROMPT_LEVEL.get() {
         crate::bailand!(error!(
             "prompt not allowed in non-interactive mode: {message}"
@@ -126,5 +129,46 @@ impl Drop for PromptJoinScope {
             handle
         };
         let _: Result<_, _> = handle.join();
+    }
+}
+
+/// A string that will have its inner buffer zeroed when dropped
+#[derive(Default, Clone)]
+pub struct ZeroWhenDropString(String);
+impl std::fmt::Display for ZeroWhenDropString {
+    #[inline(always)]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+impl From<String> for ZeroWhenDropString {
+    #[inline(always)]
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl Drop for ZeroWhenDropString {
+    #[inline(always)]
+    fn drop(&mut self) {
+        // SAFETY: we don't use the string again
+        for c in unsafe { self.0.as_bytes_mut() } {
+            // SAFETY: c is a valid u8 pointer
+            unsafe { std::ptr::write_volatile(c, 0) };
+        }
+        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+    }
+}
+impl std::ops::Deref for ZeroWhenDropString {
+    type Target = String;
+    #[inline(always)]
+    fn deref(&self) -> &String {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for ZeroWhenDropString {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

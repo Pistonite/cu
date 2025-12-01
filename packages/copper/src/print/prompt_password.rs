@@ -8,7 +8,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) https://github.com/conradkleinespel/rpassword
 
-
 #[cfg(target_family = "unix")]
 pub(crate) use unix::read_password;
 #[cfg(target_family = "windows")]
@@ -16,7 +15,7 @@ pub(crate) use windows::read_password;
 
 #[cfg(target_family = "unix")]
 mod unix {
-    use libc::{c_int, tcsetattr, termios, ECHO, ECHONL, TCSANOW};
+    use libc::{ECHO, ECHONL, TCSANOW, c_int, tcsetattr, termios};
     use std::io::{self, BufRead};
     use std::mem;
     use std::os::unix::io::AsRawFd;
@@ -71,7 +70,7 @@ mod unix {
     }
 
     /// Reads a password from the TTY
-    pub(crate) fn read_password() -> std::io::Result<super::ZeroWhenDropString> {
+    pub(crate) fn read_password() -> std::io::Result<crate::ZeroWhenDropString> {
         let tty = std::fs::File::open("/dev/tty")?;
         let fd = tty.as_raw_fd();
         let mut reader = io::BufReader::new(tty);
@@ -83,11 +82,11 @@ mod unix {
     fn read_password_from_fd_with_hidden_input(
         reader: &mut impl BufRead,
         fd: i32,
-    ) -> std::io::Result<super::ZeroWhenDropString> {
-        let mut password = super::ZeroWhenDropString::default();
+    ) -> std::io::Result<crate::ZeroWhenDropString> {
+        let mut password = crate::ZeroWhenDropString::default();
         {
             let _hidden_input = HiddenInput::new(fd)?;
-            reader.read_line(&mut password.0)?;
+            reader.read_line(&mut password)?;
         }
         Ok(password)
     }
@@ -97,14 +96,16 @@ mod unix {
 mod windows {
     use std::io::{self, BufRead, BufReader};
     use std::os::windows::io::FromRawHandle;
-    use windows_sys::core::PCSTR;
-    use windows_sys::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::Foundation::{
+        GENERIC_READ, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE,
+    };
     use windows_sys::Win32::Storage::FileSystem::{
         CreateFileA, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
     };
     use windows_sys::Win32::System::Console::{
-        GetConsoleMode, SetConsoleMode, CONSOLE_MODE, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT,
+        CONSOLE_MODE, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, GetConsoleMode, SetConsoleMode,
     };
+    use windows_sys::core::PCSTR;
 
     struct HiddenInput {
         mode: u32,
@@ -140,7 +141,7 @@ mod windows {
     }
 
     /// Reads a password from the TTY
-    pub fn read_password() -> std::io::Result<super::ZeroWhenDropString> {
+    pub fn read_password() -> std::io::Result<crate::ZeroWhenDropString> {
         let handle = unsafe {
             CreateFileA(
                 c"CONIN$".as_ptr() as PCSTR,
@@ -165,53 +166,12 @@ mod windows {
     fn read_password_from_handle_with_hidden_input(
         reader: &mut impl BufRead,
         handle: HANDLE,
-    ) -> io::Result<super::ZeroWhenDropString> {
-        let mut password = super::ZeroWhenDropString::default();
+    ) -> io::Result<crate::ZeroWhenDropString> {
+        let mut password = crate::ZeroWhenDropString::default();
         {
             let _hidden_input = HiddenInput::new(handle)?;
-            reader.read_line(&mut password.0)?;
+            reader.read_line(&mut password)?;
         }
         Ok(password)
-    }
-}
-
-/// A string that will have its inner buffer zeroed when dropped
-#[derive(Default, Clone)]
-pub struct ZeroWhenDropString(String);
-impl std::fmt::Display for ZeroWhenDropString {
-    #[inline(always)]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-impl From<String> for ZeroWhenDropString {
-    #[inline(always)]
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-impl Drop for ZeroWhenDropString {
-    #[inline(always)]
-    fn drop(&mut self) {
-        // SAFETY: we don't use the string again
-        for c in unsafe { self.0.as_bytes_mut() } {
-            // SAFETY: c is a valid u8 pointer
-            unsafe { std::ptr::write_volatile(c, 0) };
-        }
-        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
-        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
-    }
-}
-impl std::ops::Deref for ZeroWhenDropString {
-    type Target = String;
-    #[inline(always)]
-    fn deref(&self) -> &String {
-        &self.0
-    }
-}
-impl std::ops::DerefMut for ZeroWhenDropString {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
