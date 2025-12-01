@@ -16,14 +16,41 @@ macro_rules! yesno {
         $crate::__priv::__prompt_yesno(format_args!($($fmt_args)*))
     }}
 }
+
 /// Show a prompt
+///
+/// Use the `prompt-password` feature and [`prompt_password!`](crate::prompt_password) macro
+/// if prompting for a password, which will hide user's input from the console
+///
+/// ```rust,ignore
+/// let name = cu::prompt!("please enter your name")?;
+/// cu::info!("user entered: {name}");
+/// ```
 #[cfg(feature = "prompt")]
 #[macro_export]
 macro_rules! prompt {
     ($($fmt_args:tt)*) => {{
-        $crate::__priv::__prompt(format_args!($($fmt_args)*))
+        $crate::__priv::__prompt(format_args!($($fmt_args)*), false).map(|x| x.to_string())
     }}
 }
+
+/// Show a password prompt
+///
+/// The console will have inputs hidden while user types, and the returned
+/// value is a [`ZeroWhenDropString`](crate::ZeroWhenDropString)
+///
+/// ```rust,ignore
+/// let password = cu::prompt_password!("please enter your password")?;
+/// cu::info!("user entered: {password}");
+/// ```
+#[cfg(feature = "prompt-password")]
+#[macro_export]
+macro_rules! prompt_password {
+    ($($fmt_args:tt)*) => {{
+        $crate::__priv::__prompt(format_args!($($fmt_args)*), true)
+    }}
+}
+
 pub(crate) static PROMPT_LEVEL: Atomic<u8, lv::Prompt> =
     Atomic::new_u8(lv::Prompt::Interactive as u8);
 
@@ -45,7 +72,7 @@ pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
             let Ok(mut printer) = super::PRINTER.lock() else {
                 crate::bailand!(error!("prompt failed: global print lock poisoned"));
             };
-            printer.show_prompt(&message)
+            printer.show_prompt(&message, false)
         };
         let result = recv
             .recv()
@@ -67,7 +94,10 @@ pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     }
 }
 
-pub fn __prompt(message: std::fmt::Arguments<'_>) -> crate::Result<String> {
+pub fn __prompt(
+    message: std::fmt::Arguments<'_>,
+    is_password: bool,
+) -> crate::Result<crate::ZeroWhenDropString> {
     if let lv::Prompt::No = PROMPT_LEVEL.get() {
         crate::bailand!(error!(
             "prompt not allowed in non-interactive mode: {message}"
@@ -80,7 +110,7 @@ pub fn __prompt(message: std::fmt::Arguments<'_>) -> crate::Result<String> {
             let Ok(mut printer) = super::PRINTER.lock() else {
                 crate::bailand!(error!("prompt failed: global print lock poisoned"));
             };
-            printer.show_prompt(&message)
+            printer.show_prompt(&message, is_password)
         };
         recv.recv()
             .with_context(|| format!("recv error while showing the prompt: {message}"))?
@@ -102,5 +132,46 @@ impl Drop for PromptJoinScope {
             handle
         };
         let _: Result<_, _> = handle.join();
+    }
+}
+
+/// A string that will have its inner buffer zeroed when dropped
+#[derive(Default, Clone)]
+pub struct ZeroWhenDropString(String);
+impl std::fmt::Display for ZeroWhenDropString {
+    #[inline(always)]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+impl From<String> for ZeroWhenDropString {
+    #[inline(always)]
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl Drop for ZeroWhenDropString {
+    #[inline(always)]
+    fn drop(&mut self) {
+        // SAFETY: we don't use the string again
+        for c in unsafe { self.0.as_bytes_mut() } {
+            // SAFETY: c is a valid u8 pointer
+            unsafe { std::ptr::write_volatile(c, 0) };
+        }
+        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+    }
+}
+impl std::ops::Deref for ZeroWhenDropString {
+    type Target = String;
+    #[inline(always)]
+    fn deref(&self) -> &String {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for ZeroWhenDropString {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

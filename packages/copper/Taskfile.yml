@@ -4,6 +4,7 @@ includes:
   cargo:
     taskfile: ../mono-dev/task/cargo.yaml
     internal: true
+    optional: true
 
 tasks:
   check:
@@ -28,6 +29,10 @@ tasks:
         vars:
           PACKAGE: pistonite-cu
           FEATURES: prompt,cli
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: pistonite-cu
+          FEATURES: prompt-password,cli
       - task: cargo:clippy-package-feature
         vars:
           PACKAGE: pistonite-cu

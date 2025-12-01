@@ -1,61 +1,80 @@
+//! Directory-only operations (Will error if path is a file or link)
 use std::path::Path;
 
 use crate::pre::*;
 
-/// Check if a directory is empty. Will error if cannot read the directory
-pub fn is_empty(path: impl AsRef<Path>) -> crate::Result<bool> {
-    let path = path.as_ref();
-    crate::trace!("is_empty '{}'", path.display());
-    let mut x = read_dir(path)?;
+/// Check if a directory exists and is empty.
+#[inline(always)]
+pub fn is_empty_dir(path: impl AsRef<Path>) -> crate::Result<bool> {
+    is_empty_dir_impl(path.as_ref())
+}
+fn is_empty_dir_impl(path: &Path) -> crate::Result<bool> {
+    crate::trace!("is_empty_dir '{}'", path.display());
+    let mut x = read_dir_impl(path)?;
     Ok(x.next().is_none())
 }
 
 /// Ensure `path` exists and is a directory, creating it and all parent directories
 /// if not.
+#[inline(always)]
 pub fn make_dir(path: impl AsRef<Path>) -> crate::Result<()> {
-    let path = path.as_ref();
-    let exists = path.exists();
+    make_dir_impl(path.as_ref())
+}
+fn make_dir_impl(path: &Path) -> crate::Result<()> {
     crate::trace!("make_dir '{}'", path.display());
-    if exists && !path.is_dir() {
-        crate::bail!(
-            "{} exists and is not a directory or not accessible",
-            path.display()
-        );
-    }
-    if !exists {
-        crate::trace!("make_dir: creating '{}'", path.display());
-        crate::check!(
-            std::fs::create_dir_all(path),
-            "failed to create directory '{}'",
-            path.display()
-        )?;
-    } else {
-        crate::trace!("make_dir: exists '{}'", path.display());
+    let (exists, is_dir) = match std::fs::metadata(path) {
+        Ok(m) => (true, m.is_dir()),
+        Err(_) => (false, false),
+    };
+    match (exists, is_dir) {
+        (true, false) => {
+            crate::bail!(
+                "failed to create directory: '{}' exists but is not a directory",
+                path.display()
+            );
+        }
+        (true, true) => {} // exists and is dir
+        (false, _) => {
+            crate::trace!("make_dir: creating '{}'", path.display());
+            crate::check!(
+                std::fs::create_dir_all(path),
+                "failed to create directory '{}'",
+                path.display()
+            )?;
+        }
     }
     Ok(())
 }
 
 /// Async version of [`make_dir`]
 #[cfg(feature = "coroutine")]
+#[inline(always)]
 pub async fn co_make_dir(path: impl AsRef<Path>) -> crate::Result<()> {
-    let path = path.as_ref();
-    let exists = path.exists();
+    co_make_dir_impl(path.as_ref()).await
+}
+#[cfg(feature = "coroutine")]
+async fn co_make_dir_impl(path: &Path) -> crate::Result<()> {
     crate::trace!("co_make_dir '{}'", path.display());
-    if exists && !path.is_dir() {
-        crate::bail!(
-            "{} exists and is not a directory or not accessible",
-            path.display()
-        );
-    }
-    if !exists {
-        crate::trace!("co_make_dir: creating '{}'", path.display());
-        crate::check!(
-            tokio::fs::create_dir_all(path).await,
-            "failed to create directory '{}'",
-            path.display()
-        )?;
-    } else {
-        crate::trace!("co_make_dir: exists '{}'", path.display());
+    let (exists, is_dir) = match std::fs::metadata(path) {
+        Ok(m) => (true, m.is_dir()),
+        Err(_) => (false, false),
+    };
+    match (exists, is_dir) {
+        (true, false) => {
+            crate::bail!(
+                "failed to create directory: '{}' exists but is not a directory",
+                path.display()
+            );
+        }
+        (true, true) => {} // exists and is dir
+        (false, _) => {
+            crate::trace!("co_make_dir: creating '{}'", path.display());
+            crate::check!(
+                tokio::fs::create_dir_all(path).await,
+                "failed to create directory '{}'",
+                path.display()
+            )?;
+        }
     }
     Ok(())
 }
@@ -66,16 +85,16 @@ pub async fn co_make_dir(path: impl AsRef<Path>) -> crate::Result<()> {
 /// Current contents in `path` will be removed.
 pub fn make_dir_empty(path: impl AsRef<Path>) -> crate::Result<()> {
     let path = path.as_ref();
-    make_dir(path)?;
-    remove_contents(path)
+    make_dir_impl(path)?;
+    remove_contents_impl(path)
 }
 
 /// Async version of [`make_dir_empty`]
 #[cfg(feature = "coroutine")]
 pub async fn co_make_dir_empty(path: impl AsRef<Path>) -> crate::Result<()> {
     let path = path.as_ref();
-    co_make_dir(path).await?;
-    co_remove_contents(path).await
+    co_make_dir_impl(path).await?;
+    co_remove_contents_impl(path).await
 }
 
 /// Ensure `path` either does not exist, or is an empty directory.
@@ -96,61 +115,16 @@ pub async fn co_make_dir_absent_or_empty(path: impl AsRef<Path>) -> crate::Resul
     co_remove_contents(path).await
 }
 
-/// Remove `path` as either a file or empty directory.
-///
-/// No-op if the path does not exist.
-/// Error if the path is a non-empty directory.
-pub fn remove(path: impl AsRef<Path>) -> crate::Result<()> {
-    let path = path.as_ref();
-    if !path.exists() {
-        crate::trace!("remove: is absent: '{}'", path.display());
-        return Ok(());
-    }
-    crate::trace!("remove '{}'", path.display());
-    if path.is_dir() {
-        return crate::check!(
-            std::fs::remove_dir(path),
-            "failed to remove directory '{}'",
-            path.display()
-        );
-    }
-    crate::check!(
-        std::fs::remove_file(path),
-        "failed to remove file '{}'",
-        path.display()
-    )
-}
-
-/// Async version of [`remove`]
-#[cfg(feature = "coroutine")]
-pub async fn co_remove(path: impl AsRef<Path>) -> crate::Result<()> {
-    let path = path.as_ref();
-    if !path.exists() {
-        crate::trace!("co_remove: is absent: '{}'", path.display());
-        return Ok(());
-    }
-    crate::trace!("co_remove '{}'", path.display());
-    if path.is_dir() {
-        return crate::check!(
-            tokio::fs::remove_dir(path).await,
-            "failed to remove directory '{}'",
-            path.display()
-        );
-    }
-    crate::check!(
-        tokio::fs::remove_file(path).await,
-        "failed to remove file '{}'",
-        path.display()
-    )
-}
-
 /// Recursively remove `path` and all of its contents.
 ///
 /// No-op if the path does not exist.
 /// Error if the path is a file or a link.
 /// Does not follow symlinks.
+#[inline(always)]
 pub fn rec_remove(path: impl AsRef<Path>) -> crate::Result<()> {
-    let path = path.as_ref();
+    rec_remove_impl(path.as_ref())
+}
+fn rec_remove_impl(path: &Path) -> crate::Result<()> {
     if !path.exists() {
         crate::trace!("rec_remove: is absent: '{}'", path.display());
         return Ok(());
@@ -168,8 +142,12 @@ pub fn rec_remove(path: impl AsRef<Path>) -> crate::Result<()> {
 
 /// Async version of [`rec_remove`]
 #[cfg(feature = "coroutine")]
+#[inline(always)]
 pub async fn co_rec_remove(path: impl AsRef<Path>) -> crate::Result<()> {
-    let path = path.as_ref();
+    co_rec_remove_impl(path.as_ref()).await
+}
+#[cfg(feature = "coroutine")]
+async fn co_rec_remove_impl(path: &Path) -> crate::Result<()> {
     if !path.exists() {
         crate::trace!("co_rec_remove: is absent: '{}'", path.display());
         return Ok(());
@@ -190,8 +168,11 @@ pub async fn co_rec_remove(path: impl AsRef<Path>) -> crate::Result<()> {
 /// Error if the path is not a directory. Does not follow symlinks.
 /// If any of the directory content fails to read, it will propagate
 /// the error.
+#[inline(always)]
 pub fn remove_contents(path: impl AsRef<Path>) -> crate::Result<()> {
-    let path = path.as_ref();
+    remove_contents_impl(path.as_ref())
+}
+fn remove_contents_impl(path: &Path) -> crate::Result<()> {
     crate::trace!("remove_contents '{}'", path.display());
     if !path.is_dir() {
         if !path.exists() {
@@ -210,7 +191,7 @@ pub fn remove_contents(path: impl AsRef<Path>) -> crate::Result<()> {
         if file_type.is_dir() {
             rec_remove(entry_path)?;
         } else {
-            remove(entry_path)?;
+            crate::fs::remove(entry_path)?;
         }
     }
     Ok(())
@@ -219,8 +200,12 @@ pub fn remove_contents(path: impl AsRef<Path>) -> crate::Result<()> {
 /// Async version of [`remove_contents`]. Note that this is not fail-fast.
 /// If some entry fails to delete, all entries will still be attempted to be deleted.
 #[cfg(feature = "coroutine")]
+#[inline(always)]
 pub async fn co_remove_contents(path: impl AsRef<Path>) -> crate::Result<()> {
-    let path = path.as_ref();
+    co_remove_contents_impl(path.as_ref()).await
+}
+#[cfg(feature = "coroutine")]
+async fn co_remove_contents_impl(path: &Path) -> crate::Result<()> {
     crate::trace!("remove_contents '{}'", path.display());
     if !path.is_dir() {
         if !path.exists() {
@@ -246,7 +231,7 @@ pub async fn co_remove_contents(path: impl AsRef<Path>) -> crate::Result<()> {
         if file_type.is_dir() {
             join_set.spawn(async move { co_rec_remove(entry_path).await });
         } else {
-            join_set.spawn(async move { co_remove(entry_path).await });
+            join_set.spawn(async move { crate::fs::co_remove(entry_path).await });
         }
     }
     let mut has_failure = false;
@@ -278,9 +263,13 @@ pub type CoReadDir = tokio::fs::ReadDir;
 pub type DirEntry = std::fs::DirEntry;
 #[cfg(feature = "coroutine")]
 pub type CoDirEntry = tokio::fs::DirEntry;
+
 /// `std::fs::read_dir` with error reporting
+#[inline(always)]
 pub fn read_dir(path: impl AsRef<Path>) -> crate::Result<ReadDir> {
-    let path = path.as_ref();
+    read_dir_impl(path.as_ref())
+}
+fn read_dir_impl(path: &Path) -> crate::Result<ReadDir> {
     crate::check!(
         std::fs::read_dir(path),
         "cannot read directory '{}'",
@@ -290,8 +279,12 @@ pub fn read_dir(path: impl AsRef<Path>) -> crate::Result<ReadDir> {
 
 /// Async version of [`read_dir`]
 #[cfg(feature = "coroutine")]
+#[inline(always)]
 pub async fn co_read_dir(path: impl AsRef<Path>) -> crate::Result<CoReadDir> {
-    let path = path.as_ref();
+    co_read_dir_impl(path.as_ref()).await
+}
+#[cfg(feature = "coroutine")]
+async fn co_read_dir_impl(path: &Path) -> crate::Result<CoReadDir> {
     crate::check!(
         tokio::fs::read_dir(path).await,
         "cannot read directory '{}'",
