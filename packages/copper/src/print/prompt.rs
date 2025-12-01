@@ -19,7 +19,7 @@ macro_rules! yesno {
 
 /// Show a prompt
 ///
-/// Use the `prompt-password` feature and [`prompt_password!`] macro
+/// Use the `prompt-password` feature and [`prompt_password!`](crate::prompt_password) macro
 /// if prompting for a password, which will hide user's input from the console
 ///
 /// ```rust,ignore
@@ -35,6 +35,9 @@ macro_rules! prompt {
 }
 
 /// Show a password prompt
+///
+/// The console will have inputs hidden while user types, and the returned
+/// value is a [`ZeroWhenDropString`](crate::ZeroWhenDropString)
 ///
 /// ```rust,ignore
 /// let password = cu::prompt_password!("please enter your password")?;
