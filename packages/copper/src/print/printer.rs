@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use super::{FormatBuffer, ProgressBar, ansi};
 
-use crate::lv;
+use crate::{lv, ZeroWhenDropString};
 
 /// Print something
 ///
@@ -67,7 +67,7 @@ pub(crate) struct Printer {
 }
 
 struct PromptTask {
-    send: oneshot::Sender<std::io::Result<String>>,
+    send: oneshot::Sender<std::io::Result<ZeroWhenDropString>>,
     prompt: String,
     #[cfg(feature = "prompt-password")]
     is_password: bool,
@@ -114,8 +114,8 @@ impl Printer {
     pub(crate) fn show_prompt(
         &mut self,
         prompt: &str,
-        _is_password: bool,
-    ) -> oneshot::Receiver<std::io::Result<String>> {
+        is_password: bool,
+    ) -> oneshot::Receiver<std::io::Result<ZeroWhenDropString>> {
         // format the prompt
         let mut lines = prompt.lines();
         self.format_buffer.reset(self.colors.gray, self.colors.cyan);
@@ -130,9 +130,13 @@ impl Printer {
             self.format_buffer.new_line();
             self.format_buffer.push_str(line);
         }
-        self.format_buffer.end();
-        self.format_buffer.push_control(self.colors.reset);
-        self.format_buffer.push_control("-: ");
+        if cfg!(feature = "prompt-password") && is_password {
+            self.format_buffer.push_str(": ");
+        } else {
+            self.format_buffer.end();
+            self.format_buffer.push_control(self.colors.reset);
+            self.format_buffer.push_control("-: ");
+        }
 
         // show the prompt
         let (send, recv) = oneshot::channel();
@@ -151,7 +155,7 @@ impl Printer {
             );
             self.buffered.clear();
             let _ = self.stdout.flush();
-            self.prompt_task.assign(prompt_task(send, _is_password));
+            self.prompt_task.assign(prompt_task(send, is_password));
             return recv;
         }
         #[cfg(feature = "prompt-password")]
@@ -159,7 +163,7 @@ impl Printer {
             self.pending_prompts.push_back(PromptTask {
                 send,
                 prompt: self.format_buffer.take(),
-                is_password: _is_password,
+                is_password,
             });
         }
         #[cfg(not(feature = "prompt-password"))]
@@ -554,7 +558,7 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
 // note that for interactive io, it's recommended to use blocking io directly
 // on a thread instead of tokio
 fn prompt_task(
-    first_send: oneshot::Sender<std::io::Result<String>>,
+    first_send: oneshot::Sender<std::io::Result<ZeroWhenDropString>>,
     _is_password: bool,
 ) -> JoinHandle<()> {
     use std::io::Write;
@@ -567,13 +571,13 @@ fn prompt_task(
             buf.clear();
             #[cfg(feature = "prompt-password")]
             let result = if _is_password {
-                rpassword::read_password()
+                super::prompt_password::read_password()
             } else {
-                std::io::stdin().read_line(&mut buf).map(|_| buf.clone())
+                std::io::stdin().read_line(&mut buf).map(|_| buf.clone().into())
             };
             #[cfg(not(feature = "prompt-password"))]
-            let result = std::io::stdin().read_line(&mut buf);
-            let _ = send.send(result.map(|_| buf.clone()));
+            let result = std::io::stdin().read_line(&mut buf).map(|_| buf.clone().into());
+            let _ = send.send(result);
             let Ok(mut printer) = super::PRINTER.lock() else {
                 break;
             };

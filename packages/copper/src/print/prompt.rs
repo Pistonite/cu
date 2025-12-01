@@ -30,7 +30,7 @@ macro_rules! yesno {
 #[macro_export]
 macro_rules! prompt {
     ($($fmt_args:tt)*) => {{
-        $crate::__priv::__prompt(format_args!($($fmt_args)*), false)
+        $crate::__priv::__prompt(format_args!($($fmt_args)*), false).map(|x| x.to_string())
     }}
 }
 
@@ -91,7 +91,7 @@ pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     }
 }
 
-pub fn __prompt(message: std::fmt::Arguments<'_>, is_password: bool) -> crate::Result<String> {
+pub fn __prompt(message: std::fmt::Arguments<'_>, is_password: bool) -> crate::Result<crate::ZeroWhenDropString> {
     if let lv::Prompt::No = PROMPT_LEVEL.get() {
         crate::bailand!(error!(
             "prompt not allowed in non-interactive mode: {message}"

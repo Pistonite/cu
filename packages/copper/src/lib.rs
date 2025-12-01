@@ -89,7 +89,7 @@ mod print;
 pub use print::{
     ProgressBar, init_print_options, log_init, progress_bar, progress_bar_lowp, progress_unbounded,
     progress_unbounded_lowp, set_thread_print_name, term_width, term_width_height,
-    term_width_or_max,
+    term_width_or_max, ZeroWhenDropString
 };
 
 /// Printing level values
