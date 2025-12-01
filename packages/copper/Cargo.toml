@@ -21,7 +21,7 @@ oneshot = "0.1.11"
 env_filter = { version = "0.1.4", optional = true }
 terminal_size = { version = "0.4.3", optional = true }
 unicode-width = { version = "0.2.2", features = ["cjk"], optional = true }
-clap = { version = "4.5.51", features = ["derive"], optional = true }
+clap = { version = "4.5.53", features = ["derive"], optional = true }
 regex = { version = "1.12.2", optional = true }
 rpassword = { version = "7.4.0", optional = true }
 
