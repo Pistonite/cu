@@ -23,7 +23,6 @@ terminal_size = { version = "0.4.3", optional = true }
 unicode-width = { version = "0.2.2", features = ["cjk"], optional = true }
 clap = { version = "4.5.53", features = ["derive"], optional = true }
 regex = { version = "1.12.2", optional = true }
-rpassword = { version = "7.4.0", optional = true }
 
 # fs
 dunce = {version="1.0.5", optional = true}
@@ -77,7 +76,7 @@ cli = ["dep:clap", "dep:pistonite-cu-proc-macros", "print"]
 print = ["dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width"]
 # Utils to show prompt for user input in terminal
 prompt = ["print"]
-prompt-password = ["prompt", "dep:rpassword"]
+prompt-password = ["prompt"]
 # Enable coroutine drivers, which allow interop with async
 coroutine = [
     "dep:tokio", "dep:num_cpus",
