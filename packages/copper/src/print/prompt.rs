@@ -51,6 +51,37 @@ macro_rules! prompt_password {
     }}
 }
 
+/// Show a password prompt and loops until a legal password is accepted.
+///
+/// Use this when prompting the user to set a password.
+///
+/// The console will have inputs hidden while user types, and the returned
+/// value is a [`ZeroWhenDropString`](crate::ZeroWhenDropString)
+///
+/// Legal password must be non-empty, and contains only alphanumeric characters, or selected ascii
+/// special characters.
+///
+/// ```rust,ignore
+/// let password = cu::prompt_legal_password!("please enter your password")?;
+/// cu::info!("user entered: {password}");
+/// ```
+#[cfg(feature = "prompt-password")]
+#[macro_export]
+macro_rules! prompt_legal_password {
+    ($($fmt_args:tt)*) => {{
+        loop {
+            let p = $crate::__priv::__prompt(format_args!($($fmt_args)*), true)?;
+            match $crate::check_password_legality(&*p) {
+                Ok(()) => break $crate::Ok(p),
+                Err(e) => {
+                    $crate::error!("{e}");
+                    ::std::mem::drop(p);
+                }
+            }
+        }
+    }}
+}
+
 pub(crate) static PROMPT_LEVEL: Atomic<u8, lv::Prompt> =
     Atomic::new_u8(lv::Prompt::Interactive as u8);
 

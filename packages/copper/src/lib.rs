@@ -85,6 +85,8 @@ pub mod co;
 /// Low level printing utils and integration with log and clap
 #[cfg(feature = "print")]
 mod print;
+#[cfg(feature = "prompt-password")]
+pub use print::check_password_legality;
 #[cfg(feature = "print")]
 pub use print::{
     ProgressBar, ZeroWhenDropString, init_print_options, log_init, progress_bar, progress_bar_lowp,
