@@ -16,14 +16,38 @@ macro_rules! yesno {
         $crate::__priv::__prompt_yesno(format_args!($($fmt_args)*))
     }}
 }
+
 /// Show a prompt
+///
+/// Use the `prompt-password` feature and [`prompt_password!`] macro
+/// if prompting for a password, which will hide user's input from the console
+///
+/// ```rust,ignore
+/// let name = cu::prompt!("please enter your name")?;
+/// cu::info!("user entered: {name}");
+/// ```
 #[cfg(feature = "prompt")]
 #[macro_export]
 macro_rules! prompt {
     ($($fmt_args:tt)*) => {{
-        $crate::__priv::__prompt(format_args!($($fmt_args)*))
+        $crate::__priv::__prompt(format_args!($($fmt_args)*), false)
     }}
 }
+
+/// Show a password prompt
+///
+/// ```rust,ignore
+/// let password = cu::prompt_password!("please enter your password")?;
+/// cu::info!("user entered: {password}");
+/// ```
+#[cfg(feature = "prompt-password")]
+#[macro_export]
+macro_rules! prompt_password {
+    ($($fmt_args:tt)*) => {{
+        $crate::__priv::__prompt(format_args!($($fmt_args)*), true)
+    }}
+}
+
 pub(crate) static PROMPT_LEVEL: Atomic<u8, lv::Prompt> =
     Atomic::new_u8(lv::Prompt::Interactive as u8);
 
@@ -45,7 +69,7 @@ pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
             let Ok(mut printer) = super::PRINTER.lock() else {
                 crate::bailand!(error!("prompt failed: global print lock poisoned"));
             };
-            printer.show_prompt(&message)
+            printer.show_prompt(&message, false)
         };
         let result = recv
             .recv()
@@ -67,7 +91,7 @@ pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     }
 }
 
-pub fn __prompt(message: std::fmt::Arguments<'_>) -> crate::Result<String> {
+pub fn __prompt(message: std::fmt::Arguments<'_>, is_password: bool) -> crate::Result<String> {
     if let lv::Prompt::No = PROMPT_LEVEL.get() {
         crate::bailand!(error!(
             "prompt not allowed in non-interactive mode: {message}"
@@ -80,7 +104,7 @@ pub fn __prompt(message: std::fmt::Arguments<'_>) -> crate::Result<String> {
             let Ok(mut printer) = super::PRINTER.lock() else {
                 crate::bailand!(error!("prompt failed: global print lock poisoned"));
             };
-            printer.show_prompt(&message)
+            printer.show_prompt(&message, is_password)
         };
         recv.recv()
             .with_context(|| format!("recv error while showing the prompt: {message}"))?

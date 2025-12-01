@@ -25,9 +25,11 @@ pub fn current_exe() -> crate::Result<PathBuf> {
 /// if from and to is the pointing to the same, it might be truncated.
 ///
 /// The number of bytes in `to` is returned.
+#[inline(always)]
 pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> crate::Result<u64> {
-    let from = from.as_ref();
-    let to = to.as_ref();
+    copy_impl(from.as_ref(), to.as_ref())
+}
+fn copy_impl(from: &Path, to: &Path) -> crate::Result<u64> {
     crate::trace!("copy from='{}' to='{}'", from.display(), to.display());
     if to.is_dir() {
         crate::bail!(
@@ -99,8 +101,11 @@ pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> crate::Result<u64> 
 /// Get the modified time for a file.
 ///
 /// If the file doesn't exist, None is returned
+#[inline(always)]
 pub fn get_mtime(path: impl AsRef<Path>) -> crate::Result<Option<Time>> {
-    let path = path.as_ref();
+    get_mtime_impl(path.as_ref())
+}
+fn get_mtime_impl(path: &Path) -> crate::Result<Option<Time>> {
     match path.metadata() {
         Ok(meta) => Ok(Some(Time::from_last_modification_time(&meta))),
         Err(e) => {
@@ -117,11 +122,69 @@ pub fn get_mtime(path: impl AsRef<Path>) -> crate::Result<Option<Time>> {
 }
 
 /// Set the modified time for a file
+#[inline(always)]
 pub fn set_mtime(path: impl AsRef<Path>, time: Time) -> crate::Result<()> {
-    let path = path.as_ref();
+    set_mtime_impl(path.as_ref(), time)
+}
+fn set_mtime_impl(path: &Path, time: Time) -> crate::Result<()> {
     crate::check!(
         filetime::set_file_mtime(path, time),
         "failed to set modification time for '{}'",
+        path.display()
+    )
+}
+
+/// Remove `path` as either a file or empty directory.
+///
+/// No-op if the path does not exist.
+/// Error if the path is a non-empty directory.
+#[inline(always)]
+pub fn remove(path: impl AsRef<Path>) -> crate::Result<()> {
+    remove_impl(path.as_ref())
+}
+fn remove_impl(path: &Path) -> crate::Result<()> {
+    if !path.exists() {
+        crate::trace!("remove: is absent: '{}'", path.display());
+        return Ok(());
+    }
+    crate::trace!("remove '{}'", path.display());
+    if path.is_dir() {
+        return crate::check!(
+            std::fs::remove_dir(path),
+            "failed to remove directory '{}'",
+            path.display()
+        );
+    }
+    crate::check!(
+        std::fs::remove_file(path),
+        "failed to remove file '{}'",
+        path.display()
+    )
+}
+
+/// Async version of [`remove`]
+#[cfg(feature = "coroutine")]
+#[inline(always)]
+pub async fn co_remove(path: impl AsRef<Path>) -> crate::Result<()> {
+    co_remove_impl(path.as_ref()).await
+}
+#[cfg(feature = "coroutine")]
+async fn co_remove_impl(path: &Path) -> crate::Result<()> {
+    if !path.exists() {
+        crate::trace!("co_remove: is absent: '{}'", path.display());
+        return Ok(());
+    }
+    crate::trace!("co_remove '{}'", path.display());
+    if path.is_dir() {
+        return crate::check!(
+            tokio::fs::remove_dir(path).await,
+            "failed to remove directory '{}'",
+            path.display()
+        );
+    }
+    crate::check!(
+        tokio::fs::remove_file(path).await,
+        "failed to remove file '{}'",
         path.display()
     )
 }
