@@ -140,10 +140,10 @@ mod windows {
     }
 
     /// Reads a password from the TTY
-    pub fn read_password() -> std::io::Result<String> {
+    pub fn read_password() -> std::io::Result<super::ZeroWhenDropString> {
         let handle = unsafe {
             CreateFileA(
-                b"CONIN$\x00".as_ptr() as PCSTR,
+                c"CONIN$".as_ptr() as PCSTR,
                 GENERIC_READ | GENERIC_WRITE,
                 FILE_SHARE_READ | FILE_SHARE_WRITE,
                 std::ptr::null(),
