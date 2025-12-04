@@ -325,6 +325,8 @@ fn parse_args<T: Parser>() -> T {
     // parse the color arg first, so that we can respect it when printing help
     let color = lv::Color::from_os_args();
     let use_color = color.is_colored_for_stdout();
+
+    // this will exit on error
     let mut matches = get_colored_command::<T>(use_color).get_matches();
 
     match <T as FromArgMatches>::from_arg_matches_mut(&mut matches) {
@@ -348,8 +350,10 @@ where
     I::Item: Into<OsString> + Clone,
 {
     let use_color = crate::color_enabled();
-    let mut matches = get_colored_command::<T>(use_color).get_matches_from(iter);
-    match <T as FromArgMatches>::from_arg_matches_mut(&mut matches) {
+    let result = get_colored_command::<T>(use_color)
+        .try_get_matches_from(iter)
+        .and_then(|mut matches| <T as FromArgMatches>::from_arg_matches_mut(&mut matches));
+    match result {
         Ok(x) => Some(x),
         Err(e) => {
             let mut command = get_colored_command::<T>(use_color);
