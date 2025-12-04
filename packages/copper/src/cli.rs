@@ -371,9 +371,12 @@ where
 /// Whether the output has color depends on the main CLI `--color` option.
 /// This is useful for implementing custom command parser within
 /// an application.
+#[inline(always)]
 pub fn print_help<T: Parser>(long: bool) {
-    let use_color = crate::color_enabled();
-    let mut command = get_colored_command::<T>(use_color);
+    let command = get_colored_command::<T>(crate::color_enabled());
+    print_help_impl(command, long)
+}
+fn print_help_impl(mut command: Command, long: bool) {
     let result = if long {
         command.print_long_help()
     } else {
@@ -384,9 +387,12 @@ pub fn print_help<T: Parser>(long: bool) {
     }
 }
 
+#[inline(always)]
 fn get_colored_command<T: Parser>(color: bool) -> Command {
+    get_colored_command_impl(<T as CommandFactory>::command(), color)
+}
+fn get_colored_command_impl(command: Command, color: bool) -> Command {
     use clap::builder::styling::{AnsiColor, Styles};
-    let command = <T as CommandFactory>::command();
     if color {
         // Modified version of Cargo's color style
         // [source](https://github.com/crate-ci/clap-cargo/blob/master/src/style.rs)
