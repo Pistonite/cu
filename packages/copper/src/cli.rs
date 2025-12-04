@@ -155,6 +155,13 @@
 //! # Async Entry Point
 //! For async usage, see the [`coroutine`](crate::co) concept.
 //!
+//! # Manual Parsing
+//! [`cu::cli::try_parse`](crate::cli::try_parse)
+//! and [`cu::cli::print_help`](crate::cli::print_help) can be useful
+//! when you want to manually invoke a command parser. These
+//! respect the `--color` option passed to the program.
+//!
+use std::ffi::OsString;
 use std::time::Instant;
 
 use clap::{Command, CommandFactory, FromArgMatches, Parser};
@@ -170,8 +177,6 @@ pub struct Flags {
     #[clap(short = 'q', long, action(clap::ArgAction::Count))]
     quiet: u8,
     /// Set the color mode for this program. May affect subprocesses spawned.
-    ///
-    /// Fooo
     #[clap(long)]
     color: Option<lv::Color>,
     /// Automatically answer 'yes' to all yes/no prompts
@@ -320,6 +325,8 @@ fn parse_args<T: Parser>() -> T {
     // parse the color arg first, so that we can respect it when printing help
     let color = lv::Color::from_os_args();
     let use_color = color.is_colored_for_stdout();
+
+    // this will exit on error
     let mut matches = get_colored_command::<T>(use_color).get_matches();
 
     match <T as FromArgMatches>::from_arg_matches_mut(&mut matches) {
@@ -332,9 +339,60 @@ fn parse_args<T: Parser>() -> T {
     }
 }
 
+/// Try to parse arguments from an iterator and print the error/help
+/// on failure.
+///
+/// Whether the output has color depends on the main CLI `--color` option.
+/// This is useful for implementing custom command parser within
+/// an application.
+pub fn try_parse<T: Parser, I: IntoIterator>(iter: I) -> Option<T>
+where
+    I::Item: Into<OsString> + Clone,
+{
+    let use_color = crate::color_enabled();
+    let result = get_colored_command::<T>(use_color)
+        .try_get_matches_from(iter)
+        .and_then(|mut matches| <T as FromArgMatches>::from_arg_matches_mut(&mut matches));
+    match result {
+        Ok(x) => Some(x),
+        Err(e) => {
+            let mut command = get_colored_command::<T>(use_color);
+            let error = e.format(&mut command);
+            if let Err(e) = error.print() {
+                crate::warn!("arg parse error failed to print: {e:?}");
+            }
+            None
+        }
+    }
+}
+
+/// Print the help text from a command parser.
+///
+/// Whether the output has color depends on the main CLI `--color` option.
+/// This is useful for implementing custom command parser within
+/// an application.
+#[inline(always)]
+pub fn print_help<T: Parser>(long: bool) {
+    let command = get_colored_command::<T>(crate::color_enabled());
+    print_help_impl(command, long)
+}
+fn print_help_impl(mut command: Command, long: bool) {
+    let result = if long {
+        command.print_long_help()
+    } else {
+        command.print_help()
+    };
+    if let Err(e) = result {
+        crate::warn!("help failed to print: {e:?}");
+    }
+}
+
+#[inline(always)]
 fn get_colored_command<T: Parser>(color: bool) -> Command {
+    get_colored_command_impl(<T as CommandFactory>::command(), color)
+}
+fn get_colored_command_impl(command: Command, color: bool) -> Command {
     use clap::builder::styling::{AnsiColor, Styles};
-    let command = <T as CommandFactory>::command();
     if color {
         // Modified version of Cargo's color style
         // [source](https://github.com/crate-ci/clap-cargo/blob/master/src/style.rs)
