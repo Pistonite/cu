@@ -8,7 +8,7 @@ struct Args {
     #[clap(flatten)]
     inner: cu::cli::Flags,
 }
-/// Run with cargo run --example print --features prompt
+/// Run with cargo run --example print --features prompt,cli
 #[cu::cli(flags = "inner")]
 fn main(_: Args) -> cu::Result<()> {
     cu::print!("today's weather is {}", "good");
@@ -69,5 +69,44 @@ fn main(_: Args) -> cu::Result<()> {
     r3?;
     cu::info!("all threads joined ok");
 
+    let command = cu::prompt!("enter command")?;
+    // note: in a real-world application, you would use something like
+    // the `shell_words` crate to split the input
+    let args: AnotherArgs = cu::check!(
+        cu::cli::try_parse(command.split_whitespace()),
+        "error parsing args"
+    )?;
+    cu::print!("parsed args: {args:?}");
+    // note: in a real-world application, this will probably be some subcommand
+    if args.help {
+        cu::cli::print_help::<AnotherArgs>(true);
+    }
+
     Ok(())
+}
+
+/// Test Another Arg
+///
+/// long text here
+#[derive(Debug, clap::Parser)]
+#[clap(
+    name = "",
+    no_binary_name = true,
+    disable_help_flag = true,
+    disable_version_flag = true
+)]
+struct AnotherArgs {
+    /// the file
+    ///
+    /// long text here
+    pub file: String,
+    /// If we should copy
+    ///
+    /// long text here
+    #[clap(short, long)]
+    pub copy: bool,
+
+    /// HELP ME
+    #[clap(short, long, conflicts_with = "copy")]
+    pub help: bool,
 }
