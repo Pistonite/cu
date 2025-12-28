@@ -8,8 +8,14 @@ struct Args {
     #[clap(flatten)]
     inner: cu::cli::Flags,
 }
+impl Args {
+    fn preprocess(&mut self) {
+        self.inner.verbose += 1;
+        println!("{:#?}", self.inner);
+    }
+}
 /// Run with cargo run --example print --features prompt,cli
-#[cu::cli(flags = "inner")]
+#[cu::cli(flags = "inner", preprocess = Args::preprocess)]
 fn main(_: Args) -> cu::Result<()> {
     cu::print!("today's weather is {}", "good");
     cu::hint!("today's weather is {}", "ok");

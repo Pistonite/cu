@@ -20,3 +20,27 @@ pub fn flatten<T: crate::ToTokens>(result: syn::Result<T>) -> crate::TokenStream
         Err(e) => e.into_compile_error().into(),
     }
 }
+
+/// Convenience wrapper for parsing punctuated syntax
+pub fn parse_punctuated<T: syn::parse::Parse, P: syn::parse::Parse>(
+    input: crate::TokenStream,
+) -> syn::Result<syn::punctuated::Punctuated<T, P>> {
+    let pun: Punctuated<T, P> = syn::parse(input)?;
+    Ok(pun.0)
+}
+
+/// Convenience wrapper for parsing punctuated syntax
+pub fn parse_punctuated2<T: syn::parse::Parse, P: syn::parse::Parse>(
+    input: crate::TokenStream2,
+) -> syn::Result<syn::punctuated::Punctuated<T, P>> {
+    let pun: Punctuated<T, P> = syn::parse2(input)?;
+    Ok(pun.0)
+}
+
+struct Punctuated<T, P>(syn::punctuated::Punctuated<T, P>);
+impl<T: syn::parse::Parse, P: syn::parse::Parse> syn::parse::Parse for Punctuated<T, P> {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let parts = syn::punctuated::Punctuated::<T, P>::parse_terminated(input)?;
+        Ok(Self(parts))
+    }
+}
