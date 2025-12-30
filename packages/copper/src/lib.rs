@@ -120,6 +120,7 @@ pub use misc::*;
 // re-exports from libraries
 pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail, ensure};
 pub use log::{debug, error, info, trace, warn};
+pub use pistonite_cu_proc_macros::error_ctx;
 #[cfg(feature = "coroutine")]
 pub use tokio::{join, try_join};
 

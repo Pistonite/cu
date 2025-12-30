@@ -53,9 +53,9 @@ pub fn expand(attr: TokenStream, input: TokenStream) -> pm::Result<TokenStream2>
     Ok(expanded)
 }
 
-fn parse_attributes(attr: TokenStream) -> pm::Result<CliAttributes> {
+fn parse_attributes(attr: TokenStream) -> pm::Result<ParsedAttributes> {
     let attrs = pm::parse_punctuated::<syn::MetaNameValue, syn::Token![,]>(attr)?;
-    let mut out = CliAttributes::default();
+    let mut out = ParsedAttributes::default();
 
     for attr in attrs {
         if attr.path.is_ident("flags") {
@@ -79,7 +79,7 @@ fn parse_attributes(attr: TokenStream) -> pm::Result<CliAttributes> {
     Ok(out)
 }
 #[derive(Default)]
-struct CliAttributes {
+struct ParsedAttributes {
     flags_ident: Option<syn::Ident>,
     preprocess_fn: Option<syn::Expr>,
 }

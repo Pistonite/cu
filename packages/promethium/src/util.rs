@@ -22,6 +22,7 @@ pub fn flatten<T: crate::ToTokens>(result: syn::Result<T>) -> crate::TokenStream
 }
 
 /// Convenience wrapper for parsing punctuated syntax
+#[cfg(feature = "proc-macro")]
 pub fn parse_punctuated<T: syn::parse::Parse, P: syn::parse::Parse>(
     input: crate::TokenStream,
 ) -> syn::Result<syn::punctuated::Punctuated<T, P>> {
