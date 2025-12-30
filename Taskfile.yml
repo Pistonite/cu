@@ -36,6 +36,7 @@ tasks:
 
   test:
     cmds:
+      - task: pm:test
       - task: cu:test
 
   dev-doc:

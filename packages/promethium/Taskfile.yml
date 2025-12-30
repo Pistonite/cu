@@ -18,3 +18,8 @@ tasks:
     cmds:
       - cmd: cargo publish
         ignore_error: true
+  test:
+    cmds:
+      - cargo test
+      - cargo test --features full
+      - cargo test --no-default-features --features full

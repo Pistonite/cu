@@ -13,3 +13,13 @@ pub fn derive_parse(input: TokenStream) -> TokenStream {
     pm::flatten(derive_parse::expand(input))
 }
 mod derive_parse;
+
+/// Attribute macro for wrapping a function with an error context
+///
+/// See the [tests](https://github.com/Pistonite/cu/blob/main/packages/copper/tests/error_ctx.rs)
+/// for examples
+#[proc_macro_attribute]
+pub fn error_ctx(attr: TokenStream, input: TokenStream) -> TokenStream {
+    pm::flatten(error_ctx::expand(attr, input))
+}
+mod error_ctx;
