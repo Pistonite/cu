@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu-proc-macros"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 description = "Proc-macros for Cu"
 repository = "https://github.com/Pistonite/cu"
