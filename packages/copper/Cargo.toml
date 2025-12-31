@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.6.5"
+version = "0.6.6"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -11,7 +11,7 @@ exclude = [
 ]
 
 [dependencies]
-pistonite-cu-proc-macros = { version = "0.2.1", path = "../copper-proc-macros" }
+pistonite-cu-proc-macros = { version = "0.2.2", path = "../copper-proc-macros" }
 
 anyhow = "1.0.100"
 log = "0.4.29"

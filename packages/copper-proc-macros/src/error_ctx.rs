@@ -6,6 +6,7 @@ pub fn expand(attr: TokenStream, input: TokenStream) -> pm::Result<TokenStream2>
 
     let item_attrs = &item.attrs;
     let item_block = &item.block;
+    let vis = &item.vis;
     let sig = &item.sig;
     let is_async = item.sig.asyncness.is_some();
     let retty = match &item.sig.output {
@@ -34,6 +35,9 @@ pub fn expand(attr: TokenStream, input: TokenStream) -> pm::Result<TokenStream2>
                 __result.context(__error_msg)
             }
         }
+        // note if the args is a literal, there's a small perf hit here to call format!
+        // however, it's not easy to detect if a literal needs formatting (need to check
+        // if there are any format args insite the literal
         (false, false) => {
             pm::quote! {
                 use cu::Context as _;
@@ -51,7 +55,7 @@ pub fn expand(attr: TokenStream, input: TokenStream) -> pm::Result<TokenStream2>
     };
 
     let expanded = pm::quote! {
-        #(#item_attrs)* #sig { #block }
+        #(#item_attrs)* #vis #sig { #block }
     };
 
     Ok(expanded)
