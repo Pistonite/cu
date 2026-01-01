@@ -175,7 +175,7 @@ fn find_with_strats<'a, I: IntoIterator<Item = Strategy<'a>>>(
     }
 
     crate::trace!("could not finding '{name}' {prev}: {error}");
-    crate::bailand!(error!("could not find program '{name}'"));
+    crate::bail!("could not find program '{name}'");
 }
 
 /// Strategy to resolve the given path as path for the program
