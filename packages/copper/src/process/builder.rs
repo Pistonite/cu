@@ -198,6 +198,12 @@ impl<Out, Err, In> Command<Out, Err, In> {
         }
     }
 
+    /// Configure child's standard output stream to inherit from parent ([`pio::inherit()`])
+    #[inline(always)]
+    pub fn stdout_inherit(self) -> Command<pio::Inherit, Err, In> {
+        self.stdout(pio::inherit())
+    }
+
     /// Configure child's standard error stream
     #[inline(always)]
     pub fn stderr<T: pio::ChildOutConfig>(self, config: T) -> Command<Out, T, In> {
@@ -209,6 +215,12 @@ impl<Out, Err, In> Command<Out, Err, In> {
             stderr: config,
             stdin: self.stdin
         }
+    }
+
+    /// Configure child's standard output stream to inherit from parent ([`pio::inherit()`])
+    #[inline(always)]
+    pub fn stderr_inherit(self) -> Command<Out, pio::Inherit, In> {
+        self.stderr(pio::inherit())
     }
 
     /// Configure child's both standard output and standard error with the same config
@@ -258,6 +270,12 @@ impl<Out, Err, In> Command<Out, Err, In> {
     #[inline(always)]
     pub fn all_null(self) -> Command<pio::Null, pio::Null, pio::Null> {
         self.stdin_null().stdout_null().stderr_null()
+    }
+
+    /// Configure all standard input, output and error streams as [`pio::inherit()`]
+    #[inline(always)]
+    pub fn all_inherit(self) -> Command<pio::Inherit, pio::Inherit, pio::Inherit> {
+        self.stdin_inherit().stdout_inherit().stderr_inherit()
     }
 
     /// Apply a preset for the child command's input and output.

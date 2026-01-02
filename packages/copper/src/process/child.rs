@@ -1,4 +1,4 @@
-use std::process::ExitStatus;
+use std::{process::ExitStatus, time::Duration};
 
 use tokio::{process::Child as TokioChild, task::JoinSet};
 
@@ -76,6 +76,106 @@ impl Child {
     #[inline(always)]
     pub fn wait_guard(self) -> ChildWaitGuard {
         ChildWaitGuard { inner: Some(self) }
+    }
+
+    /// Wait for the child to exit for at least the timeout.
+    /// Return the exit status if exited
+    pub async fn co_wait_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> crate::Result<Option<ExitStatus>> {
+        let mut ms = 100;
+        let mut total_ms = 0;
+        loop {
+            match self.inner.try_wait() {
+                Ok(Some(s)) => return Ok(Some(s)),
+                Ok(None) => {}
+                Err(e) => {
+                    crate::rethrow!(e, "io error while waiting {}", self.name)
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(ms)).await;
+            total_ms += ms;
+            if Duration::from_millis(total_ms) >= timeout {
+                break;
+            }
+            ms *= 4;
+        }
+        Ok(None)
+    }
+
+    pub fn wait_timeout(&mut self, timeout: Duration) -> crate::Result<Option<ExitStatus>> {
+        let mut ms = 100;
+        let mut total_ms = 0;
+        loop {
+            match self.inner.try_wait() {
+                Ok(Some(s)) => return Ok(Some(s)),
+                Ok(None) => {}
+                Err(e) => {
+                    crate::rethrow!(e, "io error while waiting {}", self.name)
+                }
+            }
+            std::thread::sleep(Duration::from_millis(ms));
+            total_ms += ms;
+            if Duration::from_millis(total_ms) >= timeout {
+                break;
+            }
+            ms *= 4;
+        }
+        Ok(None)
+    }
+
+    /// Kill the child and wait for it to exit asynchronously. Return the exit status
+    ///
+    /// # Panic
+    /// Will panic if called outside of a tokio runtime context
+    pub async fn co_kill(mut self) -> crate::Result<ExitStatus> {
+        self.io.co_join(&self.name).await;
+        let mut ms = 100;
+        for i in 0..5 {
+            crate::trace!("trying to kill child '{}', attempt {}", self.name, i + 1);
+            crate::check!(
+                self.inner.start_kill(),
+                "failed to send kill signal to child"
+            )?;
+            match self.inner.try_wait() {
+                Ok(Some(s)) => return Ok(s),
+                Ok(None) => {}
+                Err(e) => {
+                    crate::rethrow!(e, "io error while killing {}", self.name)
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(ms)).await;
+            ms *= 4;
+        }
+        crate::bail!("failed to kill child '{}' after many attempts", self.name);
+    }
+
+    /// Kill the child and block the current thread until the child exits. Return the exit status.
+    ///
+    /// # Blocking
+    /// This will block the current thread while trying to join the child.
+    /// Use [`co_kill`](Self::co_kill) to avoid blocking if in async context.
+    pub fn kill(mut self) -> crate::Result<ExitStatus> {
+        self.io.join(&self.name);
+        let mut ms = 100;
+        for i in 0..5 {
+            crate::trace!("trying to kill child '{}', attempt {}", self.name, i + 1);
+            crate::check!(
+                self.inner.start_kill(),
+                "failed to send kill signal to child"
+            )?;
+            match self.inner.try_wait() {
+                Ok(Some(s)) => return Ok(s),
+                Ok(None) => {}
+                Err(e) => {
+                    crate::rethrow!(e, "io error while killing {}", self.name)
+                }
+            }
+            std::thread::sleep(Duration::from_millis(ms));
+            ms *= 4;
+        }
+        crate::bail!("failed to kill child '{}' after many attempts", self.name);
     }
 }
 

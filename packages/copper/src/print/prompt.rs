@@ -169,6 +169,11 @@ impl Drop for PromptJoinScope {
 /// A string that will have its inner buffer zeroed when dropped
 #[derive(Default, Clone)]
 pub struct ZeroWhenDropString(String);
+impl ZeroWhenDropString {
+    pub const fn new() -> Self {
+        Self(String::new())
+    }
+}
 impl std::fmt::Display for ZeroWhenDropString {
     #[inline(always)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -179,6 +184,24 @@ impl From<String> for ZeroWhenDropString {
     #[inline(always)]
     fn from(value: String) -> Self {
         Self(value)
+    }
+}
+impl AsRef<[u8]> for ZeroWhenDropString {
+    #[inline(always)]
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+impl AsRef<String> for ZeroWhenDropString {
+    #[inline(always)]
+    fn as_ref(&self) -> &String {
+        &self.0
+    }
+}
+impl AsRef<str> for ZeroWhenDropString {
+    #[inline(always)]
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 impl Drop for ZeroWhenDropString {
