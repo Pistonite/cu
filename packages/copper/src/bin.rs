@@ -56,15 +56,37 @@ use crate::pre::*;
 static BIN_PATHS: LazyLock<RwLock<BTreeMap<String, PathBuf>>> =
     LazyLock::new(|| RwLock::new(BTreeMap::new()));
 
-/// Get a previously cached path. Returns None if the path
-/// was never cached (either because it was never referenced,
-/// or because previous resolution failed)
+/// Clear the cached path for the binary name, if previously set
+#[inline(always)]
+pub fn clear(name: impl AsRef<str>) {
+    clear_impl(name.as_ref())
+}
+fn clear_impl(name: &str) {
+    BIN_PATHS
+        .write()
+        .expect("could not lock global bin path map")
+        .remove(name);
+}
+
+/// Get a previously cached path.
+///
+/// Returns None if the path was never cached
+/// (either because it was never referenced, or because previous resolution failed),
+/// or if the path now does not exist
+#[inline(always)]
 pub fn get(name: impl AsRef<str>) -> Option<PathBuf> {
-    let name = name.as_ref();
-    let paths = BIN_PATHS
+    get_impl(name.as_ref())
+}
+fn get_impl(name: &str) -> Option<PathBuf> {
+    let guard = BIN_PATHS
         .read()
         .expect("could not lock global bin path map");
-    paths.get(name).map(|x| x.to_path_buf())
+    let path = guard.get(name)?;
+    if !path.exists() {
+        clear_impl(name);
+        return None;
+    }
+    Some(path.clone())
 }
 
 /// Check and set bin name to the specified path. Return the absolute path that is set.
@@ -87,9 +109,12 @@ pub fn get(name: impl AsRef<str>) -> Option<PathBuf> {
 /// # Ok(())
 /// # }
 /// ```
+#[inline(always)]
 pub fn set(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathBuf> {
-    let name = name.as_ref();
-    let path = location(path.as_ref()).find(name)?;
+    set_impl(name.as_ref(), path.as_ref())
+}
+fn set_impl(name: &str, path: &Path) -> crate::Result<PathBuf> {
+    let path = location(path).find(name)?;
     crate::trace!("setting bin path: '{name}' -> '{}'", path.display());
     let mut paths = BIN_PATHS
         .write()
@@ -107,8 +132,9 @@ pub fn set(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathB
 /// Result will be cached so finding the same executable name will always result in the same path.
 ///
 /// See [`cu::bin`](self) module-level documentation for more info.
+#[inline(always)]
 pub fn which(name: impl AsRef<str>) -> crate::Result<PathBuf> {
-    find(name, std::iter::once(in_PATH()))
+    find_impl(name.as_ref(), std::iter::once(in_PATH()))
 }
 
 /// Resolve an executable at the location provided, or use a previously registered path.
@@ -116,8 +142,9 @@ pub fn which(name: impl AsRef<str>) -> crate::Result<PathBuf> {
 /// Result will be cached so finding the same executable name will always result in the same path.
 ///
 /// See [`cu::bin`](self) module-level documentation for more info.
+#[inline(always)]
 pub fn resolve(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<PathBuf> {
-    find(name, std::iter::once(location(path.as_ref())))
+    find_impl(name.as_ref(), std::iter::once(location(path.as_ref())))
 }
 
 /// Find the executable using a series of strategies.
@@ -126,23 +153,35 @@ pub fn resolve(name: impl AsRef<str>, path: impl AsRef<Path>) -> crate::Result<P
 /// that path is returned instead.
 ///
 /// See [`cu::bin`](self) module-level documentation for more info.
+#[inline(always)]
 pub fn find<'a, I: IntoIterator<Item = Strategy<'a>>>(
     name: impl AsRef<str>,
     strats: I,
 ) -> crate::Result<PathBuf> {
-    let name = name.as_ref();
+    find_impl(name.as_ref(), strats)
+}
+fn find_impl<'a, I: IntoIterator<Item = Strategy<'a>>>(
+    name: &str,
+    strats: I,
+) -> crate::Result<PathBuf> {
     {
         let Ok(paths) = BIN_PATHS.read() else {
             crate::bail!("could not lock global bin path map");
         };
-        if let Some(x) = paths.get(name) {
+        if let Some(x) = paths.get(name)
+            && x.exists()
+        {
+            crate::trace!("found executable '{name}' from cache: {}", x.display());
             return Ok(x.clone());
         }
     }
     let Ok(mut paths) = BIN_PATHS.write() else {
         crate::bail!("could not lock global bin path map");
     };
-    if let Some(x) = paths.get(name) {
+    if let Some(x) = paths.get(name)
+        && x.exists()
+    {
+        crate::trace!("found executable '{name}' from cache: {}", x.display());
         return Ok(x.clone());
     }
     let path = find_with_strats(name, strats)?;

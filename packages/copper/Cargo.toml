@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.6.7"
+version = "0.6.8"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -88,7 +88,8 @@ coroutine-heavy = ["coroutine"]
 process = [
     "coroutine", "fs",
     "dep:spin",
-    "tokio/process"
+    "tokio/process",
+    "tokio/time",
 ]
 # Enable file system and path util
 fs = [
