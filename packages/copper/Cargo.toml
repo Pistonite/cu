@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.6.8"
+version = "0.6.9"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -11,7 +11,7 @@ exclude = [
 ]
 
 [dependencies]
-pistonite-cu-proc-macros = { version = "0.2.3", path = "../copper-proc-macros" }
+pistonite-cu-proc-macros = { version = "0.2.4", path = "../copper-proc-macros" }
 
 anyhow = "1.0.100"
 log = "0.4.29"
@@ -21,7 +21,7 @@ oneshot = "0.1.11"
 env_filter = { version = "0.1.4", optional = true }
 terminal_size = { version = "0.4.3", optional = true }
 unicode-width = { version = "0.2.2", features = ["cjk"], optional = true }
-clap = { version = "4.5.53", features = ["derive"], optional = true }
+clap = { version = "4.5.54", features = ["derive"], optional = true }
 regex = { version = "1.12.2", optional = true }
 
 # fs
@@ -45,17 +45,17 @@ derive_more = { version = "2.1.1", features = ["full"], optional = true }
 num_cpus = { version = "1.17.0", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.178"
+libc = "0.2.179"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_Console", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System_SystemServices"] }
 
 [dependencies.tokio]
-version = "1.48.0" 
+version = "1.49.0" 
 features = [ "macros", "rt-multi-thread" ]
 optional = true
 [dev-dependencies.tokio]
-version = "1.48.0" 
+version = "1.49.0" 
 features = [ "macros", "rt-multi-thread", "time" ]
 
 [features]

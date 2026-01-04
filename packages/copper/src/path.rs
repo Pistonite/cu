@@ -251,7 +251,11 @@ fn fallback_normalize_absolute(path: &Path) -> crate::Result<PathBuf> {
     }
     let mut out = match prefix {
         None => PathBuf::from("/"),
-        Some(prefix) => PathBuf::from(prefix.as_os_str().to_ascii_uppercase()),
+        Some(prefix) => {
+            let mut out = prefix.as_os_str().to_ascii_uppercase();
+            out.push("\\"); // ok since this only occurs on windows
+            out.into()
+        }
     };
     out.extend(components);
     // simplify windows UNC if needed
