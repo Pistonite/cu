@@ -1,4 +1,5 @@
 //! Directory-only operations (Will error if path is a file or link)
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::pre::*;
@@ -290,4 +291,66 @@ async fn co_read_dir_impl(path: &Path) -> crate::Result<CoReadDir> {
         "cannot read directory '{}'",
         path.display()
     )
+}
+
+/// (Inefficiently) recursively copy all files in `from` directory to `to` directory.
+/// Old files in `to` are NOT removed if no corresponding file exists in `from`.
+/// (If that behavior is desired, call [`cu::fs::make_dir_empty`](make_dir_empty) or
+/// [`cu::fs::remove_contents`](remove_contents) first)
+///
+/// The implementation is naive, suitable for a quick invocation in your build scripts
+/// or something. Find other crates if you are looking for an efficient solution
+/// that does not involve cloning the files.
+///
+/// # Behavior
+/// - `to` will be created if does not exist.
+/// - symlinks are not followed (they are copied as-is)
+///
+/// # Will error if:
+/// - `from` is not a directory, or `to` exists and is not a directory
+/// - there is a path in `to` that is a directory and not a directory in `from`, or vice versa
+///
+#[inline(always)]
+pub fn rec_copy_inefficiently(from: impl AsRef<Path>, to: impl AsRef<Path>) -> crate::Result<()> {
+    rec_copy_inefficiently_impl(from.as_ref(), to.as_ref())
+}
+#[crate::error_ctx("failed to copy '{}' to '{}'", from.display(), to.display())]
+fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
+    crate::trace!(
+        "rec_copy_inefficiently from='{}' to='{}'",
+        from.display(),
+        to.display()
+    );
+    if !from.is_dir() {
+        crate::bail!("source does not exist or is not a directory");
+    }
+    let to_meta = to.metadata();
+    if to_meta.is_ok_and(|x| !x.is_dir()) {
+        crate::bail!("target exists and is not a directory");
+    }
+
+    // cache paths that are known to be directories in `to`
+    let mut dir_cache = BTreeSet::new();
+    let mut walk = crate::fs::walk(from)?;
+    while let Some(entry) = walk.next() {
+        let entry = entry?;
+        if !entry.is_dir() {
+            // ensure parent directories exists
+            if !dir_cache.contains(entry.rel_containing) {
+                let dir_path = to.join(entry.rel_containing);
+                make_dir_impl(&dir_path)?;
+                dir_cache.insert(dir_path);
+            }
+            // copy the file
+            crate::fs::copy(
+                entry.path(),
+                to.join(entry.rel_containing).join(&entry.file_name),
+            )?;
+        } else {
+            let dir_path = to.join(entry.rel_containing);
+            make_dir_impl(&dir_path)?;
+        }
+    }
+
+    Ok(())
 }
