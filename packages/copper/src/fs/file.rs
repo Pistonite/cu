@@ -188,3 +188,61 @@ async fn co_remove_impl(path: &Path) -> crate::Result<()> {
         path.display()
     )
 }
+
+/// Move a file or directory.
+///
+/// Unlike `std::fs::rename`, this will fallback to less efficient methods
+/// of moving if the paths are on separate file systems. Currently, renaming
+/// directories on separate filesystems is not supported to prevent unintended
+/// behavior.
+///
+/// # If `from` is file
+/// - will error if `to` is a directory
+/// - `to` will be replaced if exists
+///
+/// # If `from` is a directory
+/// - will error if `to` exists and is not a directory or is a non-empty directory (use `cu::fs::rec_remove(to)` to delete
+///   it first), or is on a different filesystem than `from`.
+#[inline(always)]
+pub fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> crate::Result<()> {
+    rename_impl(from.as_ref(), to.as_ref())
+}
+#[crate::error_ctx("failed to rename '{}' to '{}'", from.display(), to.display())]
+fn rename_impl(from: &Path, to: &Path) -> crate::Result<()> {
+    crate::trace!("rename: '{}' to '{}'", from.display(), to.display());
+    let Ok(from_meta) = from.metadata() else {
+        crate::bail!("source does not exist");
+    };
+    if from_meta.is_file() {
+        if to.is_dir() {
+            crate::bail!("target is a directory");
+        }
+        let Err(e) = std::fs::rename(from, to) else {
+            return Ok(());
+        };
+        crate::trace!("rename failed: {e}, trying fallback");
+        // fallback is copy and delete old
+        crate::fs::copy(from, to)?;
+        crate::fs::remove(from)?;
+        return Ok(());
+    }
+    match to.metadata().ok() {
+        None => {
+            // does not exist, OK
+        }
+        Some(to_meta) => {
+            if !to_meta.is_dir() {
+                // exists and is not directory
+                crate::bail!("target is not a directory");
+            }
+            if !crate::fs::is_empty_dir(to)? {
+                crate::bail!("target is a non-empty directory");
+            }
+            // remove old
+            crate::fs::remove(to)?;
+        }
+    }
+    // no fallback if std rename fails
+    std::fs::rename(from, to)?;
+    Ok(())
+}

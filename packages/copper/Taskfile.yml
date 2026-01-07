@@ -58,7 +58,7 @@ tasks:
           PACKAGE: pistonite-cu
           FEATURES: full
       - task: cargo:fmt-check
-      - cmd: echo "checking default feature"; grep "^default = \[\]$" Cargo.toml
+      - cmd: echo "checking default feature"; (grep "^default = \[\]$" Cargo.toml || rg "^default = \[\]$" cargo.toml)
 
   fix:
     cmds:

@@ -145,13 +145,33 @@ pub struct WalkEntry<'a> {
 impl WalkEntry<'_> {
     /// Get the path by joining the walk root and the relative
     /// path of the entry
+    #[inline(always)]
     pub fn path(&self) -> PathBuf {
         self.entry.path()
     }
 
     /// Get the relative path of this entry, from the walk root
+    #[inline(always)]
     pub fn rel_path(&self) -> PathBuf {
         self.rel_containing.join(&self.file_name)
+    }
+
+    /// Check if the entry is a file. Convenience wrapper for `self.file_type.is_file()`
+    #[inline(always)]
+    pub fn is_file(&self) -> bool {
+        self.file_type.is_file()
+    }
+
+    /// Check if the entry is a directory. Convenience wrapper for `self.file_type.is_dir()`
+    #[inline(always)]
+    pub fn is_dir(&self) -> bool {
+        self.file_type.is_dir()
+    }
+
+    /// Check if the entry is a symlink. Convenience wrapper for `self.file_type.is_symlink()`
+    #[inline(always)]
+    pub fn is_symlink(&self) -> bool {
+        self.file_type.is_symlink()
     }
 
     /// Get the entry metadata

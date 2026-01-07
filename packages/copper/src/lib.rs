@@ -47,6 +47,8 @@
 
 #![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_cfg))]
 
+extern crate self as cu;
+
 #[cfg(feature = "process")]
 mod process;
 #[cfg(feature = "process")]
