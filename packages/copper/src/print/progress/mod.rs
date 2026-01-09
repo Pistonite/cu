@@ -3,7 +3,25 @@ use std::time::{Duration, Instant};
 
 use super::ansi;
 
+mod eta;
+mod state;
+mod bar;
+
 /// Update a progress bar
+///
+/// The macro takes 2 parts separated by comma `,`:
+/// - An expression for updating the progress:
+/// - Optional format args for updating the message.
+///
+/// The progress update expression can be one of:
+/// - `bar = i`: set the progress to `i`
+/// - `bar += i`: increment the steps by i
+/// - `bar`: don't update the progress
+/// 
+/// , where `bar` is an ident
+///
+/// The format args can be omitted to update the progress without
+/// updating the message
 ///
 /// # Examples
 /// ```rust,no_run
@@ -11,43 +29,34 @@ use super::ansi;
 /// let bar = cu::progress_bar(10, "10 steps");
 /// // update the current count and message
 /// let i = 1;
-/// cu::progress!(&bar, i, "doing step {i}");
+/// cu::progress!(bar = i, "doing step {i}");
 /// // update the current count without changing message
-/// cu::progress!(&bar, 2);
-/// // update the message without changing count (or the bar is unbounded)
-/// cu::progress!(&bar, (), "doing the thing");
+/// cu::progress!(bar += 2);
+/// // update the message without changing current step
+/// cu::progress!(bar, "doing the thing");
 /// ```
 #[macro_export]
 macro_rules! progress {
-    ($bar:expr, $current:expr) => {
-        $crate::ProgressBar::set($bar, $current, None);
+    ($bar:ident, $($fmt_args:tt)*) => {
+        {$bar}.__inc(0, Some(format!($($fmt_args)*)))
     };
-    ($bar:expr, (), $($fmt_args:tt)*) => {{
-        let message = format!($($fmt_args)*);
-        $crate::ProgressBar::set_message($bar, message);
-    }};
-    ($bar:expr, $current:expr, $($fmt_args:tt)*) => {{
-        let message = format!($($fmt_args)*);
-        $crate::ProgressBar::set($bar, $current, Some(message));
-    }};
+    ($bar:ident += $inc:expr) => {
+        {$bar}.__inc($inc, None)
+    };
+    ($bar:ident += $inc:expr, $($fmt_args:tt)*) => {
+        {$bar}.__inc($inc, Some(format!($($fmt_args)*)))
+    };
+    ($bar:ident = $x:expr) => {
+        {$bar}.__set($x, None)
+    };
+    ($bar:ident = $x:expr, $($fmt_args:tt)*) => {
+        {$bar}.__set($x, Some(format!($($fmt_args)*)))
+    };
 }
 
-/// Signify the progress bar is done, with a custom done message
-///
-/// # Examples
-/// ```rust,no_run
-/// # use pistonite_cu as cu;
-/// let bar = cu::progress_bar(10, "10 steps");
-/// cu::progress!(&bar, 1, "doing step {}", 1);
-/// cu::progress_done!(&bar, "this is {}", "done!");
-/// ```
-#[macro_export]
-macro_rules! progress_done {
-    ($bar:expr, $($fmt_args:tt)*) => {{
-        let message = format!($($fmt_args)*);
-        $crate::ProgressBar::set_done_message($bar, message);
-    }};
-}
+
+/// Marker object for testing if a progress bar is interrupted
+pub struct ProgressInterruptGuard;
 
 /// Create a progress bar
 pub fn progress_bar(total: usize, message: impl Into<String>) -> Arc<ProgressBar> {
@@ -191,6 +200,16 @@ impl ProgressBar {
     }
 }
 
+struct ProgressBarStateImmut {
+    /// The prefix message (corresponds to message in the builder)
+    prefix: String,
+    /// None means don't keep the progress bar printed
+    /// (the default done message is formatted at spawn time)
+    done_message: Option<String>,
+    /// None means use the default
+    interrupted_message: Option<String>,
+}
+
 /// Progress bar state
 struct ProgressBarState {
     /// Total count, or 0 for unbounded
@@ -211,8 +230,6 @@ struct ProgressBarState {
     message: String,
     /// If bounded, used for estimating the ETA
     started: Instant,
-    /// If set, print this message when done instead of the default done message
-    done_message: Option<String>,
 }
 
 impl ProgressBarState {
@@ -227,7 +244,6 @@ impl ProgressBarState {
             started: Instant::now(),
             prefix,
             message: String::new(),
-            done_message: None,
         }
     }
     pub(crate) fn set_total(&mut self, total: usize) {

@@ -447,7 +447,6 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
                 b.push_str("\x1b[1A\x1b[K"); // move up one line and erase it
             }
         }
-        // std::thread::sleep(INTERVAL);
         clear(buffer, *lines);
         // scope for locking the printer
         let Ok(mut printer) = PRINTER.lock() else {
@@ -479,19 +478,25 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
         buffer.push_str(printer.colors.yellow);
         *lines = 0;
         let anime = CHARS[(tick as usize) % CHARS.len()];
+        let mut ii = 0;
         printer.bars.retain(|bar| {
             let Some(bar) = bar.upgrade() else {
                 return false;
             };
             if more_bars < 0 {
                 if width >= 2 {
+                    for _ in 0..ii {
+                        buffer.push(' ');
+                        buffer.push(' ');
+                    }
                     buffer.push(anime);
                     buffer.push(']');
-                    bar.format(width - 2, now, tick, INTERVAL, buffer, temp);
+                    bar.format(width - 2 - ii * 2, now, tick, INTERVAL, buffer, temp);
                 }
                 buffer.push('\n');
                 *lines += 1;
             }
+            ii += 1;
             more_bars += 1;
 
             true

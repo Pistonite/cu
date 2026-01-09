@@ -17,6 +17,10 @@ impl Args {
 /// Run with cargo run --example print --features prompt,cli
 #[cu::cli(flags = "inner", preprocess = Args::preprocess)]
 fn main(_: Args) -> cu::Result<()> {
+
+    cu::progress().foo();
+
+
     cu::print!("today's weather is {}", "good");
     cu::hint!("today's weather is {}", "ok");
     cu::info!(

@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.6.10"
+version = "0.7.0"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -59,7 +59,7 @@ version = "1.49.0"
 features = [ "macros", "rt-multi-thread", "time" ]
 
 [features]
-default = []
+default = ["full"]
 full = [
     "coroutine-heavy",
     "cli",
