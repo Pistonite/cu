@@ -97,7 +97,7 @@ pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     }
 
     let message = format!("{message} [y/n]");
-    let _scope = PromptJoinScope;
+    // let _scope = PromptJoinScope;
     loop {
         let recv = {
             let Ok(mut printer) = super::PRINTER.lock() else {
@@ -136,7 +136,7 @@ pub fn __prompt(
     }
     let message = format!("{message}");
     let result = {
-        let _scope = PromptJoinScope;
+        // let _scope = PromptJoinScope;
         let recv = {
             let Ok(mut printer) = super::PRINTER.lock() else {
                 crate::bailand!(error!("prompt failed: global print lock poisoned"));
@@ -150,82 +150,19 @@ pub fn __prompt(
     result.with_context(|| format!("io error while showing the prompt: {message}"))
 }
 
-struct PromptJoinScope;
-impl Drop for PromptJoinScope {
-    fn drop(&mut self) {
-        let handle = {
-            let Ok(mut printer) = super::PRINTER.lock() else {
-                return;
-            };
-            let Some(handle) = printer.take_prompt_task_if_should_join() else {
-                return;
-            };
-            handle
-        };
-        let _: Result<_, _> = handle.join();
-    }
-}
-
-/// A string that will have its inner buffer zeroed when dropped
-#[derive(Default, Clone)]
-pub struct ZeroWhenDropString(String);
-impl ZeroWhenDropString {
-    pub const fn new() -> Self {
-        Self(String::new())
-    }
-}
-impl std::fmt::Display for ZeroWhenDropString {
-    #[inline(always)]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-impl From<String> for ZeroWhenDropString {
-    #[inline(always)]
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-impl AsRef<[u8]> for ZeroWhenDropString {
-    #[inline(always)]
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
-    }
-}
-impl AsRef<String> for ZeroWhenDropString {
-    #[inline(always)]
-    fn as_ref(&self) -> &String {
-        &self.0
-    }
-}
-impl AsRef<str> for ZeroWhenDropString {
-    #[inline(always)]
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-impl Drop for ZeroWhenDropString {
-    #[inline(always)]
-    fn drop(&mut self) {
-        // SAFETY: we don't use the string again
-        for c in unsafe { self.0.as_bytes_mut() } {
-            // SAFETY: c is a valid u8 pointer
-            unsafe { std::ptr::write_volatile(c, 0) };
-        }
-        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
-        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
-    }
-}
-impl std::ops::Deref for ZeroWhenDropString {
-    type Target = String;
-    #[inline(always)]
-    fn deref(&self) -> &String {
-        &self.0
-    }
-}
-impl std::ops::DerefMut for ZeroWhenDropString {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
+// struct PromptJoinScope;
+// impl Drop for PromptJoinScope {
+//     fn drop(&mut self) {
+//         let handle = {
+//             let Ok(mut printer) = super::PRINTER.lock() else {
+//                 return;
+//             };
+//             let Some(handle) = printer.take_print_task_if_should_join() else {
+//                 return;
+//             };
+//             handle
+//         };
+//         let _: Result<_, _> = handle.join();
+//     }
+// }
+//

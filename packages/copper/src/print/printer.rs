@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
+use std::ops::ControlFlow;
 use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::thread::JoinHandle;
-use std::time::Duration;
 
-use super::{FormatBuffer, ProgressBar, ansi};
-
+use crate::print::progress::{BarFormatter, BarResult, ProgressBar};
+use crate::print::{FormatBuffer, TICK_INTERVAL, ansi};
 use crate::{ZeroWhenDropString, lv};
 
 /// Print something
@@ -40,6 +40,7 @@ pub(crate) static PRINTER: LazyLock<Mutex<Printer>> =
 
 /// Global printer state
 pub(crate) struct Printer {
+    is_stdin_terminal: bool,
     /// Handle to stdout
     stdout: std::io::Stdout,
     /// Handle to stderr
@@ -50,14 +51,9 @@ pub(crate) struct Printer {
     controls: ansi::Controls,
 
     // printing
-    /// Handle for the printing task, None means
-    /// either no printing task is running, or, the printing
-    /// task is terminating
-    print_task: PrintThread,
+    print_task: PrintingThread,
     bar_target: Option<Target>,
     bars: Vec<Weak<ProgressBar>>,
-
-    prompt_task: PrintThread,
     pending_prompts: VecDeque<PromptTask>,
 
     /// Buffer for automatically do certain formatting
@@ -78,6 +74,7 @@ impl Default for Printer {
         use std::io::IsTerminal as _;
         let stdout = std::io::stdout();
         let stderr = std::io::stderr();
+        let is_stdin_terminal = std::io::stdin().is_terminal();
         let is_terminal = stdout.is_terminal();
         let bar_target = if is_terminal {
             Some(Target::Stdout)
@@ -90,15 +87,15 @@ impl Default for Printer {
         let controls = ansi::controls(is_terminal);
 
         Self {
+            is_stdin_terminal,
             stdout,
             stderr,
             colors,
             controls,
+
             print_task: Default::default(),
             bar_target,
             bars: Default::default(),
-
-            prompt_task: Default::default(),
             pending_prompts: Default::default(),
 
             format_buffer: FormatBuffer::new(),
@@ -138,26 +135,7 @@ impl Printer {
             self.format_buffer.push_control("-: ");
         }
 
-        // show the prompt
         let (send, recv) = oneshot::channel();
-        if !self.prompt_task.active() {
-            self.prompt_task.join();
-            // erase current line, and print new prompt
-            // this may mess up progress bars - having both prompts
-            // and progress bar is not a good idea anyway
-            use std::io::Write;
-            let _ = write!(
-                self.stdout,
-                "{}{}{}",
-                self.controls.move_to_begin_and_clear,
-                self.buffered,
-                self.format_buffer.as_str()
-            );
-            self.buffered.clear();
-            let _ = self.stdout.flush();
-            self.prompt_task.assign(prompt_task(send, is_password));
-            return recv;
-        }
         #[cfg(feature = "prompt-password")]
         {
             self.pending_prompts.push_back(PromptTask {
@@ -173,6 +151,7 @@ impl Printer {
                 prompt: self.format_buffer.take(),
             });
         }
+        self.start_print_task_if_needed();
         recv
     }
 
@@ -186,18 +165,13 @@ impl Printer {
         }
         // start the bar
         self.bars.push(Arc::downgrade(bar));
+        self.start_print_task_if_needed();
+    }
+
+    fn start_print_task_if_needed(&mut self) {
         if !self.print_task.active() {
             self.print_task.join();
-            // don't use bar if we can't measure terminal size
-            let Some((width, height)) = super::term_width_height() else {
-                return;
-            };
-            let max_bars = (height / 2).saturating_sub(2);
-            // don't use bars if the terminal is too short
-            if max_bars == 0 {
-                return;
-            }
-            self.print_task.assign(print_task(width, max_bars as i32));
+            self.print_task.assign(print_task());
         }
     }
 
@@ -276,19 +250,33 @@ impl Printer {
         self.print_format_buffer();
     }
 
-    /// Format and print a progress bar done message
-    pub(crate) fn print_bar_done(&mut self, message: &str, is_progress_complete: bool) {
+    /// Print a progress bar done message
+    pub(crate) fn print_bar_done(&mut self, result: &BarResult, is_root: bool) {
         if lv::PRINT_LEVEL.get() < lv::Print::Normal {
             return;
         }
-        if is_progress_complete {
-            self.format_buffer
-                .reset(self.colors.gray, self.colors.green);
-            self.format_buffer.push_control(self.colors.green);
-        } else {
-            self.format_buffer
-                .reset(self.colors.gray, self.colors.yellow);
-            self.format_buffer.push_control(self.colors.yellow);
+        if !is_root && self.bar_target.is_some() {
+            // if bar is animated, don't print child's done messages
+            return;
+        }
+        let message = match result {
+            BarResult::DontKeep => return,
+            BarResult::Done(message) => {
+                self.format_buffer
+                    .reset(self.colors.gray, self.colors.green);
+                self.format_buffer.push_control(self.colors.green);
+                message
+            }
+            BarResult::Interrupted(message) => {
+                self.format_buffer
+                    .reset(self.colors.gray, self.colors.yellow);
+                self.format_buffer.push_control(self.colors.yellow);
+                message
+            }
+        };
+        self.format_buffer.push_control("\u{283f}]");
+        if !message.starts_with('[') {
+            self.format_buffer.push_control(" ");
         }
         self.format_buffer.push_str(message);
         self.format_buffer.end();
@@ -296,7 +284,7 @@ impl Printer {
     }
 
     fn print_format_buffer(&mut self) {
-        if !self.prompt_task.active() && self.bars.is_empty() {
+        if !self.print_task.active() {
             use std::io::Write;
             let _ = write!(self.stdout, "{}", self.format_buffer.as_str());
             let _ = self.stdout.flush();
@@ -337,28 +325,31 @@ impl Printer {
         if self.print_task.needs_join {
             return self.print_task.take();
         }
-        // if there are no bars, then eventually the task will end
-        let strong_count = self.bars.iter().filter(|x| x.upgrade().is_some()).count();
-        if strong_count == 0 {
+        // if there are no bars and no prompts, then eventually the task will end
+        // we have to check the strong count and not the bars size, because
+        // we need to force the last bar to join the printing thread before
+        // the program exits
+        let bar_strong_count = self.bars.iter().filter(|x| x.upgrade().is_some()).count();
+        if bar_strong_count == 0 && self.pending_prompts.is_empty() {
             self.print_task.take()
         } else {
             None
         }
     }
-    pub(crate) fn take_prompt_task_if_should_join(&mut self) -> Option<JoinHandle<()>> {
-        if self.prompt_task.needs_join {
-            return self.prompt_task.take();
-        }
-
-        if self.pending_prompts.is_empty() {
-            self.prompt_task.take()
-        } else {
-            None
-        }
-    }
+    // pub(crate) fn take_prompt_task_if_should_join(&mut self) -> Option<JoinHandle<()>> {
+    //     if self.prompt_task.needs_join {
+    //         return self.prompt_task.take();
+    //     }
+    //
+    //     if self.pending_prompts.is_empty() {
+    //         self.prompt_task.take()
+    //     } else {
+    //         None
+    //     }
+    // }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Target {
     /// Print to Stdout
     Stdout,
@@ -366,27 +357,27 @@ enum Target {
     Stderr,
 }
 #[derive(Default)]
-struct PrintThread {
+struct PrintingThread {
     needs_join: bool,
+    /// Handle for the printing task, None means
+    /// either no printing task is running, or, the printing
+    /// task is terminating
     handle: Option<JoinHandle<()>>,
 }
-impl PrintThread {
+impl PrintingThread {
     /// Take the handle for joining
     fn take(&mut self) -> Option<JoinHandle<()>> {
         self.needs_join = false;
         self.handle.take()
     }
-
     /// Mark the task as will end, so it can be joined
     fn mark_join(&mut self) {
         self.needs_join = true;
     }
-
     /// If the task is active
     fn active(&self) -> bool {
         !self.needs_join && self.handle.is_some()
     }
-
     /// Blockingly join the task on the current thread
     fn join(&mut self) {
         self.needs_join = false;
@@ -394,7 +385,6 @@ impl PrintThread {
             let _: Result<_, _> = handle.join();
         }
     }
-
     /// Assign a new handle
     fn assign(&mut self, handle: JoinHandle<()>) {
         self.needs_join = false;
@@ -402,11 +392,9 @@ impl PrintThread {
     }
 }
 
-fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
-    use std::fmt::Write as _;
-
-    // 50ms between each cycle
-    const INTERVAL: Duration = Duration::from_millis(10);
+/// Printing thread that handles progress bar animation and printing during progress bar display
+fn print_task() -> JoinHandle<()> {
+    // progress bar animation chars
     #[rustfmt::skip]
     const CHARS: [char; 30] = [
         '\u{280b}', '\u{280b}', '\u{280b}', '\u{280b}', '\u{280b}', 
@@ -422,13 +410,11 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
     // if drop() is working to prevent holding the lock during sleep
     #[inline(always)]
     fn print_loop(
-        original_width: usize,
-        max_bars: i32,
         tick: u32,
         buffer: &mut String,
         temp: &mut String,
         lines: &mut i32,
-    ) -> std::ops::ControlFlow<()> {
+    ) -> ControlFlow<()> {
         // This won't cause race condition where
         // the return value of start_print_task is put
         // into the handle after the task is ended,
@@ -440,97 +426,148 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
             printer.print_task.mark_join();
         }
         #[inline(always)]
-        fn clear(b: &mut String, lines: i32) {
+        fn clear(b: &mut String, lines: &mut i32) {
             b.clear();
-            b.push_str("\r\x1b[K"); // erase the last spacing line (... and X more)
-            for _ in 0..lines {
+            b.push_str("\r\x1b[K"); // erase the last spacing line
+            for _ in 0..*lines {
                 b.push_str("\x1b[1A\x1b[K"); // move up one line and erase it
             }
+            *lines = 0;
         }
-        clear(buffer, *lines);
-        // scope for locking the printer
-        let Ok(mut printer) = PRINTER.lock() else {
-            return std::ops::ControlFlow::Break(());
-        };
-        if printer.bar_target.is_none() {
-            on_task_end(&mut printer);
-            return std::ops::ControlFlow::Break(());
-        }
-
-        if printer.prompt_task.active() {
-            // don't do anything when there's a prompt,
-            // since that will cause cursor to change position
-            return std::ops::ControlFlow::Continue(());
-        }
-        let now = std::time::Instant::now();
-
-        // remeasure terminal width on every cycle
-        let width = super::term_width().unwrap_or(original_width);
-
-        if printer.bar_target == Some(Target::Stdout) {
-            // add the buffered messages
-            printer.take_buffered(buffer);
-        } else {
-            printer.print_buffered();
-        }
-        // print the bars
-        let mut more_bars = -max_bars;
-        buffer.push_str(printer.colors.yellow);
-        *lines = 0;
-        let anime = CHARS[(tick as usize) % CHARS.len()];
-        let mut ii = 0;
-        printer.bars.retain(|bar| {
-            let Some(bar) = bar.upgrade() else {
-                return false;
+        // first check if there are any pending prompts
+        // scope for locking the printer for checking prompts
+        {
+            let Ok(mut printer) = PRINTER.lock() else {
+                return ControlFlow::Break(());
             };
-            if more_bars < 0 {
-                if width >= 2 {
-                    for _ in 0..ii {
-                        buffer.push(' ');
-                        buffer.push(' ');
-                    }
-                    buffer.push(anime);
-                    buffer.push(']');
-                    bar.format(width - 2 - ii * 2, now, tick, INTERVAL, buffer, temp);
+            let task = printer.pending_prompts.pop_front();
+            let is_stdin_terminal = printer.is_stdin_terminal;
+            if let Some(mut task) = task {
+                use std::io::Write as _;
+                // print the prompt
+                let control = printer.controls.move_to_begin_and_clear;
+                let _ = write!(printer.stdout, "{}{}", control, task.prompt);
+                let _ = printer.stdout.flush();
+
+                // drop the lock while we wait for user input
+                drop(printer);
+                // if there is a prompt, don't clear the previous progress bar yet,
+                // since we want to display the prompt after the progress bars
+
+                // we know the prompt string does not end with a new line (because of
+                // the prompt prefix), so the number of lines to display
+                // is exactly .lines().count()
+                let mut l = task.prompt.lines().count() as i32;
+                // however, if stdin is not terminal, then user won't press enter,
+                // and we actually have 1 fewer line
+                if !is_stdin_terminal {
+                    l = l.saturating_sub(1)
                 }
-                buffer.push('\n');
-                *lines += 1;
-            }
-            ii += 1;
-            more_bars += 1;
+                *lines += l;
+                // process this prompt
+                #[cfg(feature = "prompt-password")]
+                let (result, is_password) = if task.is_password {
+                    (super::prompt_password::read_password(), true)
+                } else {
+                    (read_plaintext(temp), false)
+                };
+                #[cfg(not(feature = "prompt-password"))]
+                let (result, is_password) = (read_plaintext(temp), false);
 
-            true
-        });
+                // clear sensitive information in the memory
+                super::zero_string(temp);
+                // now, re-print the prompt text to the buffer without the prompt prefix
+                if !is_password {
+                    while !task.prompt.ends_with('\n') {
+                        task.prompt.pop();
+                    }
+                    task.prompt.pop(); // pop the final new line
+                }
+                // add the prompt to the print buffer
+                if let Ok(mut printer) = PRINTER.lock() {
+                    printer.buffered.push_str(&task.prompt);
+                    printer.buffered.push('\n');
+                }
+                // send the result of the prompt
+                let _ = task.send.send(result);
 
-        if more_bars > 0 {
-            temp.clear();
-            if write!(temp, "  ... and {more_bars} more").is_err() {
-                temp.clear();
+                // we only process one prompt at a time
             }
-            if width >= temp.len() {
-                buffer.push_str(temp);
-                buffer.push_str(printer.colors.reset);
-                buffer.push('\r');
-            }
-        } else {
-            buffer.push_str(printer.colors.reset);
         }
 
+        // clear previous progress bars and prompts
+        clear(buffer, lines);
+        // lock the printer again for printing progress bars
+        let Ok(mut printer) = PRINTER.lock() else {
+            return ControlFlow::Break(());
+        };
+
+        if let Some(bar_target) = printer.bar_target {
+            // print the bars, after processing buffered messages
+
+            // remeasure terminal width on every cycle
+            let width = super::term_width_or_max();
+
+            if bar_target == Target::Stdout {
+                // add the buffered messages
+                printer.take_buffered(buffer);
+            } else {
+                printer.print_buffered();
+            }
+            // print the bars
+            buffer.push_str(printer.colors.yellow);
+            let anime = CHARS[(tick as usize) % CHARS.len()];
+
+            let mut formatter = BarFormatter {
+                colors: printer.colors,
+                bar_color: printer.colors.yellow,
+                width,
+                tick,
+                now: &mut None,
+                out: buffer,
+                temp,
+            };
+            printer.bars.retain(|bar| {
+                let Some(bar) = bar.upgrade() else {
+                    // bar is done
+                    return false;
+                };
+                if width >= 2 {
+                    formatter.out.push(anime);
+                    formatter.out.push(']');
+                    *lines += bar.format(&mut formatter);
+                } else {
+                    formatter.out.push('\n');
+                    *lines += 1;
+                }
+
+                true
+            });
+        }
+        buffer.push_str(printer.colors.reset);
         printer.print_to_bar_target(buffer);
+        let bars_empty = printer.bars.is_empty();
+        let prompts_empty = printer.pending_prompts.is_empty();
+
+        if bars_empty {
+            // erase the bars
+            clear(buffer, lines);
+            printer.print_to_bar_target(buffer);
+        }
 
         // check exit
-        if printer.bars.is_empty() {
+        if bars_empty && prompts_empty {
+            // nothing else to do, mark the task done,
+            // so the printer knows to join this thread (after we drop the lock guard)
+            // whenever someone calls, instead of posting to this thread
             on_task_end(&mut printer);
-            // erase the bars
-            clear(buffer, *lines);
             // we know the printer buffer is empty
             // because we just printed all of it while having
-            // the lock on the printer
-            printer.print_to_bar_target(buffer);
-            std::ops::ControlFlow::Break(())
-        } else {
-            std::ops::ControlFlow::Continue(())
+            // the lock on the printer, no need to print again
+            return ControlFlow::Break(());
         }
+
+        ControlFlow::Continue(())
     }
 
     std::thread::spawn(move || {
@@ -542,17 +579,10 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
         // how many bars were printed
         let mut lines = 0;
         loop {
-            match print_loop(
-                original_width,
-                max_bars,
-                tick,
-                &mut buffer,
-                &mut temp,
-                &mut lines,
-            ) {
-                std::ops::ControlFlow::Break(_) => break,
+            match print_loop(tick, &mut buffer, &mut temp, &mut lines) {
+                ControlFlow::Break(_) => break,
                 _ => {
-                    std::thread::sleep(INTERVAL);
+                    std::thread::sleep(TICK_INTERVAL);
                     tick = tick.wrapping_add(1);
                 }
             };
@@ -560,53 +590,57 @@ fn print_task(original_width: usize, max_bars: i32) -> JoinHandle<()> {
     })
 }
 
-// note that for interactive io, it's recommended to use blocking io directly
-// on a thread instead of tokio
-fn prompt_task(
-    first_send: oneshot::Sender<std::io::Result<ZeroWhenDropString>>,
-    _is_password: bool,
-) -> JoinHandle<()> {
-    use std::io::Write;
-    let mut stdout = std::io::stdout();
-    std::thread::spawn(move || {
-        let mut send = first_send;
-        let mut _is_password = _is_password;
-        let mut buf = String::new();
-        loop {
-            buf.clear();
-            #[cfg(feature = "prompt-password")]
-            let result = if _is_password {
-                super::prompt_password::read_password()
-            } else {
-                std::io::stdin()
-                    .read_line(&mut buf)
-                    .map(|_| buf.trim().to_string().into())
-            };
-            #[cfg(not(feature = "prompt-password"))]
-            let result = std::io::stdin()
-                .read_line(&mut buf)
-                .map(|_| buf.trim().to_string().into());
-            let _ = send.send(result);
-            let Ok(mut printer) = super::PRINTER.lock() else {
-                break;
-            };
-            let Some(next) = printer.pending_prompts.pop_front() else {
-                printer.prompt_task.mark_join();
-                break;
-            };
-            let _ = write!(
-                stdout,
-                "{}{}{}",
-                printer.controls.move_to_begin_and_clear, printer.buffered, next.prompt
-            );
-            printer.buffered.clear();
-            let _ = stdout.flush();
-            send = next.send;
+// // note that for interactive io, it's recommended to use blocking io directly
+// // on a thread instead of tokio
+// fn prompt_task(
+//     first_send: oneshot::Sender<std::io::Result<ZeroWhenDropString>>,
+//     _is_password: bool,
+// ) -> JoinHandle<()> {
+//     use std::io::Write as _;
+//     let mut stdout = std::io::stdout();
+//     std::thread::spawn(move || {
+//         let mut send = first_send;
+//         let mut _is_password = _is_password;
+//         let mut buf = String::new();
+//         loop {
+//
+//             #[cfg(feature = "prompt-password")]
+//             let result = if _is_password {
+//                 super::prompt_password::read_password()
+//             } else {
+//                 read_plaintext(&mut buf)
+//             };
+//             #[cfg(not(feature = "prompt-password"))]
+//             let result = read_plaintext(&mut buf);
+//
+//             let _ = send.send(result);
+//             let Ok(mut printer) = super::PRINTER.lock() else {
+//                 break;
+//             };
+//             let Some(next) = printer.pending_prompts.pop_front() else {
+//                 printer.prompt_task.mark_join();
+//                 break;
+//             };
+//             let _ = write!(
+//                 stdout,
+//                 "{}{}{}",
+//                 printer.controls.move_to_begin_and_clear, printer.buffered, next.prompt
+//             );
+//             printer.buffered.clear();
+//             let _ = stdout.flush();
+//             send = next.send;
+//
+//             #[cfg(feature = "prompt-password")]
+//             {
+//                 _is_password = next.is_password;
+//             }
+//         }
+//     })
+// }
 
-            #[cfg(feature = "prompt-password")]
-            {
-                _is_password = next.is_password;
-            }
-        }
-    })
+fn read_plaintext(buf: &mut String) -> std::io::Result<ZeroWhenDropString> {
+    buf.clear();
+    std::io::stdin()
+        .read_line(buf)
+        .map(|_| buf.trim().to_string().into())
 }

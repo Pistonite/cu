@@ -41,10 +41,14 @@ pub fn expand(attr: TokenStream, input: TokenStream) -> pm::Result<TokenStream2>
         }
     };
 
-    item.sig.ident = generated_main_name;
+    let old_name = {
+        let mut new_name = generated_main_name;
+        std::mem::swap(&mut new_name, &mut item.sig.ident);
+        new_name
+    };
 
     let expanded = pm::quote! {
-        fn main() -> std::process::ExitCode {
+        fn #old_name() -> std::process::ExitCode {
             unsafe { #main_impl }
         }
         #item

@@ -4,7 +4,8 @@ use std::sync::Arc;
 use spin::mutex::SpinMutex;
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
-use crate::{Atomic, BoxedFuture, ProgressBar, lv::Lv};
+use crate::lv::Lv;
+use crate::{Atomic, BoxedFuture};
 
 use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
@@ -66,7 +67,7 @@ pub fn spinner(name: impl Into<String>) -> Spinner {
         prefix: name.into(),
         config: Arc::new(SpinnerInner {
             lv: Atomic::new_u8(Lv::Off as u8),
-            bar: SpinMutex::new(None),
+            // bar: SpinMutex::new(None),
         }),
     }
 }
@@ -101,12 +102,12 @@ struct SpinnerInner {
     // the bar spawned when calling take() for the first time,
     // using a spin lock because it should be VERY rare that
     // we get contention
-    bar: SpinMutex<Option<Arc<ProgressBar>>>,
+    // bar: SpinMutex<Option<Arc<ProgressBar>>>,
 }
 pub struct SpinnerTask {
     lv: Lv,
     prefix: String,
-    bar: Arc<ProgressBar>,
+    // bar: Arc<ProgressBar>,
     out: Option<ChildStdout>,
     err: Option<ChildStderr>,
 }
@@ -136,58 +137,61 @@ impl ChildOutConfig for Spinner {
         } else {
             String::new()
         };
-        let bar = {
-            let mut bar_arc = self.config.bar.lock();
-            if let Some(bar) = bar_arc.as_ref() {
-                Arc::clone(bar)
-            } else {
-                let bar = crate::progress_unbounded(self.prefix);
-                *bar_arc = Some(Arc::clone(&bar));
-                bar
-            }
-        };
-        Ok(SpinnerTask {
-            lv,
-            prefix: log_prefix,
-            bar,
-            out: if is_out { child.stdout.take() } else { None },
-            err: if !is_out { child.stderr.take() } else { None },
-        })
+        todo!()
+        // let bar = {
+        //     let mut bar_arc = self.config.bar.lock();
+        //     if let Some(bar) = bar_arc.as_ref() {
+        //         Arc::clone(bar)
+        //     } else {
+        //         let bar = crate::progress_unbounded(self.prefix);
+        //         *bar_arc = Some(Arc::clone(&bar));
+        //         bar
+        //     }
+        // };
+        // Ok(SpinnerTask {
+        //     lv,
+        //     prefix: log_prefix,
+        //     bar,
+        //     out: if is_out { child.stdout.take() } else { None },
+        //     err: if !is_out { child.stderr.take() } else { None },
+        // })
     }
 }
 impl ChildOutTask for SpinnerTask {
-    type Output = Arc<ProgressBar>;
+    type Output = Arc<() /*ProgressBar*/>;
 
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output) {
-        let bar = Arc::clone(&self.bar);
-        (Some(Box::pin(self.main())), bar)
+        todo!()
+        // let bar = Arc::clone(&self.bar);
+        // (Some(Box::pin(self.main())), bar)
     }
 }
 impl SpinnerTask {
     async fn main(self) {
-        let bar = self.bar;
-        let lv = self.lv;
-        let prefix = self.prefix;
-        // if we are printing, then let the driver only return the last
-        // line if more than one line is found
-        let mut driver = Driver::new(self.out, self.err, lv == Lv::Off);
-        loop {
-            match driver.next().await {
-                DriverOutput::Line(line) => {
-                    if lv != Lv::Off {
-                        crate::__priv::__print_with_level(lv, format_args!("{prefix}{line}"));
-                        // erase the progress line if we decide to print it out
-                        crate::progress!(&bar, (), "")
-                    } else {
-                        crate::progress!(&bar, (), "{line}")
-                    }
-                }
-                DriverOutput::Progress(line) => {
-                    crate::progress!(&bar, (), "{line}")
-                }
-                DriverOutput::Done => break,
-                _ => {}
-            }
-        }
+        todo!()
+        // let bar = self.bar;
+        // let lv = self.lv;
+        // let prefix = self.prefix;
+        // // if we are printing, then let the driver only return the last
+        // // line if more than one line is found
+        // let mut driver = Driver::new(self.out, self.err, lv == Lv::Off);
+        // loop {
+        //     match driver.next().await {
+        //         DriverOutput::Line(line) => {
+        //             if lv != Lv::Off {
+        //                 crate::__priv::__print_with_level(lv, format_args!("{prefix}{line}"));
+        //                 // erase the progress line if we decide to print it out
+        //                 // crate::progress!(&bar, (), "")
+        //             } else {
+        //                 // crate::progress!(&bar, (), "{line}")
+        //             }
+        //         }
+        //         DriverOutput::Progress(line) => {
+        //             // crate::progress!(&bar, (), "{line}")
+        //         }
+        //         DriverOutput::Done => break,
+        //         _ => {}
+        //     }
+        // }
     }
 }

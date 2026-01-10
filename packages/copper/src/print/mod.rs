@@ -9,6 +9,8 @@ mod format;
 pub use format::*;
 mod progress;
 pub use progress::*;
+mod zero_when_drop;
+pub use zero_when_drop::*;
 
 mod prompt;
 pub use prompt::*;

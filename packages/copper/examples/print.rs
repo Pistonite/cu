@@ -17,10 +17,6 @@ impl Args {
 /// Run with cargo run --example print --features prompt,cli
 #[cu::cli(flags = "inner", preprocess = Args::preprocess)]
 fn main(_: Args) -> cu::Result<()> {
-
-    cu::progress().foo();
-
-
     cu::print!("today's weather is {}", "good");
     cu::hint!("today's weather is {}", "ok");
     cu::info!(
@@ -37,60 +33,76 @@ fn main(_: Args) -> cu::Result<()> {
     cu::info!("you chose to continue!");
 
     {
-        let bar2 = cu::progress_bar(20, "This takes 5 seconds");
-        let bar = cu::progress_unbounded("This is unbounded");
+        let bar2 = cu::progress("This takes 5 seconds").total(20).spawn();
+        let bar = bar2.child("This is unbounded").spawn();
+        // make some fake hierarchy
+        let bar3 = bar.child("level 2").total(3).keep(true).spawn();
+        let bar4 = bar3.child("level 3").total(7).spawn();
+        let bar5 = bar2.child("last").total(9).keep(true).spawn();
         for i in 0..10 {
-            cu::progress!(&bar, (), "step {i}");
-            cu::progress!(&bar2, i, "step {i}");
+            cu::progress!(bar, "step {i}");
+            cu::progress!(bar2 = i, "step {i}");
+            cu::progress!(bar3 += 1, "step {i}");
+            cu::progress!(bar4 += 1, "step {i}");
+            cu::progress!(bar5 += 1, "step {i}");
             cu::debug!("this is debug message\n");
             std::thread::sleep(Duration::from_millis(250));
+
+            if i == 5 {
+                cu::prompt!("what's your favorite fruit?")?;
+            }
         }
-        drop(bar);
+        drop(bar4);
+        drop(bar5);
+        bar.done();
         for i in 0..10 {
-            cu::progress!(&bar2, i + 10, "step {}", i + 10);
+            cu::progress!(bar2 += 1, "step {}", i + 10);
             std::thread::sleep(Duration::from_millis(250));
             cu::print!("doing stuff");
         }
+        cu::progress!(bar2 += 1, "last step");
     }
 
-    let thread1 = std::thread::spawn(|| {
-        cu::set_thread_print_name("t1");
-        let answer = cu::prompt!("from thread 1")?;
-        cu::info!("you entered: {answer}");
-        cu::Ok(())
-    });
-    let thread2 = std::thread::spawn(|| {
-        cu::set_thread_print_name("t2");
-        let answer = cu::prompt!("from thread 2")?;
-        cu::info!("you entered: {answer}");
-        cu::Ok(())
-    });
-    let thread3 = std::thread::spawn(|| {
-        cu::set_thread_print_name("t3");
-        let answer = cu::prompt!("from thread 3")?;
-        cu::info!("you entered: {answer}");
-        cu::Ok(())
-    });
-    let r1 = thread1.join().unwrap();
-    let r2 = thread2.join().unwrap();
-    let r3 = thread3.join().unwrap();
-    r1?;
-    r2?;
-    r3?;
-    cu::info!("all threads joined ok");
+    cu::print!("bars done");
 
-    let command = cu::prompt!("enter command")?;
-    // note: in a real-world application, you would use something like
-    // the `shell_words` crate to split the input
-    let args: AnotherArgs = cu::check!(
-        cu::cli::try_parse(command.split_whitespace()),
-        "error parsing args"
-    )?;
-    cu::print!("parsed args: {args:?}");
-    // note: in a real-world application, this will probably be some subcommand
-    if args.help {
-        cu::cli::print_help::<AnotherArgs>(true);
-    }
+    // let thread1 = std::thread::spawn(|| {
+    //     cu::set_thread_print_name("t1");
+    //     let answer = cu::prompt!("from thread 1")?;
+    //     cu::info!("you entered: {answer}");
+    //     cu::Ok(())
+    // });
+    // let thread2 = std::thread::spawn(|| {
+    //     cu::set_thread_print_name("t2");
+    //     let answer = cu::prompt!("from thread 2")?;
+    //     cu::info!("you entered: {answer}");
+    //     cu::Ok(())
+    // });
+    // let thread3 = std::thread::spawn(|| {
+    //     cu::set_thread_print_name("t3");
+    //     let answer = cu::prompt!("from thread 3")?;
+    //     cu::info!("you entered: {answer}");
+    //     cu::Ok(())
+    // });
+    // let r1 = thread1.join().unwrap();
+    // let r2 = thread2.join().unwrap();
+    // let r3 = thread3.join().unwrap();
+    // r1?;
+    // r2?;
+    // r3?;
+    // cu::info!("all threads joined ok");
+    //
+    // let command = cu::prompt!("enter command")?;
+    // // note: in a real-world application, you would use something like
+    // // the `shell_words` crate to split the input
+    // let args: AnotherArgs = cu::check!(
+    //     cu::cli::try_parse(command.split_whitespace()),
+    //     "error parsing args"
+    // )?;
+    // cu::print!("parsed args: {args:?}");
+    // // note: in a real-world application, this will probably be some subcommand
+    // if args.help {
+    //     cu::cli::print_help::<AnotherArgs>(true);
+    // }
 
     Ok(())
 }

@@ -91,11 +91,8 @@ mod print;
 pub use print::check_password_legality;
 #[cfg(feature = "print")]
 pub use print::{
-    progress,
-    ProgressBarBuilder,
-    ProgressBar, ZeroWhenDropString, init_print_options, log_init, progress_bar, progress_bar_lowp,
-    progress_unbounded, progress_unbounded_lowp, set_thread_print_name, term_width,
-    term_width_height, term_width_or_max,
+    ProgressBar, ProgressBarBuilder, ZeroWhenDropString, init_print_options, log_init, progress,
+    set_thread_print_name, term_width, term_width_height, term_width_or_max,
 };
 
 /// Printing level values

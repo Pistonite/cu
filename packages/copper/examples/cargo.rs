@@ -12,15 +12,14 @@ struct Cli {
 #[cu::cli(flags = "common")]
 fn main(args: Cli) -> cu::Result<()> {
     cu::info!("invoking cargo");
-    cu::which("cargo")?
+    let (child, bar) = cu::which("cargo")?
         .command()
         .args(["build"])
-        .name("cargo build")
         .current_dir(args.path)
         .add(cu::color_flag())
-        .preset(cu::pio::cargo())
-        .spawn()?
-        .0
-        .wait_nz()?;
+        .preset(cu::pio::cargo("cargo build"))
+        .spawn()?;
+    child.wait_nz()?;
+    bar.done();
     Ok(())
 }
