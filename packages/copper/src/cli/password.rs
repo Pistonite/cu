@@ -118,13 +118,13 @@ mod windows {
 
             // Get the old mode so we can reset back to it when we are done
             if unsafe { GetConsoleMode(handle, &mut mode as *mut CONSOLE_MODE) } == 0 {
-                return Err(std::io::Error::last_os_error());
+                return Err(io::Error::last_os_error());
             }
 
             // We want to be able to read line by line, and we still want backspace to work
             let new_mode_flags = ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT;
             if unsafe { SetConsoleMode(handle, new_mode_flags) } == 0 {
-                return Err(std::io::Error::last_os_error());
+                return Err(io::Error::last_os_error());
             }
 
             Ok(HiddenInput { mode, handle })
@@ -141,7 +141,7 @@ mod windows {
     }
 
     /// Reads a password from the TTY
-    pub fn read_password() -> std::io::Result<crate::ZeroWhenDropString> {
+    pub fn read_password() -> io::Result<crate::ZString> {
         let handle = unsafe {
             CreateFileA(
                 c"CONIN$".as_ptr() as PCSTR,
@@ -155,7 +155,7 @@ mod windows {
         };
 
         if handle == INVALID_HANDLE_VALUE {
-            return Err(std::io::Error::last_os_error());
+            return Err(io::Error::last_os_error());
         }
 
         let mut stream = BufReader::new(unsafe { std::fs::File::from_raw_handle(handle as _) });
@@ -166,8 +166,8 @@ mod windows {
     fn read_password_from_handle_with_hidden_input(
         reader: &mut impl BufRead,
         handle: HANDLE,
-    ) -> io::Result<crate::ZeroWhenDropString> {
-        let mut password = crate::ZeroWhenDropString::default();
+    ) -> io::Result<crate::ZString> {
+        let mut password = crate::ZString::default();
         {
             let _hidden_input = HiddenInput::new(handle)?;
             reader.read_line(&mut password)?;
