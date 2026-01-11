@@ -27,11 +27,26 @@ impl OsStrExtension for OsStr {
 
 impl OsStrExtension for Path {
     #[inline(always)]
-    fn as_utf8(&self) -> crate::Result<&str> {
+    fn as_utf8(&self) -> cu::Result<&str> {
         self.as_os_str().as_utf8()
     }
 }
 
+impl OsStrExtensionOwned for OsString {
+    #[inline(always)]
+    fn into_utf8(self) -> cu::Result<String> {
+        match self.into_string() {
+            Ok(s) => Ok(s),
+            Err(e) => cu::bail!("not utf-8: {e:?}"),
+        }
+    }
+}
+impl OsStrExtensionOwned for PathBuf {
+    #[inline(always)]
+    fn into_utf8(self) -> cu::Result<String> {
+        self.into_os_string().into_utf8()
+    }
+}
 #[cfg(all(test, unix))]
 mod test {
     use std::os::unix::ffi::OsStrExt as _;
@@ -52,3 +67,31 @@ mod test {
     }
 }
 
+#[cfg(all(test, windows))]
+mod test {
+    use std::os::windows::ffi::OsStringExt as _;
+    use super::*;
+    #[test]
+    fn test_not_utf8() {
+        let wide: &[u16] = &[0x0068, 0x0065, 0x006C, 0x006C, 0x006F, 0xD800, 0x0077, 0x006F, 0x0072, 0x006C, 0x0064];
+        let s = OsString::from_wide(wide);
+        let result = s.as_utf8().unwrap_err().to_string();
+        assert_eq!(result, r#"not utf-8: "hello\u{d800}world""#);
+        let result = Path::new(&s).as_utf8().unwrap_err().to_string();
+        assert_eq!(result, r#"not utf-8: "hello\u{d800}world""#);
+
+        let result = s.clone().into_utf8().unwrap_err().to_string();
+        assert_eq!(result, r#"not utf-8: "hello\u{d800}world""#);
+        let result = PathBuf::from(s).into_utf8().unwrap_err().to_string();
+        assert_eq!(result, r#"not utf-8: "hello\u{d800}world""#);
+    }
+    #[test]
+    fn test_utf8() {
+        let wide: &[u16] = &[0x0068, 0x0065, 0x006C, 0x006C, 0x006F, 0x0020, 0x0077, 0x006F, 0x0072, 0x006C, 0x0064];
+        let s = OsString::from_wide(wide);
+        assert!(s.as_utf8().is_ok());
+        assert!(Path::new(&s).as_utf8().is_ok());
+        assert!(s.clone().into_utf8().is_ok());
+        assert!(PathBuf::from(s).into_utf8().is_ok());
+    }
+}

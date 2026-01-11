@@ -4,7 +4,7 @@ mod byte_format;
 pub use byte_format::ByteFormat;
 
 mod osstring;
-pub use osstring::OsStrExtension;
+pub use osstring::{OsStrExtension, OsStrExtensionOwned};
 
 
 // path requires fs since there are utils that checks for existence
