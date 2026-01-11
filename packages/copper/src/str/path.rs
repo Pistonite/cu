@@ -3,10 +3,45 @@ use std::path::{Path, PathBuf};
 
 use crate::Context as _;
 
-/// Extension to paths
+/// # File System Paths and Strings
+/// Rust works with [`String`](std::string)s, which are UTF-8 encoded bytes.
+/// However, not all operating systems work with UTF-8. That's why Rust has 
+/// [`OsString`](std::ffi::OsString), which has platform-specific implementations.
+/// And `PathBuf`s are wrappers for `OsString`.
 ///
-/// Most of these are related to file system, and not purely path processing.
-/// Therefore this is tied to the `fs` feature.
+/// However, often when writing platform-independent code, we want to stay
+/// in the UTF-8 realm, but conversion can be painful because you must handle
+/// the error when the `OsString` is not valid UTF-8.
+///
+/// ```rust
+/// # use pistonite_cu as cu;
+/// use std::ffi::{OsString, OsStr};
+///
+/// use cu::pre::*;
+///
+/// fn take_os_string(s: &OsStr) -> cu::Result<()> {
+///     match s.to_str() {
+///         Some(s) => {
+///             cu::info!("valid utf-8: {s}");
+///             Ok(())
+///         }
+///         None => {
+///             cu::bail!("not valid utf-8!");
+///         }
+///     }
+/// }
+/// ```
+///
+/// `cu` provides extension traits that integrates with `cu::Result`,
+/// so you can have the error handling by simply propagate with `?`.
+///
+/// There are 4 traits, all will be included into scope with `use cu::pre::*;`.
+/// The path extensions also have utilities for working with file system specifically,
+/// (such as normalizing it), which is why they require the `fs` feature.
+///
+/// - [`OsStrExtension`]
+/// - [`OsStrExtensionOwned`]
+/// - `PathExtension` - requires `fs` feature
 pub trait PathExtension {
     /// Get file name. Error if the file name is not UTF-8 or other error occurs
     fn file_name_str(&self) -> crate::Result<&str>;

@@ -65,6 +65,7 @@
 //! - [Progress Bars](fn@crate::progress)
 //! - [Prompting](macro@crate::prompt)
 //! - [Coroutines (Async)](mod@crate::co) (via [`tokio`](https://docs.rs/tokio))
+//! - [File System Paths and Strings](trait@crate::PathExtension)
 //!
 //! # Feature Reference:
 //! - `fs`: Enables file system utils. See [`cu::fs`](module@fs) and [`cu::bin`](module@bin).
@@ -80,7 +81,8 @@ extern crate self as cu;
 
 // --- Basic stuff (no feature needed) ---
 pub mod str;
-pub use str::*;
+pub use str::{ZString, ByteFormat};
+
 mod env_var;
 pub use env_var::*;
 mod atomic; // Atomic helpers
@@ -167,9 +169,9 @@ pub mod pre {
     #[cfg(feature = "parse")]
     pub use crate::ParseTo as _;
     #[cfg(feature = "fs")]
-    pub use crate::PathExtension as _;
+    pub use crate::str::PathExtension as _;
     #[cfg(feature = "fs")]
-    pub use crate::PathExtensionOwned as _;
+    pub use crate::str::PathExtensionOwned as _;
     #[cfg(feature = "process")]
     pub use crate::Spawn as _;
     #[cfg(feature = "json")]

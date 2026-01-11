@@ -6,7 +6,7 @@ use tokio::process::{Child as TokioChild, Command as TokioCommand};
 
 use super::{Child, ChildIo, Config, Preset};
 
-use crate::{Context as _, PathExtension as _, co, pio};
+use crate::{Context as _, str::PathExtension as _, co, pio};
 
 /// A [`Command`] to be built
 pub type CommandBuilder = Command<(), (), ()>;

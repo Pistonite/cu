@@ -39,7 +39,8 @@ impl AsRef<str> for ZString {
 impl Drop for ZString {
     #[inline(always)]
     fn drop(&mut self) {
-        zero_string(&mut self.0)
+        // safety: we are dropped
+        unsafe { do_zero(&mut self.0) }
     }
 }
 impl std::ops::Deref for ZString {
@@ -57,8 +58,15 @@ impl std::ops::DerefMut for ZString {
 }
 
 /// Write 0's to the internal buffer of the string
-pub fn zero_string(s: &mut String) {
+#[inline(always)]
+pub fn zero(s: &mut String) {
     let mut s = std::mem::take(s);
+    // safety: s is dropped afterwards when going out of scope
+    unsafe { do_zero(&mut s) }
+}
+
+// Safety: the string must be dropped afterwards
+unsafe fn do_zero(s: &mut String) {
     // SAFETY: we don't use the string again
     for c in unsafe { s.as_bytes_mut() } {
         // SAFETY: c is a valid u8 pointer

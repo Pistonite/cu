@@ -385,7 +385,7 @@ fn print_task() -> JoinHandle<()> {
                 let (result, is_password) = (read_plaintext(temp), false);
 
                 // clear sensitive information in the memory
-                crate::zero_string(temp);
+                crate::str::zero(temp);
                 // now, re-print the prompt text to the buffer without the prompt prefix
                 if !is_password {
                     while !task.prompt.ends_with('\n') {
