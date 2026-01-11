@@ -3,6 +3,8 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 use tokio::task::{JoinError, JoinHandle};
 
+use crate::co::{co_util, runtime};
+
 /// Join handle for async task
 ///
 /// This is a wrapper around `tokio`'s `JoinHandle` type.
@@ -43,7 +45,7 @@ impl<T> Handle<T> {
     /// Use [`co_join().await`](`Self::co_join`) instead.
     #[inline]
     pub fn join(self) -> crate::Result<T> {
-        Self::handle_error(super::foreground().block_on(self.0))
+        Self::handle_error(runtime::foreground().block_on(self.0))
     }
 
     /// Wait for the task asynchronously
@@ -67,7 +69,7 @@ impl<T> Handle<T> {
     /// Use [`co_join_maybe_aborted().await`](`Self::co_join_maybe_aborted`) instead.
     #[inline]
     pub fn join_maybe_aborted(self) -> crate::Result<Option<T>> {
-        Self::handle_error_maybe_aborted(super::foreground().block_on(self.0))
+        Self::handle_error_maybe_aborted(runtime::foreground().block_on(self.0))
     }
 
     /// Like [`co_join`](Self::co_join), but returns `None` if the task was aborted.
@@ -90,7 +92,7 @@ impl<T> Handle<T> {
             Ok(x) => return Ok(Some(x)),
             Err(e) => e,
         };
-        super::handle_join_error(e)?;
+        co_util::handle_join_error(e)?;
         Ok(None)
     }
 }
@@ -249,7 +251,7 @@ impl<T> RobustHandle<T> {
     /// Use [`co_join_maybe_aborted_robust().await`](`Self::co_join_maybe_aborted_robust`) instead.
     pub fn join_maybe_aborted_robust(self) -> crate::Result<Result<T, Option<T>>> {
         Self::handle_error_maybe_aborted_robust(
-            super::foreground().block_on(self.inner.0),
+            runtime::foreground().block_on(self.inner.0),
             &self.aborted,
         )
     }
@@ -281,7 +283,7 @@ impl<T> RobustHandle<T> {
         if Self::check_aborted(aborted) {
             return Ok(Err(None));
         }
-        super::handle_join_error(e)?;
+        co_util::handle_join_error(e)?;
         Ok(Err(None))
     }
 

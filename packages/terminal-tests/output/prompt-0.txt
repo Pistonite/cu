@@ -1,12 +1,7 @@
 $ -y --non-interactive
 STDOUT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 H] testing prompts^LF
-E] prompt not allowed in non-interactive mode: what's your f^LF
- | avorite programming language?^LF
-E] fatal: prompt not allowed in non-interactive mode: what's^LF
- |  your favorite programming language?^LF
-H] use -vv or set RUST_BACKTRACE=1 to display the error back^LF
- | trace.^LF
+E] fatal: prompt not allowed with --non-interactive^LF
 I] finished in 0.00s^LF
 ^<EOF
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

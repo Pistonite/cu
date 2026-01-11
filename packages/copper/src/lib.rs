@@ -60,14 +60,13 @@
 //! # Quick Reference
 //! - [Error Handling](macro@crate::check) (via [`anyhow`](https://docs.rs/anyhow))
 //! - [Logging](mod@crate::lv) (via [`log`](https://docs.rs/log))
-//! - [Printting and Command Line Interface](mod@crate::cli) (CLI arg parsing via
+//! - [Printing and Command Line Interface](mod@crate::cli) (CLI arg parsing via
 //!   [`clap`](https://docs.rs/clap))
 //! - [Progress Bars](fn@crate::progress)
 //! - [Prompting](macro@crate::prompt)
+//! - [Coroutines (Async)](mod@crate::co) (via [`tokio`](https://docs.rs/tokio))
 //!
 //! # Feature Reference:
-//! - `coroutine` and `coroutine-heavy`:
-//!   Enables `async` and integration with `tokio`. See [`cu::co`](module@co).
 //! - `fs`: Enables file system utils. See [`cu::fs`](module@fs) and [`cu::bin`](module@bin).
 //! - `process`: Enables utils spawning child process. See [`Command`].
 //! - `parse`, `json`, `yaml`, `toml`:
@@ -92,6 +91,7 @@ pub use misc::*;
 // --- Error Handling (no feature needed) ---
 mod error_handling;
 pub use error_handling::*;
+pub use pistonite_cu_proc_macros::context;
 
 // --- Logging (no feature needed) ---
 pub mod lv;
@@ -106,6 +106,14 @@ pub use cli::password_chars_legal;
 pub use cli::{ProgressBar, ProgressBarBuilder, progress};
 #[cfg(feature = "cli")]
 pub use pistonite_cu_proc_macros::cli;
+
+// --- Async (coroutine/coroutine-heavy) ---
+/// Alias for a boxed future
+pub type BoxedFuture<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send + 'static>>;
+#[cfg(feature = "coroutine")]
+pub mod co;
+#[cfg(feature = "coroutine")]
+pub use co::{join, select, try_join};
 
 #[cfg(feature = "process")]
 mod process;
@@ -124,13 +132,6 @@ pub use bin::which;
 #[cfg(feature = "fs")]
 pub mod fs;
 
-#[cfg(feature = "coroutine")]
-mod async_;
-/// Alias for a boxed future
-pub type BoxedFuture<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send + 'static>>;
-#[cfg(feature = "coroutine")]
-pub mod co;
-
 /// Parsing utilities
 #[cfg(feature = "parse")]
 mod parse;
@@ -138,11 +139,6 @@ mod parse;
 pub use parse::*;
 #[cfg(feature = "parse")]
 pub use pistonite_cu_proc_macros::Parse;
-
-// re-exports from libraries
-pub use pistonite_cu_proc_macros::error_ctx;
-#[cfg(feature = "coroutine")]
-pub use tokio::{join, select, try_join};
 
 #[doc(hidden)]
 pub mod __priv {
@@ -164,6 +160,9 @@ pub mod pre {
 
     #[cfg(feature = "cli")]
     pub use crate::lib::clap;
+
+    #[cfg(feature = "coroutine")]
+    pub use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
 
     #[cfg(feature = "parse")]
     pub use crate::ParseTo as _;
@@ -191,7 +190,4 @@ pub mod pre {
         LowerHex as DisplayLowerHex, Octal as DisplayOctal, Pointer as DisplayPointer,
         UpperExp as DisplayUpperExp, UpperHex as DisplayUpperHex,
     };
-
-    #[cfg(feature = "coroutine")]
-    pub use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _};
 }

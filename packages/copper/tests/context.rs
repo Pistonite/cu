@@ -12,7 +12,7 @@ Caused by:
     )
 }
 
-#[cu::error_ctx("failed with arg {arg}")]
+#[cu::context("failed with arg {arg}")]
 fn example1(arg: u32) -> cu::Result<()> {
     cu::bail!("example1")
 }
@@ -31,7 +31,7 @@ Caused by:
 
 // 'pre' is needed because s is moved into the function
 // so the error message needs to be formatted before running the function
-#[cu::error_ctx(pre, format("failed with arg {s}"))]
+#[cu::context(pre, format("failed with arg {s}"))]
 fn example2(s: String) -> cu::Result<()> {
     cu::bail!("example2: {s}")
 }
@@ -54,7 +54,7 @@ async fn test_example3_ok() {
 }
 
 // question mark works as expected (context is added at return time)
-#[cu::error_ctx("async failed with arg {}", s)]
+#[cu::context("async failed with arg {}", s)]
 async fn example3(s: u32) -> cu::Result<()> {
     let value = returns_ok(s)?;
     cu::ensure!(value > 4)?;
@@ -79,7 +79,7 @@ async fn test_example4_ok() {
 }
 
 // question mark works as expected (context is added at return time)
-#[cu::error_ctx(pre, format("async failed with arg {s}"))]
+#[cu::context(pre, format("async failed with arg {s}"))]
 async fn example4(s: String) -> cu::Result<()> {
     let value = returns_ok(s)?;
     cu::ensure!(!value.is_empty())?;
@@ -101,7 +101,7 @@ Caused by:
 // associated functions also work
 struct Foo(u32);
 impl Foo {
-    #[cu::error_ctx("Foo failed with arg {}", self.0)]
+    #[cu::context("Foo failed with arg {}", self.0)]
     fn example5(&self) -> cu::Result<()> {
         cu::bail!("example5")
     }

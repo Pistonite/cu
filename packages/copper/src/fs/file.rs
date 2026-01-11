@@ -207,7 +207,7 @@ async fn co_remove_impl(path: &Path) -> crate::Result<()> {
 pub fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> crate::Result<()> {
     rename_impl(from.as_ref(), to.as_ref())
 }
-#[crate::error_ctx("failed to rename '{}' to '{}'", from.display(), to.display())]
+#[crate::context("failed to rename '{}' to '{}'", from.display(), to.display())]
 fn rename_impl(from: &Path, to: &Path) -> crate::Result<()> {
     crate::trace!("rename: '{}' to '{}'", from.display(), to.display());
     let Ok(from_meta) = from.metadata() else {

@@ -6,7 +6,7 @@ H] testing prompts^LF
 -: ^CR
 \x1B[K\x1B[1A\x1B[K!] continue? [y/n]^LF
 ^CR
-\x1B[KE] please enter yes or no^LF
+\x1B[KH] please enter yes or no^LF
 ^CR
 \x1B[K!] continue? [y/n]^LF
 -: ^CR

@@ -314,7 +314,7 @@ async fn co_read_dir_impl(path: &Path) -> crate::Result<CoReadDir> {
 pub fn rec_copy_inefficiently(from: impl AsRef<Path>, to: impl AsRef<Path>) -> crate::Result<()> {
     rec_copy_inefficiently_impl(from.as_ref(), to.as_ref())
 }
-#[crate::error_ctx("failed to copy '{}' to '{}'", from.display(), to.display())]
+#[crate::context("failed to copy recursively copy '{}' to '{}'", from.display(), to.display())]
 fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
     crate::trace!(
         "rec_copy_inefficiently from='{}' to='{}'",

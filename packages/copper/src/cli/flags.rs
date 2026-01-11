@@ -146,6 +146,9 @@ pub unsafe fn __co_run<
 ) -> std::process::ExitCode {
     let start = std::time::Instant::now();
     let args = unsafe { parse_args_or_help::<TArg, FPreproc, FFlag>(fn_preproc, fn_flag) };
+    #[cfg(not(feature = "coroutine-heavy"))]
+    let result = crate::co::block(async move { fn_execute(args).await });
+    #[cfg(feature = "coroutine-heavy")]
     let result = crate::co::run(async move { fn_execute(args).await });
 
     handle_result(start, result)

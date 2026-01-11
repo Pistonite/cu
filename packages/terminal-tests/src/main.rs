@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::process::ExitStatus;
 use std::sync::Arc;
+use std::time::Duration;
 
 use cu::pre::*;
 
@@ -19,7 +20,7 @@ struct Cli {
     /// Prompt instead of using pre-configured stdin
     #[clap(short = 'i', long, requires = "test", conflicts_with = "update")]
     inherit_stdin: bool,
-    
+
     #[clap(flatten)]
     flags: cu::cli::Flags,
 }
@@ -48,9 +49,10 @@ async fn main(args: Cli) -> cu::Result<()> {
                 let stdin = test_case.stdin.as_ref().cloned().unwrap_or_default();
                 let feature = format!("__test-{example_name},common");
                 cu::print!("TEST OUTPUT >>>>>>>>>>>>>>>>>>>>>>>>>>");
-                let command_builder = 
-                 cu::which("cargo")?
+                let command_builder = cu::which("cargo")?
                     .command()
+                    // don't include warnings in the output
+                    .env("RUSTFLAGS", "-Awarnings")
                     .args([
                         "run",
                         "-q",
@@ -65,13 +67,12 @@ async fn main(args: Cli) -> cu::Result<()> {
                     .stdout_inherit()
                     .stderr_inherit();
                 let exit_status = if args.inherit_stdin {
-                    command_builder.stdin_inherit()
-                    .co_wait()
-                    .await?
+                    command_builder.stdin_inherit().co_wait().await?
                 } else {
-                    command_builder.stdin(cu::pio::write(stdin))
-                    .co_wait()
-                    .await?
+                    command_builder
+                        .stdin(cu::pio::write(stdin))
+                        .co_wait()
+                        .await?
                 };
                 cu::print!("TEST OUTPUT <<<<<<<<<<<<<<<<<<<<<<<<<<");
                 cu::print!("STATUS: {exit_status}");
@@ -95,6 +96,7 @@ struct TestTarget {
 struct TestCase {
     stdin: Option<Vec<u8>>,
     args: Vec<String>,
+    skip: bool,
 }
 
 fn find_tests() -> cu::Result<Vec<TestTarget>> {
@@ -128,6 +130,10 @@ fn parse_test_cases(path: &Path) -> cu::Result<Vec<TestCase>> {
         let Some(line) = line.strip_prefix("// $") else {
             break;
         };
+        let (line, skip) = match line.strip_prefix("-") {
+            None => (line, false),
+            Some(line) => (line, true),
+        };
         let mut args = cu::check!(
             shell_words::split(line.trim()),
             "failed to parse command line: {line}"
@@ -144,7 +150,7 @@ fn parse_test_cases(path: &Path) -> cu::Result<Vec<TestCase>> {
                 args.pop();
             }
         }
-        test_cases.push(TestCase { args, stdin });
+        test_cases.push(TestCase { args, stdin, skip });
     }
     Ok(test_cases)
 }
@@ -208,18 +214,25 @@ async fn run_test_targets(targets: Vec<TestTarget>, update: bool) -> cu::Result<
             "unexpected: cannot find test cases"
         )?;
 
-        for (index, test_cases) in target.test_cases.iter().enumerate() {
+        for (index, test_case) in target.test_cases.iter().enumerate() {
             let example_name = example_name.clone();
-            let args = test_cases.args.clone();
-            let stdin = test_cases.stdin.clone().unwrap_or_default();
+            if test_case.skip {
+                cu::warn!("skipping {example_name}-{index}");
+                cu::progress!(test_bar += 1);
+                continue;
+            }
+            let args = test_case.args.clone();
+            let stdin = test_case.stdin.clone().unwrap_or_default();
             let test_bar = Arc::clone(&test_bar);
 
             let handle = test_pool.spawn(async move {
                 let feature = format!("__test-{example_name},common");
                 let command = shell_words::join(&args);
                 let child_bar = test_bar.child(format!("{example_name}: {command}")).spawn();
-                let (child, stdout, stderr) = cu::which("cargo")?
+                let (mut child, stdout, stderr) = cu::which("cargo")?
                     .command()
+                    // don't include warnings in the output
+                    .env("RUSTFLAGS", "-Awarnings")
                     .args([
                         "run",
                         "-q",
@@ -236,7 +249,10 @@ async fn run_test_targets(targets: Vec<TestTarget>, update: bool) -> cu::Result<
                     .stdin(cu::pio::write(stdin))
                     .co_spawn()
                     .await?;
-                let status = child.co_wait().await?;
+                let status = child.co_wait_timeout(Duration::from_secs(10)).await?;
+                if status.is_none() {
+                    child.co_kill().await?;
+                }
                 child_bar.done();
                 let stdout = stdout.co_join().await??;
                 let stderr = stderr.co_join().await??;
@@ -277,7 +293,7 @@ fn decode_output_streams(
     command: &str,
     stdout: Vec<u8>,
     stderr: Vec<u8>,
-    status: ExitStatus,
+    status: Option<ExitStatus>,
 ) -> String {
     use std::fmt::Write as _;
     let mut out = String::new();
@@ -291,7 +307,14 @@ fn decode_output_streams(
     decode_output_stream(&mut out, &stderr);
     out.push_str("^<EOF\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
 
-    let _ = write!(out, "status: {status}\n");
+    match status {
+        Some(status) => {
+            let _ = write!(out, "status: {status}\n");
+        }
+        None => {
+            let _ = write!(out, "timed out\n");
+        }
+    }
 
     out
 }

@@ -15,7 +15,10 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
 
     let expected = "rust";
     let answer = cu::prompt_validate!(
-        ("what's your favorite programming language? please answer {}", expected),
+        (
+            "what's your favorite programming language? please answer {}",
+            expected
+        ),
         |answer| {
             if answer == expected {
                 return Ok(true);
@@ -28,17 +31,15 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
         }
     )?;
     cu::ensure!(answer == expected)?;
-let mut index: i32 = 0;
-cu::prompt_validate!(
-    "select a number between 0 and 5",
-    |answer| {
+    let mut index: i32 = 0;
+    cu::prompt_validate!("select a number between 0 and 5", |answer| {
         let number = match cu::parse::<i32>(answer) {
             Err(e) => {
                 cu::error!("{e}");
                 cu::hint!("please ensure you are entering a number");
                 return Ok(false);
             }
-            Ok(x) => x
+            Ok(x) => x,
         };
         if number < 0 {
             cu::error!("the number you entered is too small");
@@ -50,31 +51,30 @@ cu::prompt_validate!(
         }
         index = number;
         Ok(true)
-    }
-)?;
-cu::info!("index is {index}");
+    })?;
+    cu::info!("index is {index}");
 
-let password = cu::prompt_password_validate!(
-    "please enter a password between 8 and 16 charactres and only contain sensible characters",
-    |answer| {
-        if answer == "123456" {
-            cu::bail!("how can you do that, bye");
+    let password = cu::prompt_password_validate!(
+        "please enter a password between 8 and 16 charactres and only contain sensible characters",
+        |answer| {
+            if answer == "123456" {
+                cu::bail!("how can you do that, bye");
+            }
+            if answer.len() < 8 {
+                cu::error!("password is too short");
+                return Ok(false);
+            }
+            if answer.len() > 16 {
+                cu::error!("password is too long");
+                return Ok(false);
+            }
+            if let Err(e) = cu::password_chars_legal(answer) {
+                cu::error!("invalid password: {e}");
+                return Ok(false);
+            }
+            Ok(true)
         }
-        if answer.len() < 8 {
-            cu::error!("password is too short");
-            return Ok(false);
-        }
-        if answer.len() > 16 {
-            cu::error!("password is too long");
-            return Ok(false);
-        }
-        if let Err(e) = cu::password_chars_legal(answer) {
-            cu::error!("invalid password: {e}");
-            return Ok(false);
-        }
-        Ok(true)
-    }
-)?;
-cu::print!("{password}");
+    )?;
+    cu::print!("{password}");
     Ok(())
 }

@@ -2,7 +2,7 @@ use std::sync::{Arc, Weak};
 
 use tokio::sync::Semaphore;
 
-use super::{AbortHandle, Handle};
+use crate::co::{AbortHandle, Handle, co_util, runtime};
 
 /// Create a new [`Pool`].
 ///
@@ -227,7 +227,7 @@ impl<T: Send + 'static> Set<T> {
                 drop(abort_handle);
                 result
             },
-            super::background().handle(),
+            runtime::background().handle(),
         );
     }
 
@@ -246,7 +246,7 @@ impl<T: Send + 'static> Set<T> {
     pub async fn next(&mut self) -> Option<crate::Result<T>> {
         let result = self.join_set.join_next().await?;
         match result {
-            Err(join_error) => match super::handle_join_error(join_error) {
+            Err(join_error) => match co_util::handle_join_error(join_error) {
                 Err(e) => Some(Err(e)),
                 Ok(_) => Some(Err(crate::fmterr!("aborted"))),
             },
@@ -263,6 +263,6 @@ impl<T: Send + 'static> Set<T> {
     /// Use [`next().await`](`Self::next`) instead.
     #[inline]
     pub fn block(&mut self) -> Option<crate::Result<T>> {
-        super::foreground().block_on(async move { self.next().await })
+        runtime::foreground().block_on(async move { self.next().await })
     }
 }

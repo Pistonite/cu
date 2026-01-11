@@ -55,6 +55,65 @@ pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail};
 /// Finally, if you do need to panic, [`cu::panicand`](macro@crate::panicand)
 /// allows you to also log the same message so you can debug it easier.
 ///
+/// # Context (To `check` or not to `check`)
+/// It is tricky to determine if you should wrap the result
+/// with a `check!`, or just propagate it with a `?`.
+/// Ultimately, there is no correct answer (you may say it is contextual).
+/// Another way of phrasing the same question is if the context
+/// should be added by the caller or the callee.
+///
+/// The principle I personally follow is the caller should only `check!`
+/// if there are additional information in the caller's context
+/// that the callee does not already know. The information that both
+/// the callee and caller have access to is:
+/// - The function parameters
+/// - The name of the call
+/// - The behavior of the function
+///
+/// These make up the API of the function.
+///
+/// For example, I will write the following code
+/// ```rust
+/// # use pistonite_cu as cu;
+/// use cu::pre::*;
+///
+/// fn process_paths(paths: &[&str]) -> cu::Result<()> {
+///     cu::info!("processing paths...");
+///     for (i, path) in paths.iter().enumerate() {
+///         // here there might be some candidates for context:
+///         // - "failed to save important value to '{path}'"
+///         //   - the callee knows the current context is saving
+///         //     "important value" to "path" (from function name and parameter),
+///         //     therefore this message does not add additional context
+///         // - "process paths failed on '{path}'"
+///         //   - this could work in some cases, but here I know
+///         //     cu would already log the path if it fails
+///         // - here I choose to log {i} which might help me finding the erroreous
+///         //   path from some kind of data set.
+///         cu::check!(save_important_value_to(path), "failed to process {i}th path")?;
+///     }
+///     Ok(())
+/// }
+///
+/// fn save_important_value_to(path: &str) -> cu::Result<()> {
+///     // here, the only information I have that cu::fs::write
+///     // does not have, is "important value" is "some random thing".
+///     // this is not an important context to log to the error,
+///     // so I choose to simply ?
+///     cu::fs::write(path, "some random thing")?;
+///     Ok(())
+/// }
+/// ```
+///
+/// With that said, now we can introduce [`cu::context`](macro@crate::context),
+/// which wraps a function and append a formatted context to it.
+/// This is a double-edge sword. You could end up with unnecessarily bloated
+/// error stack if you put too much context. However,
+/// it can be extremely useful in a complex function with many possible error paths
+/// to add context for what the overall failure is.
+///
+/// If you find yourself writing the same `check!` to every invocation of some function.
+/// Considering using it. However, I would not use this on any public API of your code.
 #[macro_export]
 macro_rules! check {
     ($result:expr, $($args:tt)*) => {{

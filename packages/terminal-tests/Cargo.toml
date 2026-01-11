@@ -23,4 +23,3 @@ common = ["cu/__test", "cu/cli"]
 
 __test-print_levels = []
 __test-prompt = ["cu/prompt"]
-__test-prompt_password = ["cu/prompt-password"]

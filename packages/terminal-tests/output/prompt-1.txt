@@ -1,11 +1,7 @@
 $ --non-interactive
 STDOUT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 H] testing prompts^LF
-E] prompt not allowed in non-interactive mode: continue?^LF
-E] fatal: prompt not allowed in non-interactive mode: contin^LF
- | ue?^LF
-H] use -vv or set RUST_BACKTRACE=1 to display the error back^LF
- | trace.^LF
+E] fatal: prompt not allowed with --non-interactive^LF
 I] finished in 0.00s^LF
 ^<EOF
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
