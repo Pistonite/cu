@@ -1,28 +1,25 @@
-
-use crate::{Atomic, Context as _};
-use crate::lv;
 use crate::cli::printer::PRINTER;
+use crate::lv;
+use crate::{Atomic, Context as _};
 
 pub(crate) static PROMPT_LEVEL: Atomic<u8, lv::Prompt> =
     Atomic::new_u8(lv::Prompt::Interactive as u8);
 
 #[doc(hidden)]
-pub fn __prompt_yesno(
-    message: std::fmt::Arguments<'_>,
-) -> crate::Result<bool> {
+pub fn __prompt_yesno(message: std::fmt::Arguments<'_>) -> crate::Result<bool> {
     match check_prompt_level(true) {
-        Ok(false) => {},
+        Ok(false) => {}
         other => return other,
     };
     let mut answer = false;
-    prompt_with_validation_impl(format_args!("{message} [y/n]"), false, |x| {
+    __prompt_with_validation(format_args!("{message} [y/n]"), false, |x| {
         x.make_ascii_lowercase();
         match x.trim() {
             "y" | "yes" => {
                 answer = true;
                 Ok(true)
-            } 
-            "n" | "no"  => {
+            }
+            "n" | "no" => {
                 answer = false;
                 Ok(true)
             }
@@ -36,18 +33,16 @@ pub fn __prompt_yesno(
 }
 
 #[doc(hidden)]
-pub fn __prompt(
-    message: std::fmt::Arguments<'_>,
-    is_password: bool,
-) -> cu::Result<cu::ZString> {
+pub fn __prompt(message: std::fmt::Arguments<'_>, is_password: bool) -> cu::Result<cu::ZString> {
     check_prompt_level(false)?;
     prompt_impl(&format!("{message}"), is_password)
 }
 
-fn prompt_with_validation_impl<F: FnMut(&mut String) -> crate::Result<bool>>(
+#[doc(hidden)]
+pub fn __prompt_with_validation<F: FnMut(&mut String) -> crate::Result<bool>>(
     message: std::fmt::Arguments<'_>,
     is_password: bool,
-    mut validator: F
+    mut validator: F,
 ) -> cu::Result<cu::ZString> {
     let message = format!("{message}");
     loop {
@@ -58,14 +53,13 @@ fn prompt_with_validation_impl<F: FnMut(&mut String) -> crate::Result<bool>>(
     }
 }
 
-fn prompt_impl(
-    message: &str,
-    is_password: bool,
-) -> cu::Result<cu::ZString> {
+fn prompt_impl(message: &str, is_password: bool) -> cu::Result<cu::ZString> {
     let recv = {
-        if let Ok(mut printer) = PRINTER.lock() && let Some(printer) = printer.as_mut() {
+        if let Ok(mut printer) = PRINTER.lock()
+            && let Some(printer) = printer.as_mut()
+        {
             printer.show_prompt(message, is_password)
-        }  else {
+        } else {
             crate::bail!("prompt failed: failed to lock global printer");
         }
     };
@@ -82,10 +76,13 @@ fn check_prompt_level(is_yesno: bool) -> crate::Result<bool> {
             // do not even show the prompt if --yes
             lv::Prompt::YesOrInteractive | lv::Prompt::YesOrBlock => return Ok(true),
             lv::Prompt::Interactive => return Ok(false),
-            lv::Prompt::Block => { }
+            lv::Prompt::Block => {}
         }
     } else {
-        if !matches!(PROMPT_LEVEL.get(), lv::Prompt::YesOrBlock | lv::Prompt::Block) {
+        if !matches!(
+            PROMPT_LEVEL.get(),
+            lv::Prompt::YesOrBlock | lv::Prompt::Block
+        ) {
             return Ok(false);
         }
     }

@@ -28,6 +28,10 @@ tasks:
       - task: cargo:clippy-package-feature
         vars:
           PACKAGE: pistonite-cu
+          FEATURES: prompt-password
+      - task: cargo:clippy-package-feature
+        vars:
+          PACKAGE: pistonite-cu
           FEATURES: prompt,cli
       - task: cargo:clippy-package-feature
         vars:

@@ -7,10 +7,10 @@ pub struct ByteFormat(pub u64);
 impl std::fmt::Display for ByteFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (unit_bytes, unit_char) in [
-            (1000_000_000_000, 'T'),
-            (1000_000_000, 'G'),
-            (1000_000, 'M'),
-            (1000, 'k'),
+            (1_000_000_000_000, 'T'),
+            (1_000_000_000, 'G'),
+            (1_000_000, 'M'),
+            (1_000, 'k'),
         ] {
             if self.0 >= unit_bytes {
                 let whole = self.0 / unit_bytes;

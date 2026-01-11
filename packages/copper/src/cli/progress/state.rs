@@ -2,9 +2,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::cli::Tick;
-use crate::cli::progress::{ChildState,Estimater,BarFormatter, BarResult, ProgressBarBuilder, ChildStateStrong};
 use crate::cli::fmt::ansi;
 use crate::cli::printer::PRINTER;
+use crate::cli::progress::{
+    BarFormatter, BarResult, ChildState, ChildStateStrong, Estimater, ProgressBarBuilder,
+};
 
 const CHAR_BAR_TICK: char = '\u{251C}'; // |>
 const CHAR_BAR: char = '\u{2502}'; // |
@@ -19,9 +21,14 @@ pub struct ProgressBar {
     state_mut: Mutex<State>,
 }
 impl ProgressBar {
-    pub(crate) fn spawn(state: StateImmut, state_mut: State, parent: Option<Arc<Self>>) -> Arc<Self> {
+    pub(crate) fn spawn(
+        state: StateImmut,
+        state_mut: State,
+        parent: Option<Arc<Self>>,
+    ) -> Arc<Self> {
         let bar = Arc::new(Self {
-            state, state_mut: Mutex::new(state_mut)
+            state,
+            state_mut: Mutex::new(state_mut),
         });
         match parent {
             Some(p) => {
@@ -54,7 +61,7 @@ impl ProgressBar {
     #[inline(always)]
     pub fn __inc(self: &Arc<Self>, amount: u64, message: Option<String>) {
         if let Ok(mut bar) = self.state_mut.lock() {
-            bar.unreal_current.saturating_add(amount);
+            bar.unreal_current = bar.unreal_current.saturating_add(amount);
             if let Some(x) = message {
                 bar.set_message(&x);
             }
@@ -508,7 +515,12 @@ impl State {
             // _: fmt for string does not fail
             let _ = match total {
                 None => write!(temp, "{}", cu::ByteFormat(current)),
-                Some(total) => write!(temp, "{} / {}", cu::ByteFormat(current), cu::ByteFormat(total)),
+                Some(total) => write!(
+                    temp,
+                    "{} / {}",
+                    cu::ByteFormat(current),
+                    cu::ByteFormat(total)
+                ),
             };
 
             if width >= temp.len() {
@@ -601,4 +613,3 @@ fn format_message_with_width(out: &mut String, mut width: usize, message: &str) 
     }
     width
 }
-

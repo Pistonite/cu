@@ -5,7 +5,6 @@ use crate::cli::Tick;
 use crate::cli::fmt::ansi;
 use crate::cli::progress::ProgressBar;
 
-
 #[derive(Debug)]
 pub enum ChildState {
     /// The done message (if `keep` is true)

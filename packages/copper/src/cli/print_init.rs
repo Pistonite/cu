@@ -1,10 +1,11 @@
-use std::cell::RefCell;
 use std::sync::OnceLock;
 use std::sync::atomic::Ordering;
 
+use cu::cli::printer::{PRINTER, Printer};
+#[cfg(feature = "prompt")]
+use cu::cli::prompt::PROMPT_LEVEL;
 use cu::lv;
-use cu::cli::printer::{Printer, PRINTER};
-use env_filter::{Filter as LogEnvFilter, Builder as LogEnvBuilder};
+use env_filter::{Builder as LogEnvBuilder, Filter as LogEnvFilter};
 
 static LOG_FILTER: OnceLock<LogEnvFilter> = OnceLock::new();
 /// Set the global log filter
@@ -43,7 +44,7 @@ pub fn init_options(color: lv::Color, level: lv::Print, prompt: Option<lv::Promp
             set_log_filter(filter);
             log_level.max(level.into())
         }
-        _ => level.into()
+        _ => level.into(),
     };
     log::set_max_level(log_level);
 
@@ -53,91 +54,91 @@ pub fn init_options(color: lv::Color, level: lv::Print, prompt: Option<lv::Promp
     if let Ok(mut g_printer) = PRINTER.lock() {
         *g_printer = Some(printer);
     }
-    todo!()
-    // #[cfg(feature = "prompt")]
-    // {
-    //     let prompt = match prompt {
-    //         Some(x) => x,
-    //         None => {
-    //             let is_ci = std::env::var("CI")
-    //                 .map(|mut x| {
-    //                     x.make_ascii_lowercase();
-    //                     matches!(x.trim(), "true" | "1")
-    //                 })
-    //                 .unwrap_or_default();
-    //             if is_ci {
-    //                 lv::Prompt::Block
-    //             } else {
-    //                 lv::Prompt::Interactive
-    //             }
-    //         }
-    //     };
-    //     super::PROMPT_LEVEL.set(prompt)
-    // }
-    // #[cfg(not(feature = "prompt"))]
-    // {
-    //     let _ = prompt;
-    //     super::PROMPT_LEVEL.set(lv::Prompt::No);
-    // }
-    //
-    // lv::PRINT_LEVEL.set(level);
-    // struct LogImpl;
-    // impl log::Log for LogImpl {
-    //     fn enabled(&self, metadata: &log::Metadata) -> bool {
-    //         match LOG_FILTER.get() {
-    //             Some(filter) => filter.enabled(metadata),
-    //             None => Lv::from(metadata.level()).can_print(lv::PRINT_LEVEL.get()),
-    //         }
-    //     }
-    //
-    //     fn log(&self, record: &log::Record) {
-    //         if !self.enabled(record.metadata()) {
-    //             return;
-    //         }
-    //         let typ: Lv = record.level().into();
-    //         let message = if typ == Lv::Trace {
-    //             // enable source location logging in trace messages
-    //             let mut message = String::new();
-    //             message.push('[');
-    //             if let Some(p) = record.module_path() {
-    //                 // aliased crate, use the shorthand
-    //                 if let Some(rest) = p.strip_prefix("pistonite_") {
-    //                     message.push_str(rest);
-    //                 } else {
-    //                     message.push_str(p);
-    //                 }
-    //                 message.push(' ');
-    //             }
-    //             if let Some(f) = record.file() {
-    //                 let name = match f.rfind(['/', '\\']) {
-    //                     None => f,
-    //                     Some(i) => &f[i + 1..],
-    //                 };
-    //                 message.push_str(name);
-    //             }
-    //             if let Some(l) = record.line() {
-    //                 message.push(':');
-    //                 message.push_str(&format!("{l}"));
-    //             }
-    //             if message.len() > 1 {
-    //                 message += "] ";
-    //             } else {
-    //                 message.clear();
-    //             }
-    //
-    //             use std::fmt::Write;
-    //             let _: Result<_, _> = write!(&mut message, "{}", record.args());
-    //             message
-    //         } else {
-    //             record.args().to_string()
-    //         };
-    //         if let Ok(mut printer) = super::PRINTER.lock() {
-    //             printer.print_message(typ, &message);
-    //         }
-    //     }
-    //
-    //     fn flush(&self) {}
-    // }
-    //
-    // let _ = log::set_logger(&LogImpl);
+    #[cfg(feature = "prompt")]
+    {
+        let prompt = match prompt {
+            Some(x) => x,
+            None => {
+                let is_ci = std::env::var("CI")
+                    .map(|mut x| {
+                        x.make_ascii_lowercase();
+                        matches!(x.trim(), "true" | "1")
+                    })
+                    .unwrap_or_default();
+                if is_ci {
+                    lv::Prompt::Block
+                } else {
+                    lv::Prompt::Interactive
+                }
+            }
+        };
+        PROMPT_LEVEL.set(prompt)
+    }
+    #[cfg(not(feature = "prompt"))]
+    {
+        let _ = prompt;
+        PROMPT_LEVEL.set(lv::Prompt::No);
+    }
+
+    lv::PRINT_LEVEL.set(level);
+    let _ = log::set_logger(&LogImpl);
+}
+struct LogImpl;
+impl log::Log for LogImpl {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        match LOG_FILTER.get() {
+            Some(filter) => filter.enabled(metadata),
+            None => lv::Lv::from(metadata.level()).can_print(lv::PRINT_LEVEL.get()),
+        }
+    }
+
+    fn log(&self, record: &log::Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let typ: lv::Lv = record.level().into();
+        let message = if typ == lv::T {
+            // enable source location logging in trace messages
+            let mut message = String::new();
+            message.push('[');
+            if let Some(p) = record.module_path() {
+                // aliased crate, use the shorthand
+                if let Some(rest) = p.strip_prefix("pistonite_") {
+                    message.push_str(rest);
+                } else {
+                    message.push_str(p);
+                }
+                message.push(' ');
+            }
+            if let Some(f) = record.file() {
+                let name = match f.rfind(['/', '\\']) {
+                    None => f,
+                    Some(i) => &f[i + 1..],
+                };
+                message.push_str(name);
+            }
+            if let Some(l) = record.line() {
+                message.push(':');
+                message.push_str(&format!("{l}"));
+            }
+            if message.len() > 1 {
+                message += "] ";
+            } else {
+                message.clear();
+            }
+
+            use std::fmt::Write;
+            let _: Result<_, _> = write!(&mut message, "{}", record.args());
+            message
+        } else {
+            record.args().to_string()
+        };
+        if let Ok(mut printer) = PRINTER.lock() {
+            if let Some(printer) = printer.as_mut() {
+                printer.print_message(typ, &message);
+            }
+        }
+    }
+
+    fn flush(&self) {}
 }

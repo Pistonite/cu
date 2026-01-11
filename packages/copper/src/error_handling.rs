@@ -1,5 +1,4 @@
-pub use anyhow::{Context, Error, Ok, Result, bail, anyhow as fmterr};
-
+pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail};
 
 /// # Error Handling
 /// *Does not require any feature flag. Please make sure to sponsor [David Tolnay](https://github.com/dtolnay) if you depend heavily on his work

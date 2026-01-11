@@ -1,5 +1,5 @@
 mod zstring;
-pub use zstring::{zero_string, ZString};
+pub use zstring::{ZString, zero_string};
 mod byte_format;
 pub use byte_format::ByteFormat;
 

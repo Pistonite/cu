@@ -57,7 +57,7 @@ async fn test_example3_ok() {
 #[cu::error_ctx("async failed with arg {}", s)]
 async fn example3(s: u32) -> cu::Result<()> {
     let value = returns_ok(s)?;
-    cu::ensure!(value > 4);
+    cu::ensure!(value > 4)?;
     Ok(())
 }
 
@@ -82,7 +82,7 @@ async fn test_example4_ok() {
 #[cu::error_ctx(pre, format("async failed with arg {s}"))]
 async fn example4(s: String) -> cu::Result<()> {
     let value = returns_ok(s)?;
-    cu::ensure!(!value.is_empty());
+    cu::ensure!(!value.is_empty())?;
     Ok(())
 }
 

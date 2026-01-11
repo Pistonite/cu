@@ -1,4 +1,3 @@
-
 use std::ffi::OsString;
 use std::time::Instant;
 
@@ -81,8 +80,7 @@ impl Flags {
                 None
             }
         };
-        todo!()
-        // crate::init_print_options(self.color.unwrap_or_default(), level, prompt);
+        super::print_init::init_options(self.color.unwrap_or_default(), level, prompt);
     }
 
     /// Merge `other` into self. Options in other will be applied on top of self (equivalent

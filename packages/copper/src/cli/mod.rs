@@ -109,66 +109,33 @@
 //! When mixing `RUST_LOG` and verbosity flags, logging messages are filtered
 //! by `RUST_LOG`, and the verbosity would only apply to `print` and `hint`
 //!
-//! When setting up test, you can use [`log_init`](crate::log_init) to quickly inititialize logging
+//! # Other
+//! When setting up test, you can use [`cu::cli::level`] to quickly inititialize logging
 //! without dealing with the details.
 //!
-//! [`set_thread_print_name`](crate::set_thread_print_name) can be used to add a prefix to all messages printed
+//! [`cu::cli::set_thread_name`] can be used to add a prefix to all messages printed
 //! by the current thread.
 //!
 //! Messages that are too long and multi-line messages are automatically wrapped.
 //!
-//! # Progress Bar
-//! Animated progress bars are displayed at the bottom of the terminal.
-//! While progress bars are visible, printing still works and will be put
-//! above the bars. However, prints will be buffered and refreshed
-//! and the same frame rate as the bars.
-//!
-//! [`progress_bar`](crate::progress_bar) and [`progress_bar_lowp`](crate::progress_bar_lowp) are used to create a bar.
-//! The only difference is that `lowp` doesn't print a message when the progress
-//! is done (as if the bar was never there). The bar takes a message to indicate
-//! the current action, and each update call can accept a message to indicate
-//! the current step. When `bar` is dropped, it will print a done message.
-//!
-//! ```rust,no_run
-//! # use pistonite_cu as cu;
-//! use std::time::Duration;
-//! {
-//!    let bar = cu::progress_bar(10, "This takes 2.5 seconds");
-//!    for i in 0..10 {
-//!        cu::progress!(&bar, i, "step {i}");
-//!        cu::debug!("this is debug message");
-//!        std::thread::sleep(Duration::from_millis(250));
-//!    }
-//! }
-//! ```
-//!
-//! [`progress_unbounded`](crate::progress_unbounded) and [`progress_unbounded_lowp`](crate::progress_unbounded_lowp) are variants
-//! that doesn't display the total steps. Use `()` as the step placeholder
-//! when updating the bar.
-//!
-//! # Prompting
-//! With the `prompt` feature enabled, you can
-//! use [`prompt!`](crate::prompt) and [`yesno!`](crate::yesno) to show prompts.
-//!
-//! The prompts are thread-safe, meaning
-//! You can call them from multiple threads, and they will be queued to prompt the user one after
-//! the other. Prompts are always shown regardless of verbosity. But when stdout is redirected,
-//! they will not render in terminal.
-//!
-//! # Async Entry Point
-//! For async usage, see the [`coroutine`](crate::co) concept.
-//!
-//! # Manual Parsing
+//! # Manual Parsing CLI args
 //! [`cu::cli::try_parse`](crate::cli::try_parse)
 //! and [`cu::cli::print_help`](crate::cli::print_help) can be useful
 //! when you want to manually invoke a command parser. These
 //! respect the `--color` option passed to the program.
+//!
+//! # Progress Bars
+//! See [Progress Bars](fn@crate::progress)
+//!
+//! # Prompting
+//! See [Prompting](macro@crate::prompt)
+//!
 #[cfg(feature = "cli")]
 mod flags;
-#[cfg(feature = "cli")]
-pub use flags::{Flags, try_parse, print_help, __run};
 #[cfg(all(feature = "coroutine", feature = "cli"))]
 pub use flags::__co_run;
+#[cfg(feature = "cli")]
+pub use flags::{__run, Flags, print_help, try_parse};
 
 mod print_init;
 pub use print_init::level;
@@ -176,17 +143,17 @@ mod macros;
 pub use macros::__print_with_level;
 
 mod thread_name;
-pub use thread_name::set_thread_name;
 use thread_name::THREAD_NAME;
+pub use thread_name::set_thread_name;
 mod printer;
 
 mod progress;
-pub use progress::{progress, ProgressBar, ProgressBarBuilder};
+pub use progress::{ProgressBar, ProgressBarBuilder, progress};
 
 #[cfg(feature = "prompt")]
 mod prompt;
 #[cfg(feature = "prompt")]
-pub use prompt::{__prompt, __prompt_yesno};
+pub use prompt::{__prompt, __prompt_with_validation, __prompt_yesno};
 #[cfg(feature = "prompt-password")]
 mod password;
 #[cfg(feature = "prompt-password")]

@@ -1,4 +1,3 @@
-
 use crate::cli::fmt::{self, ansi};
 
 /// Buffer for formatting printing messages
@@ -33,7 +32,7 @@ impl FormatBuffer {
     pub fn take(&mut self) -> String {
         std::mem::take(&mut self.buffer)
     }
-    /// Reset 
+    /// Reset
     pub fn reset(&mut self, gray_color: &'static str, text_color: &'static str) {
         self.curr = 0;
         self.buffer.clear();

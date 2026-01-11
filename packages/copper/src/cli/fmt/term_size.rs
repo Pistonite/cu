@@ -1,4 +1,3 @@
-
 /// Get the terminal width, or the internal max if cannot get
 pub fn term_width_or_max() -> usize {
     term_width().unwrap_or(400)

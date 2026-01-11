@@ -1,14 +1,14 @@
-use std::io::{self, IsTerminal as _};
 use std::collections::VecDeque;
+use std::io::{self, IsTerminal as _};
 use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex, Weak};
 use std::thread::JoinHandle;
 
-use oneshot::{Sender as OnceSend, Receiver as OnceRecv};
+use oneshot::{Receiver as OnceRecv, Sender as OnceSend};
 
-use crate::cli::{THREAD_NAME, Tick, TICK_INTERVAL, password};
-use crate::cli::fmt::{self, ansi, FormatBuffer};
-use crate::cli::progress::{ProgressBar, BarResult, BarFormatter};
+use crate::cli::fmt::{self, FormatBuffer, ansi};
+use crate::cli::progress::{BarFormatter, BarResult, ProgressBar};
+use crate::cli::{THREAD_NAME, TICK_INTERVAL, Tick, password};
 use crate::lv;
 
 /// Global printer state
@@ -23,12 +23,12 @@ pub(crate) struct Printer {
     colors: ansi::Colors,
     /// Control codes
     controls: ansi::Controls,
-    
+
     print_task: PrintingThread,
     bar_target: Option<Target>,
     bars: Vec<Weak<ProgressBar>>,
     pending_prompts: VecDeque<PromptTask>,
-    
+
     /// Buffer for automatically do certain formatting
     format_buffer: FormatBuffer,
     /// Place to buffer prints while printing is blocked
@@ -54,19 +54,19 @@ impl Printer {
             (bar_target, is_terminal)
         };
         let controls = ansi::controls(is_terminal);
-        
+
         Self {
             is_stdin_terminal,
             stdout,
             stderr,
             colors,
             controls,
-        
+
             print_task: Default::default(),
             bar_target,
             bars: Default::default(),
             pending_prompts: Default::default(),
-        
+
             format_buffer: FormatBuffer::new(),
             buffered: String::new(),
         }
@@ -344,10 +344,10 @@ fn print_task() -> JoinHandle<()> {
         // first check if there are any pending prompts
         // scope for locking the printer for checking prompts
         {
-            let Ok(mut printer) = PRINTER.lock() else {
+            let Ok(mut printer_guard) = PRINTER.lock() else {
                 return ControlFlow::Break(());
             };
-            let Some(printer) = printer.as_mut() else {
+            let Some(printer) = printer_guard.as_mut() else {
                 return ControlFlow::Break(());
             };
             let task = printer.pending_prompts.pop_front();
@@ -360,7 +360,7 @@ fn print_task() -> JoinHandle<()> {
                 let _ = printer.stdout.flush();
 
                 // drop the lock while we wait for user input
-                drop(printer);
+                drop(printer_guard);
                 // if there is a prompt, don't clear the previous progress bar yet,
                 // since we want to display the prompt after the progress bars
 
@@ -415,7 +415,7 @@ fn print_task() -> JoinHandle<()> {
         };
         let Some(printer) = printer.as_mut() else {
             return ControlFlow::Break(());
-    };
+        };
 
         if let Some(bar_target) = printer.bar_target {
             // print the bars, after processing buffered messages

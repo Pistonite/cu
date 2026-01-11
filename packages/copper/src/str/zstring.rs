@@ -1,4 +1,3 @@
-
 /// A string that will have its inner buffer zeroed when dropped
 #[derive(Default, Clone)]
 pub struct ZString(String);
@@ -65,7 +64,7 @@ pub fn zero_string(s: &mut String) {
         // SAFETY: c is a valid u8 pointer
         unsafe { std::ptr::write_volatile(c, 0) };
     }
-    // ensure the 
+    // ensure other threads see this change
     std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
     std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
 }

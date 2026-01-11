@@ -5,7 +5,7 @@ use spin::mutex::SpinMutex;
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
 use crate::lv::Lv;
-use crate::{Atomic, ProgressBar, ProgressBarBuilder, BoxedFuture};
+use crate::{Atomic, BoxedFuture, ProgressBar, ProgressBarBuilder};
 
 use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
@@ -174,14 +174,13 @@ impl SpinnerTask {
         loop {
             match driver.next().await {
                 DriverOutput::Line(line) => {
-                    todo!()
-                    // if lv != Lv::Off {
-                    //     crate::__priv::__print_with_level(lv, format_args!("{prefix}{line}"));
-                    //     // erase the progress line if we decide to print it out
-                    //     crate::progress!(bar, "")
-                    // } else {
-                    //     crate::progress!(bar, "{line}")
-                    // }
+                    if lv != Lv::Off {
+                        crate::cli::__print_with_level(lv, format_args!("{prefix}{line}"));
+                        // erase the progress line if we decide to print it out
+                        crate::progress!(bar, "")
+                    } else {
+                        crate::progress!(bar, "{line}")
+                    }
                 }
                 DriverOutput::Progress(line) => {
                     crate::progress!(bar, "{line}")

@@ -1,4 +1,3 @@
-
 /// Update a [progress bar](fn@crate::progress)
 ///
 /// The macro takes 2 parts separated by comma `,`:

@@ -71,10 +71,9 @@ impl PrintTask {
         loop {
             match driver.next().await {
                 DriverOutput::Line(line) => {
-                    todo!()
-                    // for l in line.lines() {
-                    //     crate::__priv::__print_with_level(lv, format_args!("{prefix}{l}"));
-                    // }
+                    for l in line.lines() {
+                        crate::cli::__print_with_level(lv, format_args!("{prefix}{l}"));
+                    }
                 }
                 DriverOutput::Done => break,
                 _ => {}

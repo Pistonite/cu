@@ -63,6 +63,7 @@
 //! - [Printting and Command Line Interface](mod@crate::cli) (CLI arg parsing via
 //!   [`clap`](https://docs.rs/clap))
 //! - [Progress Bars](fn@crate::progress)
+//! - [Prompting](macro@crate::prompt)
 //!
 //! # Feature Reference:
 //! - `coroutine` and `coroutine-heavy`:
@@ -99,14 +100,12 @@ pub use lv::{debug, error, info, trace, warn};
 // --- Command Line Interface (print/cli/prompt/prompt-password feature) ---
 #[cfg(feature = "print")]
 pub mod cli;
-#[cfg(feature = "print")]
-pub use cli::{progress, ProgressBar, ProgressBarBuilder};
 #[cfg(feature = "prompt-password")]
 pub use cli::password_chars_legal;
+#[cfg(feature = "print")]
+pub use cli::{ProgressBar, ProgressBarBuilder, progress};
 #[cfg(feature = "cli")]
 pub use pistonite_cu_proc_macros::cli;
-
-
 
 #[cfg(feature = "process")]
 mod process;
@@ -132,7 +131,6 @@ pub type BoxedFuture<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send + 'sta
 #[cfg(feature = "coroutine")]
 pub mod co;
 
-
 /// Parsing utilities
 #[cfg(feature = "parse")]
 mod parse;
@@ -144,7 +142,7 @@ pub use pistonite_cu_proc_macros::Parse;
 // re-exports from libraries
 pub use pistonite_cu_proc_macros::error_ctx;
 #[cfg(feature = "coroutine")]
-pub use tokio::{join, try_join, select};
+pub use tokio::{join, select, try_join};
 
 #[doc(hidden)]
 pub mod __priv {

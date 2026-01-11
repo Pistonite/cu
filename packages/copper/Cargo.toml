@@ -123,8 +123,8 @@ derive = ["dep:derive_more"]
 __test = []
 
 [[example]]
-name = "print"
-required-features = ["prompt", "cli"]
+name = "prompt_password"
+required-features = ["prompt-password", "cli"]
 
 [[example]]
 name = "process"

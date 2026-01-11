@@ -116,7 +116,7 @@ use state::{State, StateImmut};
 mod builder;
 pub use builder::ProgressBarBuilder;
 mod util;
-pub use util::{BarResult, BarFormatter};
+pub use util::{BarFormatter, BarResult};
 use util::{ChildState, ChildStateStrong};
 mod macros;
 

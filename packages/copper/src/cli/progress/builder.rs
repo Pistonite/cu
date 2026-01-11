@@ -1,7 +1,7 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::cli::progress::{StateImmut, ProgressBar, Estimater, State};
+use crate::cli::progress::{Estimater, ProgressBar, State, StateImmut};
 
 /// Builder for a progress bar
 #[derive(Debug, Clone)] // Clone sometimes needed to build by ref.. without unsafe
@@ -29,7 +29,7 @@ pub struct ProgressBarBuilder {
 }
 
 impl ProgressBarBuilder {
-    /// Start building a progress bar. Note [`cu::progress`](progress) is the canonical shorthand
+    /// Start building a progress bar. Note [`cu::progress`](fn@crate::progress) is the canonical shorthand
     pub fn new(message: String) -> Self {
         Self {
             message,
@@ -76,7 +76,7 @@ impl ProgressBarBuilder {
     /// ```
     #[inline(always)]
     pub fn total_bytes(mut self, total: u64) -> Self {
-        self.total = Some(total as u64);
+        self.total = Some(total);
         self.total_is_in_bytes = true;
         self
     }
