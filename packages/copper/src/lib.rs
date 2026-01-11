@@ -59,10 +59,12 @@
 //!
 //! # Quick Reference
 //! - [Error Handling](macro@crate::check) (via [`anyhow`](https://docs.rs/anyhow))
+//! - [Logging](mod@crate::lv) (via [`log`](https://docs.rs/log))
+//! - [Printting and Command Line Interface](mod@crate::cli) (CLI arg parsing via
+//!   [`clap`](https://docs.rs/clap))
+//! - [Progress Bars](fn@crate::progress)
 //!
 //! # Feature Reference:
-//! - `cli`, `print`, `prompt`:
-//!   See [`cli`](module@cli). Note that logging is still available without any feature flag.
 //! - `coroutine` and `coroutine-heavy`:
 //!   Enables `async` and integration with `tokio`. See [`cu::co`](module@co).
 //! - `fs`: Enables file system utils. See [`cu::fs`](module@fs) and [`cu::bin`](module@bin).
@@ -76,9 +78,35 @@
 // for macros
 extern crate self as cu;
 
-// --- Error Handling (does not require any feature flag) ---
+// --- Basic stuff (no feature needed) ---
+pub mod str;
+pub use str::*;
+mod env_var;
+pub use env_var::*;
+mod atomic; // Atomic helpers
+pub use atomic::*;
+mod misc; // other stuff that doesn't have a place
+pub use misc::*;
+
+// --- Error Handling (no feature needed) ---
 mod error_handling;
 pub use error_handling::*;
+
+// --- Logging (no feature needed) ---
+pub mod lv;
+pub use lv::{debug, error, info, trace, warn};
+
+// --- Command Line Interface (print/cli/prompt/prompt-password feature) ---
+#[cfg(feature = "print")]
+pub mod cli;
+#[cfg(feature = "print")]
+pub use cli::{progress, ProgressBar, ProgressBarBuilder};
+#[cfg(feature = "prompt-password")]
+pub use cli::password_chars_legal;
+#[cfg(feature = "cli")]
+pub use pistonite_cu_proc_macros::cli;
+
+
 
 #[cfg(feature = "process")]
 mod process;
@@ -97,17 +125,6 @@ pub use bin::which;
 #[cfg(feature = "fs")]
 pub mod fs;
 
-/// Path utils
-#[cfg(feature = "fs")]
-mod path;
-#[cfg(feature = "fs")]
-pub use path::{PathExtension, PathExtensionOwned};
-
-#[cfg(feature = "cli")]
-pub mod cli;
-#[cfg(feature = "cli")]
-pub use pistonite_cu_proc_macros::cli;
-
 #[cfg(feature = "coroutine")]
 mod async_;
 /// Alias for a boxed future
@@ -115,21 +132,6 @@ pub type BoxedFuture<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send + 'sta
 #[cfg(feature = "coroutine")]
 pub mod co;
 
-/// Low level printing utils and integration with log and clap
-#[cfg(feature = "print")]
-mod print;
-// #[cfg(feature = "prompt-password")]
-// pub use print::check_password_legality;
-#[cfg(feature = "print")]
-pub use print::{
-    ProgressBar, ProgressBarBuilder, ZeroWhenDropString, init_print_options, log_init, progress,
-    set_thread_print_name, term_width, term_width_height, term_width_or_max,
-};
-
-/// Printing level values
-pub mod lv;
-#[doc(inline)]
-pub use lv::{color_enabled, disable_print_time, disable_trace_hint, log_enabled};
 
 /// Parsing utilities
 #[cfg(feature = "parse")]
@@ -138,27 +140,14 @@ mod parse;
 pub use parse::*;
 #[cfg(feature = "parse")]
 pub use pistonite_cu_proc_macros::Parse;
-mod env_var;
-pub use env_var::*;
-
-// Atomic helpers
-mod atomic;
-pub use atomic::*;
-
-// other stuff that doesn't have a place
-mod misc;
-pub use misc::*;
 
 // re-exports from libraries
-pub use log::{debug, error, info, trace, warn};
 pub use pistonite_cu_proc_macros::error_ctx;
 #[cfg(feature = "coroutine")]
 pub use tokio::{join, try_join, select};
 
 #[doc(hidden)]
 pub mod __priv {
-    #[cfg(feature = "print")]
-    pub use crate::print::{__print_with_level, __prompt, __prompt_yesno};
     #[cfg(feature = "process")]
     pub use crate::process::__ConfigFn;
 }
@@ -174,6 +163,10 @@ pub mod lib {
 /// Prelude imports
 pub mod pre {
     pub use crate::Context as _;
+
+    #[cfg(feature = "cli")]
+    pub use crate::lib::clap;
+
     #[cfg(feature = "parse")]
     pub use crate::ParseTo as _;
     #[cfg(feature = "fs")]
@@ -184,8 +177,6 @@ pub mod pre {
     pub use crate::Spawn as _;
     #[cfg(feature = "json")]
     pub use crate::json;
-    #[cfg(feature = "cli")]
-    pub use crate::lib::clap;
     #[cfg(feature = "toml")]
     pub use crate::toml;
     #[cfg(feature = "yaml")]

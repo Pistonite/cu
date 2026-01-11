@@ -1,6 +1,8 @@
 use tokio::io::AsyncReadExt as _;
 use tokio::process::{ChildStderr, ChildStdout};
 
+use crate::cli::fmt::{ansi, utf8};
+
 /// Drive that takes the out stream and err stream, and produces lines
 pub(crate) struct Driver {
     out: Option<ChildStdout>,
@@ -159,7 +161,6 @@ impl Driver {
         line: &mut String,
         only_last_line: bool,
     ) -> (usize, bool) {
-        use crate::print::{ansi, utf8};
         let mut i = 0;
         let mut invalid_while_escaping = false;
         let mut start_escape_pos: Option<usize> = None;
@@ -183,7 +184,7 @@ impl Driver {
                     let prev = last;
                     last = c;
                     if let Some(s) = start_escape_pos {
-                        if ansi::is_ansi_end_char(c) {
+                        if ansi::is_esc_end(c) {
                             start_escape_pos = None;
                             // allow color codes
                             if !invalid_while_escaping && c == 'm' {

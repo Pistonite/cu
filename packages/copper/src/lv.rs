@@ -1,16 +1,47 @@
+//! # Logging
+//!
+//! *Does not require any feature flag
+//!
+//! The logging macros (`debug`, `info`, `trace`, `warn`, `error`) are
+//! re-exported from the [`log`](https://docs.rs/log) crate and are
+//! used as `cu::debug!`, `cu::info!`, etc. This means your log statements
+//! are integrated into the log infrastructure when you use `cu` in a library.
+//!
+//! Additionally, the [`cu::fmtand!`](macro@crate::fmtand) and
+//! [`cu::panicand!`](macro@crate::panicand) macros allow you
+//! to log a message in additional to `format!`/`panic!`.
+//!
+//! When the `cli` feature is enabled, you also get log integration
+//! with CLI flags and other terminal-printing features.
+//! See [Command Line Interface](mod@crate::cli)
+
+pub use log::{debug, error, info, trace, warn};
+
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::{Atomic, lv};
+use cu::Atomic;
 
-pub(crate) static PRINT_LEVEL: Atomic<u8, lv::Print> = Atomic::new_u8(lv::Print::Normal as u8);
-pub(crate) static USE_COLOR: AtomicBool = AtomicBool::new(true);
-
-/// Check if the logging level is enabled
-pub fn log_enabled(lv: lv::Lv) -> bool {
-    lv.can_print(PRINT_LEVEL.get())
+/// Format and invoke a print macro
+///
+/// # Example
+/// ```rust
+/// # use pistonite_cu as cu;
+/// let x = cu::fmtand!(error!("found {} errors", 3));
+/// assert_eq!(x, "found 3 errors");
+/// ```
+#[macro_export]
+macro_rules! fmtand {
+    ($mac:ident !( $($fmt_args:tt)* )) => {{
+        let s = format!($($fmt_args)*);
+        $crate::$mac!("{s}");
+        s
+    }}
 }
 
-/// Get if color printing is enabled
+pub(crate) static PRINT_LEVEL: Atomic<u8, Print> = Atomic::new_u8(Print::Normal as u8);
+pub(crate) static USE_COLOR: AtomicBool = AtomicBool::new(true);
+
+/// Get if color printing is enabled **Only works when cu::cli is being used**.
 pub fn color_enabled() -> bool {
     USE_COLOR.load(Ordering::Acquire)
 }
@@ -22,11 +53,13 @@ static ENABLE_PRINT_TIME: AtomicBool = AtomicBool::new(true);
 ///
 /// By default, the hint is displayed if `RUST_BACKTRACE` env var is not set
 #[inline(always)]
+#[cfg(feature = "print")]
 pub fn disable_trace_hint() {
     ENABLE_TRACE_HINT.store(false, Ordering::Release);
 }
 
-/// Check if the "use -vv to display backtrace" will be printed on error
+/// Check if the "use -vv to display backtrace" will be printed on error.
+/// **Only works when cu::cli is being used**
 #[inline(always)]
 pub fn is_trace_hint_enabled() -> bool {
     ENABLE_TRACE_HINT.load(Ordering::Acquire)
@@ -34,11 +67,13 @@ pub fn is_trace_hint_enabled() -> bool {
 
 /// Disable printing the time took to run the command
 #[inline(always)]
+#[cfg(feature = "print")]
 pub fn disable_print_time() {
     ENABLE_PRINT_TIME.store(false, Ordering::Release);
 }
 
-/// Check if the "finished in TIME" line will be printed on exit
+/// Check if the "finished in TIME" line will be printed on exit.
+/// **Only works when cu::cli is being used**
 #[inline(always)]
 pub fn is_print_time_enabled() -> bool {
     ENABLE_PRINT_TIME.load(Ordering::Acquire)
@@ -205,7 +240,18 @@ pub enum Lv {
     Off,
 }
 impl Lv {
-    /// Check if the current print level can print this message level
+    /// Check if the logging level is currently enabled **Only works when cu::cli is being used**.
+    ///
+    /// ```rust
+    /// # use pistonite_cu as cu;
+    /// // check that INFO level is enabled
+    /// assert!(cu::lv::I.enabled());
+    /// ```
+    #[inline(always)]
+    pub fn enabled(self) -> bool {
+        self.can_print(PRINT_LEVEL.get())
+    }
+    /// Check if a print level can print this message level
     pub fn can_print(self, level: Print) -> bool {
         match self {
             Lv::Off => false,

@@ -1,80 +1,45 @@
+use std::io::{self, IsTerminal as _};
 use std::collections::VecDeque;
 use std::ops::ControlFlow;
-use std::sync::{Arc, LazyLock, Mutex, Weak};
+use std::sync::{Arc, Mutex, Weak};
 use std::thread::JoinHandle;
 
-use crate::print::progress::{BarFormatter, BarResult, ProgressBar};
-use crate::print::{FormatBuffer, TICK_INTERVAL, ansi};
-use crate::{ZeroWhenDropString, lv};
+use oneshot::{Sender as OnceSend, Receiver as OnceRecv};
 
-/// Print something
-///
-/// This is similar to `info`, but unlike info, this message will still log with `-q`.
-#[macro_export]
-macro_rules! print {
-    ($($fmt_args:tt)*) => {{
-        $crate::__priv::__print_with_level($crate::lv::P, format_args!($($fmt_args)*));
-    }}
-}
-/// Logs a hint message
-#[macro_export]
-macro_rules! hint {
-    ($($fmt_args:tt)*) => {{
-        $crate::__priv::__print_with_level($crate::lv::H, format_args!($($fmt_args)*));
-    }}
-}
-
-/// Internal print function for macros
-pub fn __print_with_level(lv: lv::Lv, message: std::fmt::Arguments<'_>) {
-    if !lv.can_print(lv::PRINT_LEVEL.get()) {
-        return;
-    }
-    let message = format!("{message}");
-    if let Ok(mut printer) = PRINTER.lock() {
-        printer.print_message(lv, &message);
-    }
-}
-
-pub(crate) static PRINTER: LazyLock<Mutex<Printer>> =
-    LazyLock::new(|| Mutex::new(Printer::default()));
+use crate::cli::{THREAD_NAME, Tick, TICK_INTERVAL, password};
+use crate::cli::fmt::{self, ansi, FormatBuffer};
+use crate::cli::progress::{ProgressBar, BarResult, BarFormatter};
+use crate::lv;
 
 /// Global printer state
+pub(crate) static PRINTER: Mutex<Option<Printer>> = Mutex::new(None);
 pub(crate) struct Printer {
     is_stdin_terminal: bool,
     /// Handle to stdout
-    stdout: std::io::Stdout,
+    stdout: io::Stdout,
     /// Handle to stderr
-    stderr: std::io::Stderr,
+    stderr: io::Stderr,
     /// Color codes
     colors: ansi::Colors,
     /// Control codes
     controls: ansi::Controls,
-
-    // printing
+    
     print_task: PrintingThread,
     bar_target: Option<Target>,
     bars: Vec<Weak<ProgressBar>>,
     pending_prompts: VecDeque<PromptTask>,
-
+    
     /// Buffer for automatically do certain formatting
     format_buffer: FormatBuffer,
     /// Place to buffer prints while printing is blocked
     buffered: String,
 }
-
-struct PromptTask {
-    send: oneshot::Sender<std::io::Result<ZeroWhenDropString>>,
-    prompt: String,
-    #[cfg(feature = "prompt-password")]
-    is_password: bool,
-}
-
-impl Default for Printer {
-    fn default() -> Self {
-        use std::io::IsTerminal as _;
-        let stdout = std::io::stdout();
-        let stderr = std::io::stderr();
-        let is_stdin_terminal = std::io::stdin().is_terminal();
+impl Printer {
+    pub fn new(use_color: bool) -> Self {
+        let colors = ansi::colors(use_color);
+        let stdout = io::stdout();
+        let stderr = io::stderr();
+        let is_stdin_terminal = io::stdin().is_terminal();
         let (bar_target, is_terminal) = if cfg!(feature = "__test") {
             (Some(Target::Stdout), true)
         } else {
@@ -88,36 +53,29 @@ impl Default for Printer {
             };
             (bar_target, is_terminal)
         };
-        let colors = ansi::colors(is_terminal);
         let controls = ansi::controls(is_terminal);
-
+        
         Self {
             is_stdin_terminal,
             stdout,
             stderr,
             colors,
             controls,
-
+        
             print_task: Default::default(),
             bar_target,
             bars: Default::default(),
             pending_prompts: Default::default(),
-
+        
             format_buffer: FormatBuffer::new(),
             buffered: String::new(),
         }
     }
-}
-impl Printer {
-    pub(crate) fn set_colors(&mut self, use_color: bool) {
-        self.colors = ansi::colors(use_color);
-    }
-
     pub(crate) fn show_prompt(
         &mut self,
         prompt: &str,
         is_password: bool,
-    ) -> oneshot::Receiver<std::io::Result<ZeroWhenDropString>> {
+    ) -> OnceRecv<io::Result<cu::ZString>> {
         // format the prompt
         let mut lines = prompt.lines();
         self.format_buffer.reset(self.colors.gray, self.colors.cyan);
@@ -135,7 +93,7 @@ impl Printer {
         if cfg!(feature = "prompt-password") && is_password {
             self.format_buffer.push_str(": ");
         } else {
-            self.format_buffer.end();
+            self.format_buffer.push_lf();
             self.format_buffer.push_control(self.colors.reset);
             self.format_buffer.push_control("-: ");
         }
@@ -178,6 +136,38 @@ impl Printer {
             self.print_task.join();
             self.print_task.assign(print_task());
         }
+    }
+    /// Print a progress bar done message
+    pub(crate) fn print_bar_done(&mut self, result: &BarResult, is_root: bool) {
+        if lv::PRINT_LEVEL.get() < lv::Print::Normal {
+            return;
+        }
+        if !is_root && self.bar_target.is_some() {
+            // if bar is animated, don't print child's done messages
+            return;
+        }
+        let message = match result {
+            BarResult::DontKeep => return,
+            BarResult::Done(message) => {
+                self.format_buffer
+                    .reset(self.colors.gray, self.colors.green);
+                self.format_buffer.push_control(self.colors.green);
+                message
+            }
+            BarResult::Interrupted(message) => {
+                self.format_buffer
+                    .reset(self.colors.gray, self.colors.yellow);
+                self.format_buffer.push_control(self.colors.yellow);
+                message
+            }
+        };
+        self.format_buffer.push_control("\u{283f}]");
+        if !message.starts_with('[') {
+            self.format_buffer.push_control(" ");
+        }
+        self.format_buffer.push_str(message);
+        self.format_buffer.push_lf();
+        self.print_format_buffer();
     }
 
     /// Format and print the message
@@ -234,7 +224,7 @@ impl Printer {
                 self.format_buffer.push(']', 1);
             }
         }
-        super::THREAD_NAME.with_borrow(|x| {
+        THREAD_NAME.with_borrow(|x| {
             if let Some(x) = x {
                 self.format_buffer.push_control(self.colors.magenta);
                 self.format_buffer.push('[', 1);
@@ -251,43 +241,9 @@ impl Printer {
             self.format_buffer.new_line();
             self.format_buffer.push_str(line);
         }
-        self.format_buffer.end();
+        self.format_buffer.push_lf();
         self.print_format_buffer();
     }
-
-    /// Print a progress bar done message
-    pub(crate) fn print_bar_done(&mut self, result: &BarResult, is_root: bool) {
-        if lv::PRINT_LEVEL.get() < lv::Print::Normal {
-            return;
-        }
-        if !is_root && self.bar_target.is_some() {
-            // if bar is animated, don't print child's done messages
-            return;
-        }
-        let message = match result {
-            BarResult::DontKeep => return,
-            BarResult::Done(message) => {
-                self.format_buffer
-                    .reset(self.colors.gray, self.colors.green);
-                self.format_buffer.push_control(self.colors.green);
-                message
-            }
-            BarResult::Interrupted(message) => {
-                self.format_buffer
-                    .reset(self.colors.gray, self.colors.yellow);
-                self.format_buffer.push_control(self.colors.yellow);
-                message
-            }
-        };
-        self.format_buffer.push_control("\u{283f}]");
-        if !message.starts_with('[') {
-            self.format_buffer.push_control(" ");
-        }
-        self.format_buffer.push_str(message);
-        self.format_buffer.end();
-        self.print_format_buffer();
-    }
-
     fn print_format_buffer(&mut self) {
         if !self.print_task.active() {
             use std::io::Write;
@@ -341,60 +297,6 @@ impl Printer {
             None
         }
     }
-    // pub(crate) fn take_prompt_task_if_should_join(&mut self) -> Option<JoinHandle<()>> {
-    //     if self.prompt_task.needs_join {
-    //         return self.prompt_task.take();
-    //     }
-    //
-    //     if self.pending_prompts.is_empty() {
-    //         self.prompt_task.take()
-    //     } else {
-    //         None
-    //     }
-    // }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Target {
-    /// Print to Stdout
-    Stdout,
-    /// Print to Stderr
-    Stderr,
-}
-#[derive(Default)]
-struct PrintingThread {
-    needs_join: bool,
-    /// Handle for the printing task, None means
-    /// either no printing task is running, or, the printing
-    /// task is terminating
-    handle: Option<JoinHandle<()>>,
-}
-impl PrintingThread {
-    /// Take the handle for joining
-    fn take(&mut self) -> Option<JoinHandle<()>> {
-        self.needs_join = false;
-        self.handle.take()
-    }
-    /// Mark the task as will end, so it can be joined
-    fn mark_join(&mut self) {
-        self.needs_join = true;
-    }
-    /// If the task is active
-    fn active(&self) -> bool {
-        !self.needs_join && self.handle.is_some()
-    }
-    /// Blockingly join the task on the current thread
-    fn join(&mut self) {
-        self.needs_join = false;
-        if let Some(handle) = self.handle.take() {
-            let _: Result<_, _> = handle.join();
-        }
-    }
-    /// Assign a new handle
-    fn assign(&mut self, handle: JoinHandle<()>) {
-        self.needs_join = false;
-        self.handle = Some(handle);
-    }
 }
 
 /// Printing thread that handles progress bar animation and printing during progress bar display
@@ -415,7 +317,7 @@ fn print_task() -> JoinHandle<()> {
     // if drop() is working to prevent holding the lock during sleep
     #[inline(always)]
     fn print_loop(
-        tick: u32,
+        tick: Tick,
         buffer: &mut String,
         temp: &mut String,
         lines: &mut i32,
@@ -445,6 +347,9 @@ fn print_task() -> JoinHandle<()> {
             let Ok(mut printer) = PRINTER.lock() else {
                 return ControlFlow::Break(());
             };
+            let Some(printer) = printer.as_mut() else {
+                return ControlFlow::Break(());
+            };
             let task = printer.pending_prompts.pop_front();
             let is_stdin_terminal = printer.is_stdin_terminal;
             if let Some(mut task) = task {
@@ -472,7 +377,7 @@ fn print_task() -> JoinHandle<()> {
                 // process this prompt
                 #[cfg(feature = "prompt-password")]
                 let (result, is_password) = if task.is_password {
-                    (super::prompt_password::read_password(), true)
+                    (password::read_password(), true)
                 } else {
                     (read_plaintext(temp), false)
                 };
@@ -480,7 +385,7 @@ fn print_task() -> JoinHandle<()> {
                 let (result, is_password) = (read_plaintext(temp), false);
 
                 // clear sensitive information in the memory
-                super::zero_string(temp);
+                crate::zero_string(temp);
                 // now, re-print the prompt text to the buffer without the prompt prefix
                 if !is_password {
                     while !task.prompt.ends_with('\n') {
@@ -490,8 +395,10 @@ fn print_task() -> JoinHandle<()> {
                 }
                 // add the prompt to the print buffer
                 if let Ok(mut printer) = PRINTER.lock() {
-                    printer.buffered.push_str(&task.prompt);
-                    printer.buffered.push('\n');
+                    if let Some(printer) = printer.as_mut() {
+                        printer.buffered.push_str(&task.prompt);
+                        printer.buffered.push('\n');
+                    }
                 }
                 // send the result of the prompt
                 let _ = task.send.send(result);
@@ -506,12 +413,15 @@ fn print_task() -> JoinHandle<()> {
         let Ok(mut printer) = PRINTER.lock() else {
             return ControlFlow::Break(());
         };
+        let Some(printer) = printer.as_mut() else {
+            return ControlFlow::Break(());
+    };
 
         if let Some(bar_target) = printer.bar_target {
             // print the bars, after processing buffered messages
 
             // remeasure terminal width on every cycle
-            let width = super::term_width_or_max();
+            let width = fmt::term_width_or_max();
 
             if bar_target == Target::Stdout {
                 // add the buffered messages
@@ -565,7 +475,7 @@ fn print_task() -> JoinHandle<()> {
             // nothing else to do, mark the task done,
             // so the printer knows to join this thread (after we drop the lock guard)
             // whenever someone calls, instead of posting to this thread
-            on_task_end(&mut printer);
+            on_task_end(printer);
             // we know the printer buffer is empty
             // because we just printed all of it while having
             // the lock on the printer, no need to print again
@@ -595,57 +505,61 @@ fn print_task() -> JoinHandle<()> {
     })
 }
 
-// // note that for interactive io, it's recommended to use blocking io directly
-// // on a thread instead of tokio
-// fn prompt_task(
-//     first_send: oneshot::Sender<std::io::Result<ZeroWhenDropString>>,
-//     _is_password: bool,
-// ) -> JoinHandle<()> {
-//     use std::io::Write as _;
-//     let mut stdout = std::io::stdout();
-//     std::thread::spawn(move || {
-//         let mut send = first_send;
-//         let mut _is_password = _is_password;
-//         let mut buf = String::new();
-//         loop {
-//
-//             #[cfg(feature = "prompt-password")]
-//             let result = if _is_password {
-//                 super::prompt_password::read_password()
-//             } else {
-//                 read_plaintext(&mut buf)
-//             };
-//             #[cfg(not(feature = "prompt-password"))]
-//             let result = read_plaintext(&mut buf);
-//
-//             let _ = send.send(result);
-//             let Ok(mut printer) = super::PRINTER.lock() else {
-//                 break;
-//             };
-//             let Some(next) = printer.pending_prompts.pop_front() else {
-//                 printer.prompt_task.mark_join();
-//                 break;
-//             };
-//             let _ = write!(
-//                 stdout,
-//                 "{}{}{}",
-//                 printer.controls.move_to_begin_and_clear, printer.buffered, next.prompt
-//             );
-//             printer.buffered.clear();
-//             let _ = stdout.flush();
-//             send = next.send;
-//
-//             #[cfg(feature = "prompt-password")]
-//             {
-//                 _is_password = next.is_password;
-//             }
-//         }
-//     })
-// }
-
-fn read_plaintext(buf: &mut String) -> std::io::Result<ZeroWhenDropString> {
+fn read_plaintext(buf: &mut String) -> io::Result<cu::ZString> {
     buf.clear();
-    std::io::stdin()
+    io::stdin()
         .read_line(buf)
         .map(|_| buf.trim().to_string().into())
+}
+
+struct PromptTask {
+    send: OnceSend<io::Result<cu::ZString>>,
+    prompt: String,
+    #[cfg(feature = "prompt-password")]
+    is_password: bool,
+}
+
+/// For synchornizing with the printer
+#[derive(Default)]
+struct PrintingThread {
+    needs_join: bool,
+    /// Handle for the printing task, None means
+    /// either no printing task is running, or, the printing
+    /// task is terminating
+    handle: Option<JoinHandle<()>>,
+}
+impl PrintingThread {
+    /// Take the handle for joining
+    fn take(&mut self) -> Option<JoinHandle<()>> {
+        self.needs_join = false;
+        self.handle.take()
+    }
+    /// Mark the task as will end, so it can be joined
+    fn mark_join(&mut self) {
+        self.needs_join = true;
+    }
+    /// If the task is active
+    fn active(&self) -> bool {
+        !self.needs_join && self.handle.is_some()
+    }
+    /// Blockingly join the task on the current thread
+    fn join(&mut self) {
+        self.needs_join = false;
+        if let Some(handle) = self.handle.take() {
+            let _: Result<_, _> = handle.join();
+        }
+    }
+    /// Assign a new handle
+    fn assign(&mut self, handle: JoinHandle<()>) {
+        self.needs_join = false;
+        self.handle = Some(handle);
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Target {
+    /// Print to Stdout
+    Stdout,
+    /// Print to Stderr
+    Stderr,
 }

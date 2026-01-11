@@ -325,32 +325,33 @@ impl PrintState {
                 let Some(rendered) = message.rendered else {
                     return;
                 };
-                match message.level {
-                    Some("warning") => match &self.diagnostic_hook {
-                        None => {
-                            crate::__priv::__print_with_level(
-                                self.warning_lv,
-                                format_args!("{rendered}"),
-                            );
-                        }
-                        Some(hook) => hook(true, &rendered),
-                    },
-                    Some("error") => match &self.diagnostic_hook {
-                        None => {
-                            crate::__priv::__print_with_level(
-                                self.error_lv,
-                                format_args!("{rendered}"),
-                            );
-                        }
-                        Some(hook) => hook(false, &rendered),
-                    },
-                    _ => {
-                        crate::__priv::__print_with_level(
-                            self.other_lv,
-                            format_args!("{rendered}"),
-                        );
-                    }
-                }
+                todo!()
+                // match message.level {
+                //     Some("warning") => match &self.diagnostic_hook {
+                //         None => {
+                //             // crate::__priv::__print_with_level(
+                //             //     self.warning_lv,
+                //             //     format_args!("{rendered}"),
+                //             // );
+                //         }
+                //         Some(hook) => hook(true, &rendered),
+                //     },
+                //     Some("error") => match &self.diagnostic_hook {
+                //         None => {
+                //             crate::__priv::__print_with_level(
+                //                 self.error_lv,
+                //                 format_args!("{rendered}"),
+                //             );
+                //         }
+                //         Some(hook) => hook(false, &rendered),
+                //     },
+                //     _ => {
+                //         crate::__priv::__print_with_level(
+                //             self.other_lv,
+                //             format_args!("{rendered}"),
+                //         );
+                //     }
+                // }
             }
             "build-finished" => match payload.success {
                 Some(true) => {
@@ -369,50 +370,51 @@ impl PrintState {
     }
 
     fn handle_stderr(&mut self, line: &str) {
-        static STATUS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new("^((\x1b[^m]*m)|\\s)*(Compiling|Checking)((\x1b[^m]*m)|\\s)*").unwrap()
-        });
-        static ERROR_REGEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new("^((\x1b[^m]*m)|\\s)*error").unwrap());
-        static WARNING_REGEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new("^((\x1b[^m]*m)|\\s)*warning").unwrap());
-        let Some(m) = STATUS_REGEX.find(line) else {
-            // some error/warning messages aren't emited to stdout,
-            // so we use a regex to match and print them
-            if let Some(lv) = self.stderr_printing_message_lv {
-                // since the message might be multi-line, we
-                // keep printing until a status message is matched
-                crate::__priv::__print_with_level(lv, format_args!("{line}"));
-                return;
-            }
-            // check if the message matches error/warning
-            if ERROR_REGEX.is_match(line) {
-                crate::__priv::__print_with_level(self.error_lv, format_args!("{line}"));
-                self.stderr_printing_message_lv = Some(self.error_lv);
-                return;
-            }
-            if WARNING_REGEX.is_match(line) {
-                crate::__priv::__print_with_level(self.warning_lv, format_args!("{line}"));
-                self.stderr_printing_message_lv = Some(self.warning_lv);
-                return;
-            }
-            // print as other message
-            crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
-            return;
-        };
-        // print the status message as other, and clear the error/warning message state
-        crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
-        self.stderr_printing_message_lv = None;
-
-        // process the status message
-        let line = &line[m.end()..].trim();
-        // crate name can't have space (right?)
-        let crate_name = match line.find(' ') {
-            None => line,
-            Some(i) => &line[..i],
-        };
-        self.in_progress.insert(crate_name.replace('-', "_"));
-        self.update_bar();
+        todo!()
+        // static STATUS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+        //     Regex::new("^((\x1b[^m]*m)|\\s)*(Compiling|Checking)((\x1b[^m]*m)|\\s)*").unwrap()
+        // });
+        // static ERROR_REGEX: LazyLock<Regex> =
+        //     LazyLock::new(|| Regex::new("^((\x1b[^m]*m)|\\s)*error").unwrap());
+        // static WARNING_REGEX: LazyLock<Regex> =
+        //     LazyLock::new(|| Regex::new("^((\x1b[^m]*m)|\\s)*warning").unwrap());
+        // let Some(m) = STATUS_REGEX.find(line) else {
+        //     // some error/warning messages aren't emited to stdout,
+        //     // so we use a regex to match and print them
+        //     if let Some(lv) = self.stderr_printing_message_lv {
+        //         // since the message might be multi-line, we
+        //         // keep printing until a status message is matched
+        //         crate::__priv::__print_with_level(lv, format_args!("{line}"));
+        //         return;
+        //     }
+        //     // check if the message matches error/warning
+        //     if ERROR_REGEX.is_match(line) {
+        //         crate::__priv::__print_with_level(self.error_lv, format_args!("{line}"));
+        //         self.stderr_printing_message_lv = Some(self.error_lv);
+        //         return;
+        //     }
+        //     if WARNING_REGEX.is_match(line) {
+        //         crate::__priv::__print_with_level(self.warning_lv, format_args!("{line}"));
+        //         self.stderr_printing_message_lv = Some(self.warning_lv);
+        //         return;
+        //     }
+        //     // print as other message
+        //     crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
+        //     return;
+        // };
+        // // print the status message as other, and clear the error/warning message state
+        // crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
+        // self.stderr_printing_message_lv = None;
+        //
+        // // process the status message
+        // let line = &line[m.end()..].trim();
+        // // crate name can't have space (right?)
+        // let crate_name = match line.find(' ') {
+        //     None => line,
+        //     Some(i) => &line[..i],
+        // };
+        // self.in_progress.insert(crate_name.replace('-', "_"));
+        // self.update_bar();
     }
 
     fn update_bar(&mut self) {

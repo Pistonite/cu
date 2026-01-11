@@ -1,13 +1,160 @@
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use crate::print::progress::bar::ProgressBar;
-use crate::print::progress::eta::Estimater;
-use crate::print::{Tick, ansi};
+use crate::cli::Tick;
+use crate::cli::progress::{ChildState,Estimater,BarFormatter, BarResult, ProgressBarBuilder, ChildStateStrong};
+use crate::cli::fmt::ansi;
+use crate::cli::printer::PRINTER;
 
-const CHAR_BAR_TICK: char = '\u{251C}';
-const CHAR_BAR: char = '\u{2502}';
-const CHAR_TICK: char = '\u{2514}';
+const CHAR_BAR_TICK: char = '\u{251C}'; // |>
+const CHAR_BAR: char = '\u{2502}'; // |
+const CHAR_TICK: char = '\u{2514}'; // >
+
+/// Handle for a progress bar (This is the internal state, the handle is `Arc<ProgressBar>`)
+///
+/// See [Progress Bars](fn@crate::progress)
+#[derive(Debug)]
+pub struct ProgressBar {
+    pub(crate) state: StateImmut,
+    state_mut: Mutex<State>,
+}
+impl ProgressBar {
+    pub(crate) fn spawn(state: StateImmut, state_mut: State, parent: Option<Arc<Self>>) -> Arc<Self> {
+        let bar = Arc::new(Self {
+            state, state_mut: Mutex::new(state_mut)
+        });
+        match parent {
+            Some(p) => {
+                if let Ok(mut p) = p.state_mut.lock() {
+                    p.add_child(&bar);
+                }
+            }
+            None => {
+                if let Ok(mut printer) = PRINTER.lock() {
+                    if let Some(printer) = printer.as_mut() {
+                        printer.add_progress_bar(&bar);
+                    }
+                }
+            }
+        }
+        bar
+    }
+    #[doc(hidden)]
+    #[inline(always)]
+    pub fn __set(self: &Arc<Self>, current: u64, message: Option<String>) {
+        if let Ok(mut bar) = self.state_mut.lock() {
+            bar.unreal_current = current;
+            if let Some(x) = message {
+                bar.set_message(&x);
+            }
+        }
+    }
+
+    #[doc(hidden)]
+    #[inline(always)]
+    pub fn __inc(self: &Arc<Self>, amount: u64, message: Option<String>) {
+        if let Ok(mut bar) = self.state_mut.lock() {
+            bar.unreal_current.saturating_add(amount);
+            if let Some(x) = message {
+                bar.set_message(&x);
+            }
+        }
+    }
+
+    /// Set the total steps (if the progress is finite)
+    pub fn set_total(&self, total: u64) {
+        if total == 0 {
+            // 0 is a special value, so we do not allow setting it
+            return;
+        }
+        if let Ok(mut bar) = self.state_mut.lock() {
+            bar.unreal_total = total;
+        }
+    }
+
+    /// Start building a child progress bar
+    ///
+    /// Note that the child builder will keep this bar alive (displayed), even
+    /// if the child is not spawned
+    #[inline(always)]
+    pub fn child(self: &Arc<Self>, message: impl Into<String>) -> ProgressBarBuilder {
+        ProgressBarBuilder::new(message.into()).parent(Some(Arc::clone(self)))
+    }
+
+    /// Mark the progress bar as done and drop the handle.
+    ///
+    /// This needs to be called if the bar is unbounded. Otherwise,
+    /// the bar will display in the interrupted state when dropped.
+    ///
+    /// If the progress is finite, then interrupted state is automatically
+    /// determined (`current != total`)
+    pub fn done(self: Arc<Self>) {
+        if self.state.unbounded {
+            if let Ok(mut bar) = self.state_mut.lock() {
+                bar.unreal_current = 1;
+                bar.unreal_total = 1;
+            }
+        }
+    }
+
+    /// Same as [`done`](Self::done), but does not drop the bar.
+    pub fn done_by_ref(&self) {
+        if self.state.unbounded {
+            if let Ok(mut bar) = self.state_mut.lock() {
+                bar.unreal_current = 1;
+                bar.unreal_total = 1;
+            }
+        }
+    }
+
+    /// Format the bar
+    #[inline(always)]
+    pub(crate) fn format(&self, fmt: &mut BarFormatter<'_, '_, '_>) -> i32 {
+        self.format_at_depth(0, &mut String::new(), fmt)
+    }
+
+    /// Format the bar at depth
+    fn format_at_depth(
+        &self,
+        depth: usize,
+        hierarchy: &mut String,
+        fmt: &mut BarFormatter<'_, '_, '_>,
+    ) -> i32 {
+        let Ok(mut bar) = self.state_mut.lock() else {
+            return 0;
+        };
+        bar.format_at_depth(depth, hierarchy, fmt, &self.state)
+    }
+}
+
+impl Drop for ProgressBar {
+    fn drop(&mut self) {
+        let result = match self.state_mut.lock() {
+            Err(_) => BarResult::DontKeep,
+            Ok(bar) => bar.check_result(&self.state),
+        };
+        if let Some(parent) = &self.state.parent {
+            // inform parent our result
+            if let Ok(mut parent_state) = parent.state_mut.lock() {
+                parent_state.child_done(self.state.id, result.clone());
+            }
+        }
+        let handle = {
+            // scope for printer lock
+            let Ok(mut printer) = PRINTER.lock() else {
+                return;
+            };
+            let Some(printer) = printer.as_mut() else {
+                return;
+            };
+            printer.print_bar_done(&result, self.state.parent.is_none());
+            printer.take_print_task_if_should_join()
+        };
+        if let Some(x) = handle {
+            let _: Result<(), _> = x.join();
+        }
+    }
+}
 
 /// Internal, immutable state of progress bar
 #[derive(Debug)]
@@ -82,20 +229,6 @@ impl State {
                 self.unreal_current.min(self.unreal_total),
                 Some(self.unreal_total),
             )
-        }
-    }
-
-    pub fn set_current(&mut self, current: u64) {
-        self.unreal_current = current;
-    }
-
-    pub fn inc_current(&mut self, current: u64) {
-        self.unreal_current += current;
-    }
-
-    pub fn set_total(&mut self, total: u64) {
-        if total != 0 {
-            self.unreal_total = total;
         }
     }
 
@@ -253,6 +386,7 @@ impl State {
                 out.push(' ');
             }
             out.push(CHAR_TICK);
+            out.push_str(fmt.colors.reset);
             use std::fmt::Write as _;
             let _ = write!(
                 out,
@@ -373,8 +507,8 @@ impl State {
             temp.clear();
             // _: fmt for string does not fail
             let _ = match total {
-                None => write!(temp, "{}", ByteFormat(current)),
-                Some(total) => write!(temp, "{} / {}", ByteFormat(current), ByteFormat(total)),
+                None => write!(temp, "{}", cu::ByteFormat(current)),
+                Some(total) => write!(temp, "{} / {}", cu::ByteFormat(current), cu::ByteFormat(total)),
             };
 
             if width >= temp.len() {
@@ -442,15 +576,15 @@ impl State {
                 format!("[{current}/?] {message}")
             }
             (None, true) => {
-                let current = ByteFormat(current);
+                let current = cu::ByteFormat(current);
                 format!("{message} ({current})")
             }
             (Some(total), false) => {
                 format!("[{current}/{total}] {message}")
             }
             (Some(total), true) => {
-                let current = ByteFormat(current);
-                let total = ByteFormat(total);
+                let current = cu::ByteFormat(current);
+                let total = cu::ByteFormat(total);
                 format!("{message} ({current} / {total})")
             }
         }
@@ -467,67 +601,4 @@ fn format_message_with_width(out: &mut String, mut width: usize, message: &str) 
     }
     width
 }
-#[derive(Debug)]
-enum ChildState {
-    /// The done message (if `keep` is true)
-    Done(String),
-    /// The interrupted message
-    Interrupted(String),
-    /// Still running
-    Progress(usize, Weak<ProgressBar>),
-}
-impl ChildState {
-    fn upgrade(&self) -> Option<ChildStateStrong<'_>> {
-        Some(match self {
-            ChildState::Done(x) => ChildStateStrong::Done(x),
-            ChildState::Interrupted(x) => ChildStateStrong::Interrupted(x),
-            ChildState::Progress(_, weak) => ChildStateStrong::Progress(weak.upgrade()?),
-        })
-    }
-}
 
-enum ChildStateStrong<'a> {
-    Done(&'a str),
-    Interrupted(&'a str),
-    Progress(Arc<ProgressBar>),
-}
-
-#[derive(Default, Clone)]
-pub enum BarResult {
-    /// Bar is done and don't keep it
-    #[default]
-    DontKeep,
-    /// Bar is done, with a message to keep
-    Done(String),
-    /// Bar is interrupted
-    Interrupted(String),
-}
-
-pub struct BarFormatter<'a, 'b, 'c> {
-    pub colors: ansi::Colors,
-    pub bar_color: &'a str,
-    pub width: usize,
-    pub tick: Tick,
-    pub now: &'c mut Option<Instant>,
-    pub out: &'b mut String,
-    pub temp: &'b mut String,
-}
-
-struct ByteFormat(u64);
-impl std::fmt::Display for ByteFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (unit_bytes, unit_char) in [
-            (1000_000_000_000, 'T'),
-            (1000_000_000, 'G'),
-            (1000_000, 'M'),
-            (1000, 'k'),
-        ] {
-            if self.0 >= unit_bytes {
-                let whole = self.0 / unit_bytes;
-                let deci = (self.0 % unit_bytes) * 10 / unit_bytes;
-                return write!(f, "{whole}.{deci}{unit_char}");
-            }
-        }
-        write!(f, "{}B", self.0)
-    }
-}

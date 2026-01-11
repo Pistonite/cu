@@ -73,7 +73,7 @@ impl<'a> Iterator for AnsiWidthIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let c = self.chars.next()?;
         let width = if self.is_escaping {
-            if is_ansi_end_char(c) {
+            if is_esc_end(c) {
                 self.is_escaping = false;
             }
             0
@@ -89,7 +89,7 @@ impl<'a> Iterator for AnsiWidthIter<'a> {
     }
 }
 
-pub(crate) fn is_ansi_end_char(c: char) -> bool {
+pub(crate) fn is_esc_end(c: char) -> bool {
     // we only do very basic check right now
     c < u8::MAX as char && b"mAKGJBCDEFHSTfhlin".contains(&(c as u8))
 }

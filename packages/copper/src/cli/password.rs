@@ -8,12 +8,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) https://github.com/conradkleinespel/rpassword
 
-#[cfg(target_family = "unix")]
+#[cfg(unix)]
 pub(crate) use unix::read_password;
-#[cfg(target_family = "windows")]
+#[cfg(windows)]
 pub(crate) use windows::read_password;
 
-#[cfg(target_family = "unix")]
+#[cfg(unix)]
 mod unix {
     use libc::{ECHO, ECHONL, TCSANOW, c_int, tcsetattr, termios};
     use std::io::{self, BufRead};
@@ -56,21 +56,21 @@ mod unix {
     }
 
     /// Turns a C function return into an IO Result
-    fn io_result(ret: c_int) -> std::io::Result<()> {
+    fn io_result(ret: c_int) -> io::Result<()> {
         match ret {
             0 => Ok(()),
-            _ => Err(std::io::Error::last_os_error()),
+            _ => Err(io::Error::last_os_error()),
         }
     }
 
-    fn safe_tcgetattr(fd: c_int) -> std::io::Result<termios> {
+    fn safe_tcgetattr(fd: c_int) -> io::Result<termios> {
         let mut term = mem::MaybeUninit::<termios>::uninit();
         io_result(unsafe { ::libc::tcgetattr(fd, term.as_mut_ptr()) })?;
         Ok(unsafe { term.assume_init() })
     }
 
     /// Reads a password from the TTY
-    pub(crate) fn read_password() -> std::io::Result<crate::ZeroWhenDropString> {
+    pub(crate) fn read_password() -> io::Result<crate::ZString> {
         let tty = std::fs::File::open("/dev/tty")?;
         let fd = tty.as_raw_fd();
         let mut reader = io::BufReader::new(tty);
@@ -82,8 +82,8 @@ mod unix {
     fn read_password_from_fd_with_hidden_input(
         reader: &mut impl BufRead,
         fd: i32,
-    ) -> std::io::Result<crate::ZeroWhenDropString> {
-        let mut password = crate::ZeroWhenDropString::default();
+    ) -> io::Result<crate::ZString> {
+        let mut password = crate::ZString::default();
         {
             let _hidden_input = HiddenInput::new(fd)?;
             reader.read_line(&mut password)?;
@@ -92,7 +92,7 @@ mod unix {
     }
 }
 
-#[cfg(target_family = "windows")]
+#[cfg(windows)]
 mod windows {
     use std::io::{self, BufRead, BufReader};
     use std::os::windows::io::FromRawHandle;

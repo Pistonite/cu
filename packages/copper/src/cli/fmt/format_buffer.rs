@@ -1,69 +1,63 @@
-use super::ansi;
 
-/// Get the terminal width, or the internal max if cannot get
-pub fn term_width_or_max() -> usize {
-    term_width().unwrap_or(400)
-}
+use crate::cli::fmt::{self, ansi};
 
-/// Get the terminal width, capped as some internal amount
-pub fn term_width() -> Option<usize> {
-    term_width_height().map(|x| x.0)
-}
-
-/// Get the terminal height, capped as some internal amount
-pub fn term_width_height() -> Option<(usize, usize)> {
-    if cfg!(feature = "__test") {
-        // fix the size in test
-        Some((60, 20))
-    } else {
-        use terminal_size::*;
-        terminal_size().map(|(Width(w), Height(h))| ((w as usize).min(400), (h as usize).min(400)))
-    }
-}
-
+/// Buffer for formatting printing messages
 pub(crate) struct FormatBuffer {
+    /// Total width to print
     width: usize,
+    /// Current char position in the line
     curr: usize,
+    /// Internal buffer
     buffer: String,
+    /// ANSI code for gray
     gray_color: &'static str,
+    /// ANSI code for the current text color
     text_color: &'static str,
 }
 
 impl FormatBuffer {
     pub fn new() -> Self {
         Self {
-            width: term_width_or_max(),
+            width: fmt::term_width_or_max(),
             curr: 0,
             buffer: String::new(),
             gray_color: "",
             text_color: "",
         }
     }
+    /// Get the formatted buffer content
     pub fn as_str(&self) -> &str {
         self.buffer.as_str()
     }
+    /// Take the formatted buffer content out, leaving empty string
     pub fn take(&mut self) -> String {
         std::mem::take(&mut self.buffer)
     }
+    /// Reset 
     pub fn reset(&mut self, gray_color: &'static str, text_color: &'static str) {
         self.curr = 0;
         self.buffer.clear();
-        self.width = term_width_or_max();
+        self.width = fmt::term_width_or_max();
         self.gray_color = gray_color;
         self.text_color = text_color;
     }
-    pub fn end(&mut self) {
+
+    /// Push a newline character (note this is different from [`new_line`](Self::new_line))
+    pub fn push_lf(&mut self) {
         self.buffer.push('\n');
     }
-
+    /// Push a string as control characters. i.e. the content will be
+    /// appended to the buffer without formatting.
+    pub fn push_control(&mut self, x: &str) {
+        self.buffer.push_str(x)
+    }
+    /// Push and format string content
     pub fn push_str(&mut self, x: &str) {
         for (c, w) in ansi::with_width(x.chars()) {
             self.push(c, w);
         }
     }
-    pub fn push_control(&mut self, x: &str) {
-        self.buffer.push_str(x)
-    }
+    /// Push a character with its width
     pub fn push(&mut self, c: char, w: usize) {
         if c == '\n' {
             self.new_line();
@@ -80,7 +74,7 @@ impl FormatBuffer {
         self.buffer.push(c);
         self.curr += w;
     }
-
+    /// Start formatting a new line
     pub fn new_line(&mut self) {
         self.buffer.push('\n');
         self.buffer.push_str(self.gray_color);

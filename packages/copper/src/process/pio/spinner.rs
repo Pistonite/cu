@@ -123,7 +123,7 @@ impl ChildOutConfig for Spinner {
         is_out: bool,
     ) -> crate::Result<Self::Task> {
         let lv = self.config.lv.get();
-        let log_prefix = if crate::log_enabled(lv) {
+        let log_prefix = if lv.enabled() {
             let name = name.unwrap_or_default();
             if name.is_empty() {
                 String::new()
@@ -174,13 +174,14 @@ impl SpinnerTask {
         loop {
             match driver.next().await {
                 DriverOutput::Line(line) => {
-                    if lv != Lv::Off {
-                        crate::__priv::__print_with_level(lv, format_args!("{prefix}{line}"));
-                        // erase the progress line if we decide to print it out
-                        crate::progress!(bar, "")
-                    } else {
-                        crate::progress!(bar, "{line}")
-                    }
+                    todo!()
+                    // if lv != Lv::Off {
+                    //     crate::__priv::__print_with_level(lv, format_args!("{prefix}{line}"));
+                    //     // erase the progress line if we decide to print it out
+                    //     crate::progress!(bar, "")
+                    // } else {
+                    //     crate::progress!(bar, "{line}")
+                    // }
                 }
                 DriverOutput::Progress(line) => {
                     crate::progress!(bar, "{line}")

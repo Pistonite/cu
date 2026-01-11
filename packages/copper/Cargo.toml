@@ -13,11 +13,12 @@ exclude = [
 [dependencies]
 pistonite-cu-proc-macros = { version = "0.2.5", path = "../copper-proc-macros" }
 
+# --- Always enabled ---
 anyhow = "1.0.100"
 log = "0.4.29"
-oneshot = "0.1.11"
 
 # printing/cli
+oneshot = { version = "0.1.11", optional = true }
 env_filter = { version = "0.1.4", optional = true }
 terminal_size = { version = "0.4.3", optional = true }
 unicode-width = { version = "0.2.2", features = ["cjk"], optional = true }
@@ -65,8 +66,8 @@ features = [ "macros", "rt-multi-thread", "time" ]
 [features]
 default = ["full"]
 full = [
-    "coroutine-heavy",
     "cli",
+    "coroutine-heavy",
     "prompt-password",
     "process",
     "json",
@@ -75,12 +76,12 @@ full = [
     "derive",
 ]
 
-# Command Line Interface (enables integration with `clap` and command line entry points)
+# Command Line Interface
+print = ["dep:oneshot", "dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width"]
 cli = ["dep:clap", "print"]
-print = ["dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width"]
-# Utils to show prompt for user input in terminal
 prompt = ["print"]
 prompt-password = ["prompt"]
+
 # Enable coroutine drivers, which allow interop with async
 coroutine = [
     "dep:tokio", "dep:num_cpus",
@@ -136,7 +137,3 @@ required-features = ["fs", "cli"]
 [[example]]
 name = "cargo"
 required-features = ["process", "cli", "json"]
-
-[[example]]
-name = "prompt_password"
-required-features = ["cli", "prompt-password"]

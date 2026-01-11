@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::print::{TICK_INTERVAL, Tick};
+use crate::cli::{TICK_INTERVAL, Tick};
 
 /// Estimate the time for progress bar
 #[derive(Debug)]
