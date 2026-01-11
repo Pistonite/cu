@@ -6,7 +6,7 @@ use tokio::process::{Child as TokioChild, Command as TokioCommand};
 
 use super::{Child, ChildIo, Config, Preset};
 
-use crate::{Context as _, PathExtension as _, co, pio};
+use crate::{Context as _, co, pio, str::PathExtension as _};
 
 /// A [`Command`] to be built
 pub type CommandBuilder = Command<(), (), ()>;
@@ -541,7 +541,7 @@ fn pre_spawn<Out: pio::ChildOutConfig, Err: pio::ChildOutConfig, In: pio::ChildI
     let mut trace = String::new();
 
     // build the trace message
-    let log_enabled = crate::log_enabled(crate::lv::T);
+    let log_enabled = crate::lv::T.enabled();
     if log_enabled {
         let command = self_.command.as_std();
         let _ = write!(

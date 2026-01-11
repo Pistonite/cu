@@ -1,5 +1,8 @@
 use tokio::process::Command as TokioCommand;
 
+#[cfg(feature = "print")]
+use crate::cli::fmt;
+
 /// Add arguments to the command
 #[doc(hidden)]
 pub trait Config {
@@ -94,7 +97,7 @@ impl ColorFlag {
 }
 impl std::fmt::Display for ColorFlag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let flag = if crate::color_enabled() {
+        let flag = if crate::lv::color_enabled() {
             "always"
         } else {
             "never"
@@ -108,7 +111,7 @@ impl std::fmt::Display for ColorFlag {
 }
 impl Config for ColorFlag {
     fn configure(self, command: &mut TokioCommand) {
-        let flag = if crate::color_enabled() {
+        let flag = if crate::lv::color_enabled() {
             "always"
         } else {
             "never"
@@ -179,7 +182,7 @@ impl WidthFlag {
 #[cfg(feature = "print")]
 impl Config for WidthFlag {
     fn configure(self, command: &mut TokioCommand) {
-        if let Some(w) = crate::term_width() {
+        if let Some(w) = fmt::term_width() {
             if self.use_eq_sign() {
                 command.arg(format!("--width={w}"));
             } else {

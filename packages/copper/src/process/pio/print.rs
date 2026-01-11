@@ -72,7 +72,7 @@ impl PrintTask {
             match driver.next().await {
                 DriverOutput::Line(line) => {
                     for l in line.lines() {
-                        crate::__priv::__print_with_level(lv, format_args!("{prefix}{l}"));
+                        crate::cli::__print_with_level(lv, format_args!("{prefix}{l}"));
                     }
                 }
                 DriverOutput::Done => break,

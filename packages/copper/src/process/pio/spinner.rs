@@ -4,7 +4,8 @@ use std::sync::Arc;
 use spin::mutex::SpinMutex;
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
-use crate::{Atomic, BoxedFuture, ProgressBar, lv::Lv};
+use crate::lv::Lv;
+use crate::{Atomic, BoxedFuture, ProgressBar, ProgressBarBuilder};
 
 use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
@@ -63,10 +64,9 @@ use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 #[inline(always)]
 pub fn spinner(name: impl Into<String>) -> Spinner {
     Spinner {
-        prefix: name.into(),
         config: Arc::new(SpinnerInner {
             lv: Atomic::new_u8(Lv::Off as u8),
-            bar: SpinMutex::new(None),
+            bar: SpinMutex::new(Err(crate::progress(name))),
         }),
     }
 }
@@ -74,9 +74,6 @@ pub fn spinner(name: impl Into<String>) -> Spinner {
 #[derive(Clone)]
 #[doc(hidden)]
 pub struct Spinner {
-    /// prefix of the bar
-    prefix: String,
-
     config: Arc<SpinnerInner>,
 }
 #[rustfmt::skip]
@@ -101,7 +98,7 @@ struct SpinnerInner {
     // the bar spawned when calling take() for the first time,
     // using a spin lock because it should be VERY rare that
     // we get contention
-    bar: SpinMutex<Option<Arc<ProgressBar>>>,
+    bar: SpinMutex<Result<Arc<ProgressBar>, ProgressBarBuilder>>,
 }
 pub struct SpinnerTask {
     lv: Lv,
@@ -126,7 +123,7 @@ impl ChildOutConfig for Spinner {
         is_out: bool,
     ) -> crate::Result<Self::Task> {
         let lv = self.config.lv.get();
-        let log_prefix = if crate::log_enabled(lv) {
+        let log_prefix = if lv.enabled() {
             let name = name.unwrap_or_default();
             if name.is_empty() {
                 String::new()
@@ -138,12 +135,15 @@ impl ChildOutConfig for Spinner {
         };
         let bar = {
             let mut bar_arc = self.config.bar.lock();
-            if let Some(bar) = bar_arc.as_ref() {
-                Arc::clone(bar)
-            } else {
-                let bar = crate::progress_unbounded(self.prefix);
-                *bar_arc = Some(Arc::clone(&bar));
-                bar
+            match bar_arc.as_mut() {
+                // if already created, then just use the bar (i.e. if created
+                // by the same spinner configured for multiple outputs
+                Ok(bar) => Arc::clone(bar),
+                Err(e) => {
+                    let bar = e.clone().spawn();
+                    *bar_arc = Ok(Arc::clone(&bar));
+                    bar
+                }
             }
         };
         Ok(SpinnerTask {
@@ -175,15 +175,15 @@ impl SpinnerTask {
             match driver.next().await {
                 DriverOutput::Line(line) => {
                     if lv != Lv::Off {
-                        crate::__priv::__print_with_level(lv, format_args!("{prefix}{line}"));
+                        crate::cli::__print_with_level(lv, format_args!("{prefix}{line}"));
                         // erase the progress line if we decide to print it out
-                        crate::progress!(&bar, (), "")
+                        crate::progress!(bar, "")
                     } else {
-                        crate::progress!(&bar, (), "{line}")
+                        crate::progress!(bar, "{line}")
                     }
                 }
                 DriverOutput::Progress(line) => {
-                    crate::progress!(&bar, (), "{line}")
+                    crate::progress!(bar, "{line}")
                 }
                 DriverOutput::Done => break,
                 _ => {}

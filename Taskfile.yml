@@ -14,6 +14,7 @@ includes:
   cu:             {taskfile: ./packages/copper,             dir: ./packages/copper,             internal: true}
   cu-proc-macros: {taskfile: ./packages/copper-proc-macros, dir: ./packages/copper-proc-macros, internal: true}
   pm:             {taskfile: ./packages/promethium,         dir: ./packages/promethium,         internal: true}
+  terminal-tests: {taskfile: ./packages/terminal-tests,     dir: ./packages/terminal-tests,     internal: true}
 
 tasks:
   install-cargo-extra-tools:
@@ -33,11 +34,13 @@ tasks:
       - task: pm:check
       - task: cu-proc-macros:check
       - task: cu:check
+      - task: terminal-tests:check
 
   test:
     cmds:
       - task: pm:test
       - task: cu:test
+      - task: terminal-tests:run
 
   dev-doc:
     cmds:

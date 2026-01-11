@@ -8,7 +8,7 @@ use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as T
 
 use crate::lv::Lv;
 use crate::process::{Command, Preset, pio};
-use crate::{BoxedFuture, ProgressBar};
+use crate::{BoxedFuture, ProgressBar, ProgressBarBuilder};
 
 /// Display progress of cargo task with a progress bar, and emitting
 /// status messages and diagnostic messages using this crate's printing utilities.
@@ -22,7 +22,7 @@ use crate::{BoxedFuture, ProgressBar};
 /// # fn main() -> cu::Result<()> {
 /// cu::which("cargo")?.command()
 ///     .args(["build", "--release"])
-///     .preset(cu::pio::cargo())
+///     .preset(cu::pio::cargo("building my crate"))
 ///     .spawn()?.0
 ///     .wait_nz()?;
 /// # Ok(()) }
@@ -38,6 +38,8 @@ use crate::{BoxedFuture, ProgressBar};
 /// crates being built in one line (similar to the build progress bar shown
 /// by cargo).
 ///
+/// You can customize the spawned progress bar with
+///
 /// # Message levels
 /// Errors, warnings and status messages (like `Compiling foobar v0.1.0`)
 /// can be configured with the [`error`](Cargo::error), [`warning`](Cargo::warning),
@@ -47,7 +49,7 @@ use crate::{BoxedFuture, ProgressBar};
 /// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
-/// cu::pio::cargo()
+/// cu::pio::cargo("cargo build")
 ///     // configure message levels; levels shown here are the default
 ///     .error(cu::lv::E)
 ///     .warning(cu::lv::W)
@@ -64,7 +66,7 @@ use crate::{BoxedFuture, ProgressBar};
 /// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
-/// cu::pio::cargo()
+/// cu::pio::cargo("cargo build")
 ///     // configure message levels; levels shown here are the default
 ///     .on_diagnostic(|is_warning, message| {
 ///         // this implementation will be identical to the default behavior
@@ -77,15 +79,18 @@ use crate::{BoxedFuture, ProgressBar};
 /// ```
 ///
 /// # Output
-/// The handle to the progress bar is emitted to both the stdout and stderr slot.
-/// Be sure to manually drop the handle to mark the progress as done if needed.
+/// The handle to the progress bar is emitted to the stdout slot.
+/// Be sure to manually call `.done()` on it. See [Progress Bars](fn@crate::progress)
+/// for more details
 ///
-pub fn cargo() -> Cargo {
+#[inline(always)]
+pub fn cargo(progress_message: impl Into<String>) -> Cargo {
     Cargo {
         error_lv: Lv::Error,
         warning_lv: Lv::Warn,
         other_lv: Lv::Debug,
         diagnostic_hook: None,
+        progress_builder: crate::progress(progress_message),
     }
 }
 pub struct Cargo {
@@ -93,6 +98,7 @@ pub struct Cargo {
     warning_lv: Lv,
     other_lv: Lv,
     diagnostic_hook: Option<DianogsticHook>,
+    progress_builder: ProgressBarBuilder,
 }
 
 impl Cargo {
@@ -120,24 +126,30 @@ impl Cargo {
         self.diagnostic_hook = Some(Box::new(f));
         self
     }
+
+    /// Configure the progress bar that will be spawned
+    #[inline(always)]
+    pub fn configure_spinner<F: FnOnce(ProgressBarBuilder) -> ProgressBarBuilder>(
+        mut self,
+        f: F,
+    ) -> Self {
+        self.progress_builder = f(self.progress_builder);
+        self
+    }
 }
 
 impl Preset for Cargo {
-    type Output = Command<Cargo, Cargo, pio::Null>;
+    type Output = Command<Cargo, CargoStubStdErr, pio::Null>;
 
     fn configure<O, E, I>(self, command: crate::Command<O, E, I>) -> Self::Output {
         command
             .args(["--message-format=json-diagnostic-rendered-ansi"])
-            .stderr(Cargo {
-                error_lv: self.error_lv,
-                warning_lv: self.warning_lv,
-                other_lv: self.other_lv,
-                diagnostic_hook: None,
-            })
+            .stderr(CargoStubStdErr)
             .stdout(self)
             .stdin_null()
     }
 }
+
 pub struct CargoTask {
     error_lv: Lv,
     warning_lv: Lv,
@@ -149,28 +161,17 @@ pub struct CargoTask {
 }
 
 impl pio::ChildOutConfig for Cargo {
-    type Task = Option<CargoTask>;
+    type Task = CargoTask;
     type __Null = super::__OCNonNull;
     fn configure_stdout(&mut self, command: &mut TokioCommand) {
         command.stdout(Stdio::piped());
     }
-    fn configure_stderr(&mut self, command: &mut TokioCommand) {
-        command.stderr(Stdio::piped());
-    }
-    fn take(
-        self,
-        child: &mut TokioChild,
-        name: Option<&str>,
-        is_out: bool,
-    ) -> crate::Result<Self::Task> {
-        // we need to take both out and err
-        if !is_out {
-            return Ok(None);
-        }
+    fn configure_stderr(&mut self, _: &mut TokioCommand) {}
+    fn take(self, child: &mut TokioChild, _: Option<&str>, _: bool) -> crate::Result<Self::Task> {
         let stdout = super::take_child_stdout(child)?;
         let stderr = super::take_child_stderr(child)?;
-        let bar = crate::progress_unbounded(name.unwrap_or("cargo"));
-        Ok(Some(CargoTask {
+        let bar = self.progress_builder.spawn();
+        Ok(CargoTask {
             error_lv: self.error_lv,
             warning_lv: self.warning_lv,
             other_lv: self.other_lv,
@@ -178,20 +179,28 @@ impl pio::ChildOutConfig for Cargo {
             out: stdout,
             err: stderr,
             diagnostic_hook: self.diagnostic_hook,
-        }))
+        })
     }
 }
-impl pio::ChildOutTask for Option<CargoTask> {
-    type Output = Option<Arc<ProgressBar>>;
+pub struct CargoStubStdErr;
+impl pio::ChildOutConfig for CargoStubStdErr {
+    type Task = ();
+    type __Null = super::__OCNull;
+    fn configure_stdout(&mut self, _: &mut TokioCommand) {}
+    fn configure_stderr(&mut self, command: &mut TokioCommand) {
+        command.stderr(Stdio::piped());
+    }
+    fn take(self, _: &mut TokioChild, _: Option<&str>, _: bool) -> crate::Result<Self::Task> {
+        Ok(())
+    }
+}
+
+impl pio::ChildOutTask for CargoTask {
+    type Output = Arc<ProgressBar>;
 
     fn run(self) -> (Option<BoxedFuture<()>>, Self::Output) {
-        match self {
-            None => (None, None),
-            Some(task) => {
-                let bar = Arc::clone(&task.bar);
-                (Some(Box::pin(task.main())), Some(bar))
-            }
-        }
+        let bar = Arc::clone(&self.bar);
+        (Some(Box::pin(self.main())), bar)
     }
 }
 
@@ -202,13 +211,15 @@ impl CargoTask {
         let read_err = tokio::io::BufReader::new(self.err);
         let mut err_lines = Some(read_err.lines());
 
-        crate::progress!(&self.bar, (), "preparing");
+        let bar = self.bar;
+
+        crate::progress!(bar, "preparing");
 
         let mut state = PrintState::new(
             self.error_lv,
             self.warning_lv,
             self.other_lv,
-            self.bar,
+            bar,
             self.diagnostic_hook,
         );
 
@@ -317,7 +328,7 @@ impl PrintState {
                 match message.level {
                     Some("warning") => match &self.diagnostic_hook {
                         None => {
-                            crate::__priv::__print_with_level(
+                            crate::cli::__print_with_level(
                                 self.warning_lv,
                                 format_args!("{rendered}"),
                             );
@@ -326,7 +337,7 @@ impl PrintState {
                     },
                     Some("error") => match &self.diagnostic_hook {
                         None => {
-                            crate::__priv::__print_with_level(
+                            crate::cli::__print_with_level(
                                 self.error_lv,
                                 format_args!("{rendered}"),
                             );
@@ -334,15 +345,13 @@ impl PrintState {
                         Some(hook) => hook(false, &rendered),
                     },
                     _ => {
-                        crate::__priv::__print_with_level(
-                            self.other_lv,
-                            format_args!("{rendered}"),
-                        );
+                        crate::cli::__print_with_level(self.other_lv, format_args!("{rendered}"));
                     }
                 }
             }
             "build-finished" => match payload.success {
                 Some(true) => {
+                    self.bar.done_by_ref();
                     crate::trace!("cargo build successful");
                 }
                 _ => {
@@ -370,26 +379,26 @@ impl PrintState {
             if let Some(lv) = self.stderr_printing_message_lv {
                 // since the message might be multi-line, we
                 // keep printing until a status message is matched
-                crate::__priv::__print_with_level(lv, format_args!("{line}"));
+                crate::cli::__print_with_level(lv, format_args!("{line}"));
                 return;
             }
             // check if the message matches error/warning
             if ERROR_REGEX.is_match(line) {
-                crate::__priv::__print_with_level(self.error_lv, format_args!("{line}"));
+                crate::cli::__print_with_level(self.error_lv, format_args!("{line}"));
                 self.stderr_printing_message_lv = Some(self.error_lv);
                 return;
             }
             if WARNING_REGEX.is_match(line) {
-                crate::__priv::__print_with_level(self.warning_lv, format_args!("{line}"));
+                crate::cli::__print_with_level(self.warning_lv, format_args!("{line}"));
                 self.stderr_printing_message_lv = Some(self.warning_lv);
                 return;
             }
             // print as other message
-            crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
+            crate::cli::__print_with_level(self.other_lv, format_args!("{line}"));
             return;
         };
         // print the status message as other, and clear the error/warning message state
-        crate::__priv::__print_with_level(self.other_lv, format_args!("{line}"));
+        crate::cli::__print_with_level(self.other_lv, format_args!("{line}"));
         self.stderr_printing_message_lv = None;
 
         // process the status message
@@ -405,6 +414,8 @@ impl PrintState {
 
     fn update_bar(&mut self) {
         let count = self.done_count;
+        let bar = &self.bar;
+
         self.buf.clear();
         let mut iter = self.in_progress.iter();
         if let Some(x) = iter.next() {
@@ -413,9 +424,9 @@ impl PrintState {
                 self.buf.push_str(", ");
                 self.buf.push_str(c);
             }
-            crate::progress!(&self.bar, (), "{count} done, compiling: {}", self.buf);
+            crate::progress!(bar, "{count} done, compiling: {}", self.buf);
         } else if count != 0 {
-            crate::progress!(&self.bar, (), "{count} done");
+            crate::progress!(bar, "{count} done");
         }
     }
 }

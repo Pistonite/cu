@@ -1,0 +1,24 @@
+$ '--color=always' -vv
+STDOUT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+\x1B[92mI\x1B[90m]\x1B[0m this is an info messagenmultilineaa \xE4\xBD\xA0\xE5\xA5\xBD sldkfjals\xF0\x9F\xA4\x96kdjfl^LF
+\x1B[90m | \x1B[0mkasjdflkjasldkfjaklsdjflkjasldkfjlaksjdflkajsdklfjlaksjdf^LF
+\x1B[90m | \x1B[0mkljasldkfjlasldkjflaskdjflaksjdlfkajsldkfjkasjdlfkjaskldj^LF
+\x1B[90m | \x1B[0mflajsdlkfjlaskjdfklajsdf^LF
+\x1B[93mW]\x1B[93m this is a warn message^LF
+\x1B[91mE]\x1B[91m this is error message^LF
+\x1B[90m | \x1B[91m^LF
+\x1B[90mD]\x1B[96m this is debug message^LF
+\x1B[90m | \x1B[96m2^LF
+\x1B[90m | \x1B[96m^LF
+\x1B[95m*]\x1B[95m [print_levels print_levels.rs:20] this is trace message^LF
+\x1B[90m | \x1B[95m^LF
+\x1B[90m | \x1B[95m2^LF
+\x1B[90m::\x1B[0m today's weather is good^LF
+\x1B[96mH\x1B[90m]\x1B[93m today's weather is ok^LF
+\x1B[92mI\x1B[90m]\x1B[0m finished in 0.00s^LF
+^<EOF
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+STDERR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+^<EOF
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+status: exit status: 0

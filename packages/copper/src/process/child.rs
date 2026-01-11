@@ -84,7 +84,7 @@ impl Child {
         &mut self,
         timeout: Duration,
     ) -> crate::Result<Option<ExitStatus>> {
-        let mut ms = 100;
+        let ms = 100;
         let mut total_ms = 0;
         loop {
             match self.inner.try_wait() {
@@ -99,13 +99,12 @@ impl Child {
             if Duration::from_millis(total_ms) >= timeout {
                 break;
             }
-            ms *= 4;
         }
         Ok(None)
     }
 
     pub fn wait_timeout(&mut self, timeout: Duration) -> crate::Result<Option<ExitStatus>> {
-        let mut ms = 100;
+        let ms = 100;
         let mut total_ms = 0;
         loop {
             match self.inner.try_wait() {
@@ -120,7 +119,6 @@ impl Child {
             if Duration::from_millis(total_ms) >= timeout {
                 break;
             }
-            ms *= 4;
         }
         Ok(None)
     }
@@ -130,7 +128,6 @@ impl Child {
     /// # Panic
     /// Will panic if called outside of a tokio runtime context
     pub async fn co_kill(mut self) -> crate::Result<ExitStatus> {
-        self.io.co_join(&self.name).await;
         let mut ms = 100;
         for i in 0..5 {
             crate::trace!("trying to kill child '{}', attempt {}", self.name, i + 1);
@@ -148,6 +145,7 @@ impl Child {
             tokio::time::sleep(Duration::from_millis(ms)).await;
             ms *= 4;
         }
+        self.io.co_join(&self.name).await;
         crate::bail!("failed to kill child '{}' after many attempts", self.name);
     }
 
@@ -157,7 +155,6 @@ impl Child {
     /// This will block the current thread while trying to join the child.
     /// Use [`co_kill`](Self::co_kill) to avoid blocking if in async context.
     pub fn kill(mut self) -> crate::Result<ExitStatus> {
-        self.io.join(&self.name);
         let mut ms = 100;
         for i in 0..5 {
             crate::trace!("trying to kill child '{}', attempt {}", self.name, i + 1);
@@ -175,6 +172,7 @@ impl Child {
             std::thread::sleep(Duration::from_millis(ms));
             ms *= 4;
         }
+        self.io.join(&self.name);
         crate::bail!("failed to kill child '{}' after many attempts", self.name);
     }
 }

@@ -8,69 +8,70 @@ includes:
 
 tasks:
   check:
-    cmds:
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: default
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: print
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: cli
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: prompt
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: prompt,cli
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: prompt-password,cli
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: cli,coroutine
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: fs
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: process
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: parse
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: json,yaml,toml
-      - task: cargo:clippy-package-feature
-        vars:
-          PACKAGE: pistonite-cu
-          FEATURES: full
-      - task: cargo:fmt-check
-      - cmd: echo "checking default feature"; (grep "^default = \[\]$" Cargo.toml || rg "^default = \[\]$" cargo.toml)
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: default
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: print
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: cli
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: prompt
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: prompt-password
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: prompt,cli
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: prompt-password,cli
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: cli,coroutine
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: fs
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: process
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: parse
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: json,yaml,toml
+    - task: cargo:clippy-package-feature
+      vars:
+        PACKAGE: pistonite-cu
+        FEATURES: full
+    - task: cargo:fmt-check
+    - cmd: echo "checking default feature"; (grep "^default = \[\]$" Cargo.toml || rg "^default = \[\]$" Cargo.toml)
 
   fix:
-    cmds:
-      - task: cargo:fmt-fix
+    - task: cargo:fmt-fix
 
 
   test:
-    cmds:
-      - cargo test 
-      - cargo test --features cli
-      - cargo test --features full
+    - cargo test 
+    - cargo test --features cli
+    - cargo test --features full
+
   publish:
-    cmds:
-      - cmd: cargo publish
-        ignore_error: true
+    - cmd: cargo publish
+      ignore_error: true

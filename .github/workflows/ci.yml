@@ -14,7 +14,7 @@ jobs:
         with:
           mono-dev: packages
           rust: stable
-      - run: task exec -- check
+      - run: task check
   test:
     runs-on: ubuntu-latest
     steps:
@@ -22,7 +22,7 @@ jobs:
         with:
           mono-dev: packages
           rust: stable
-      - run: task exec -- test
+      - run: task test
   doc:
     runs-on: ubuntu-latest
     steps:
@@ -30,4 +30,4 @@ jobs:
         with:
           mono-dev: packages
           rust: nightly
-      - run: task exec -- doc
+      - run: task doc
