@@ -22,7 +22,7 @@ use crate::{BoxedFuture, ProgressBar, ProgressBarBuilder};
 /// # fn main() -> cu::Result<()> {
 /// cu::which("cargo")?.command()
 ///     .args(["build", "--release"])
-///     .preset(cu::pio::cargo())
+///     .preset(cu::pio::cargo("building my crate"))
 ///     .spawn()?.0
 ///     .wait_nz()?;
 /// # Ok(()) }
@@ -49,7 +49,7 @@ use crate::{BoxedFuture, ProgressBar, ProgressBarBuilder};
 /// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
-/// cu::pio::cargo()
+/// cu::pio::cargo("cargo build")
 ///     // configure message levels; levels shown here are the default
 ///     .error(cu::lv::E)
 ///     .warning(cu::lv::W)
@@ -66,7 +66,7 @@ use crate::{BoxedFuture, ProgressBar, ProgressBarBuilder};
 /// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///
-/// cu::pio::cargo()
+/// cu::pio::cargo("cargo build")
 ///     // configure message levels; levels shown here are the default
 ///     .on_diagnostic(|is_warning, message| {
 ///         // this implementation will be identical to the default behavior

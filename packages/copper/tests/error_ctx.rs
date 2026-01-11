@@ -44,7 +44,7 @@ async fn test_example3_err() {
         r"async failed with arg 4
 
 Caused by:
-    Condition failed: `value > 4` (4 vs 4)"
+    condition failed: `value > 4`"
     )
 }
 
@@ -69,7 +69,7 @@ async fn test_example4_err() {
         r"async failed with arg 
 
 Caused by:
-    Condition failed: `!value.is_empty()`"
+    condition failed: `!value.is_empty()`"
     )
 }
 

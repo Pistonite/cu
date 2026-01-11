@@ -262,7 +262,14 @@ fn handle_result(start: Instant, result: crate::Result<()>) -> std::process::Exi
     let elapsed = start.elapsed().as_secs_f32();
     if let Err(e) = result {
         crate::error!("fatal: {e:?}");
-        if crate::lv::is_trace_hint_enabled() {
+        // we display the hint for user to use -vv
+        // if:
+        // - the user is already tried to get more debug info with -v
+        //   (because otherwise it will be too noisy and it might be a user-error,
+        //   not a bug
+        // - the trace hint is not explicitly disabled
+        // - the trace hint is not already displayed
+        if lv::D.enabled() && crate::lv::is_trace_hint_enabled() {
             if std::env::var("RUST_BACKTRACE")
                 .unwrap_or_default()
                 .is_empty()

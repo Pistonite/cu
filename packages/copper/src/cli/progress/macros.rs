@@ -17,7 +17,7 @@
 /// # Examples
 /// ```rust,no_run
 /// # use pistonite_cu as cu;
-/// let bar = cu::progress_bar(10, "10 steps");
+/// let bar = cu::progress("10 steps").total(10).spawn();
 /// // update the current count and message
 /// let i = 1;
 /// cu::progress!(bar = i, "doing step {i}");

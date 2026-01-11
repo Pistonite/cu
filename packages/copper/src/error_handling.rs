@@ -11,7 +11,7 @@ pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail};
 ///
 /// The traits required for error handling are included in the prelude import
 /// ```rust
-/// # use pistonite_cu as cu
+/// # use pistonite_cu as cu;
 /// use cu::pre::*;
 /// ```
 ///

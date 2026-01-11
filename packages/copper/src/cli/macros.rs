@@ -30,6 +30,7 @@ macro_rules! hint {
 /// # use pistonite_cu as cu;
 /// let name = cu::prompt!("please enter your name")?;
 /// cu::info!("user entered: {name}");
+/// # cu::Ok(())
 /// ```
 ///
 /// See other macros for advanced usage:
@@ -74,6 +75,7 @@ macro_rules! prompt {
 /// if cu::yesno!("do you want to continue?")? {
 ///     cu::info!("user picked yes");
 /// }
+/// # cu::Ok(())
 /// ```
 #[cfg(feature = "prompt")]
 #[macro_export]
@@ -92,6 +94,7 @@ macro_rules! yesno {
 /// # use pistonite_cu as cu;
 /// let password = cu::prompt_password!("please enter your password")?;
 /// cu::info!("user entered: {password}");
+/// # cu::Ok(())
 /// ```
 #[cfg(feature = "prompt-password")]
 #[macro_export]
@@ -125,10 +128,11 @@ macro_rules! prompt_password {
 ///             cu::bail!("that's not good");
 ///         }
 ///         cu::error!("try again");
-///         Ok(false);
+///         Ok(false)
 ///     }
 /// )?;
 /// assert!(answer == expected);
+/// # cu::Ok(())
 /// ```
 ///
 /// The validation function can be a `FnMut` closure, which means
@@ -152,15 +156,16 @@ macro_rules! prompt_password {
 ///             cu::error!("the number you entered is too small");
 ///             return Ok(false);
 ///         }
-///         if number > 0 {
+///         if number > 5 {
 ///             cu::error!("the number you entered is too big");
 ///             return Ok(false);
 ///         }
 ///         index = number;
-///         Ok(true);
+///         Ok(true)
 ///     }
 /// )?;
 /// cu::info!("index is {index}");
+/// # cu::Ok(())
 /// ```
 ///
 /// For the password version, see [`prompt_password_validate`](crate::prompt_password_validate)
@@ -191,7 +196,7 @@ macro_rules! prompt_validate {
 /// # use pistonite_cu as cu;
 /// // note that extra parenthesis is needed if the format args
 /// // are not inlined into the formatting literal
-/// let password = cu::prompt_validate!(
+/// let password = cu::prompt_password_validate!(
 ///     "please enter a password between 8 and 16 charactres and only contain sensible characters",
 ///     |answer| {
 ///         if answer == "123456" {
@@ -213,6 +218,7 @@ macro_rules! prompt_validate {
 ///     }
 /// )?;
 /// cu::print!("{password}");
+/// # cu::Ok(())
 /// ```
 #[cfg(feature = "prompt-password")]
 #[macro_export]
