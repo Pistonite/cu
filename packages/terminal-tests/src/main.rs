@@ -309,10 +309,10 @@ fn decode_output_streams(
 
     match status {
         Some(status) => {
-            let _ = write!(out, "status: {status}\n");
+            let _ = writeln!(out, "status: {status}");
         }
         None => {
-            let _ = write!(out, "timed out\n");
+            let _ = writeln!(out, "timed out");
         }
     }
 

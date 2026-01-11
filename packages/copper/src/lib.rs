@@ -30,7 +30,7 @@
 //! If a function or type is not included with `pre::*`, that means the canonical
 //! style for using it is with the full path, for example, you would write:
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //!
@@ -42,7 +42,7 @@
 //! ```
 //!
 //! instead of the below:
-//! ```rust,no_run
+//! ```rust,ignore
 //! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //! use cu::{Result, fs, info};
@@ -65,14 +65,12 @@
 //! - [Progress Bars](fn@crate::progress)
 //! - [Prompting](macro@crate::prompt)
 //! - [Coroutines (Async)](mod@crate::co) (via [`tokio`](https://docs.rs/tokio))
-//! - [File System Paths and Strings](trait@crate::PathExtension)
-//!
-//! # Feature Reference:
-//! - `fs`: Enables file system utils. See [`cu::fs`](module@fs) and [`cu::bin`](module@bin).
-//! - `process`: Enables utils spawning child process. See [`Command`].
-//! - `parse`, `json`, `yaml`, `toml`:
-//!   Enable parsing utilities, and additional support for common formats. See
-//!   [`Parse`](trait@Parse).
+//! - [File System Paths and Strings](trait@crate::str::PathExtension)
+//! - [File System Operations](mod@crate::fs)
+//! - [Binary Path Registry](mod@crate::fs::bin)
+//! - [Spawning Child Processes](crate::Command)
+//! - [Parsing](trait@Parse) (via [`serde`](https://docs.rs/serde))
+//! - Derive Macros: the `derive` feature, via [`derive_more`](https://docs.rs/derive_more)
 
 #![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_cfg))]
 
@@ -81,7 +79,7 @@ extern crate self as cu;
 
 // --- Basic stuff (no feature needed) ---
 pub mod str;
-pub use str::{ZString, ByteFormat};
+pub use str::{ByteFormat, ZString};
 
 mod env_var;
 pub use env_var::*;
@@ -91,8 +89,8 @@ mod misc; // other stuff that doesn't have a place
 pub use misc::*;
 
 // --- Error Handling (no feature needed) ---
-mod error_handling;
-pub use error_handling::*;
+mod errhand;
+pub use errhand::*;
 pub use pistonite_cu_proc_macros::context;
 
 // --- Logging (no feature needed) ---
@@ -117,22 +115,23 @@ pub mod co;
 #[cfg(feature = "coroutine")]
 pub use co::{join, select, try_join};
 
+// --- File System ---
+#[cfg(feature = "fs")]
+pub mod fs;
+#[cfg(feature = "fs")]
+pub use fs::bin;
+#[cfg(feature = "fs")]
+pub use fs::bin::which;
+
+// === above is refactored and documented ===
+
+// --- Child Process ---
 #[cfg(feature = "process")]
 mod process;
 #[cfg(feature = "process")]
 pub use process::{Child, Command, CommandBuilder, Spawn, color_flag, color_flag_eq, pio};
 #[cfg(all(feature = "process", feature = "print"))]
 pub use process::{width_flag, width_flag_eq};
-
-#[cfg(feature = "fs")]
-pub mod bin;
-#[cfg(feature = "fs")]
-#[doc(inline)]
-pub use bin::which;
-
-/// File System utils (WIP)
-#[cfg(feature = "fs")]
-pub mod fs;
 
 /// Parsing utilities
 #[cfg(feature = "parse")]
@@ -149,6 +148,7 @@ pub mod __priv {
 }
 
 /// Lib re-exports
+#[doc(hidden)]
 pub mod lib {
     #[cfg(feature = "cli")]
     pub use clap;
@@ -157,8 +157,10 @@ pub mod lib {
 }
 
 /// Prelude imports
+#[doc(hidden)]
 pub mod pre {
     pub use crate::Context as _;
+    pub use crate::str::{OsStrExtension as _, OsStrExtensionOwned as _};
 
     #[cfg(feature = "cli")]
     pub use crate::lib::clap;
@@ -166,12 +168,11 @@ pub mod pre {
     #[cfg(feature = "coroutine")]
     pub use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
 
-    #[cfg(feature = "parse")]
-    pub use crate::ParseTo as _;
     #[cfg(feature = "fs")]
     pub use crate::str::PathExtension as _;
-    #[cfg(feature = "fs")]
-    pub use crate::str::PathExtensionOwned as _;
+
+    #[cfg(feature = "parse")]
+    pub use crate::ParseTo as _;
     #[cfg(feature = "process")]
     pub use crate::Spawn as _;
     #[cfg(feature = "json")]

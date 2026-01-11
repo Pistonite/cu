@@ -21,6 +21,9 @@ pub trait OsStrExtensionOwned {
 impl OsStrExtension for OsStr {
     #[inline(always)]
     fn as_utf8(&self) -> cu::Result<&str> {
+        // to_str is ok on all platforms, because Rust internally
+        // represent OsStrings on Windows as WTF-8
+        // see https://doc.rust-lang.org/src/std/sys_common/wtf8.rs.html
         cu::check!(self.to_str(), "not utf-8: {self:?}")
     }
 }
@@ -47,10 +50,11 @@ impl OsStrExtensionOwned for PathBuf {
         self.into_os_string().into_utf8()
     }
 }
+
 #[cfg(all(test, unix))]
 mod test {
-    use std::os::unix::ffi::OsStrExt as _;
     use super::*;
+    use std::os::unix::ffi::OsStrExt as _;
     #[test]
     fn test_not_utf8() {
         let s = OsStr::from_bytes(b"hello\xffworld");
@@ -58,22 +62,34 @@ mod test {
         assert_eq!(result, r#"not utf-8: "hello\xFFworld""#);
         let result = Path::new(s).as_utf8().unwrap_err().to_string();
         assert_eq!(result, r#"not utf-8: "hello\xFFworld""#);
+
+        let s = s.to_owned();
+        let result = s.clone().into_utf8().unwrap_err().to_string();
+        assert_eq!(result, r#"not utf-8: "hello\xFFworld""#);
+        let result = PathBuf::from(s).into_utf8().unwrap_err().to_string();
+        assert_eq!(result, r#"not utf-8: "hello\xFFworld""#);
     }
     #[test]
     fn test_utf8() {
         let s = OsStr::from_bytes(b"hello world");
         assert!(s.as_utf8().is_ok());
         assert!(Path::new(s).as_utf8().is_ok());
+
+        let s = s.to_owned();
+        assert!(s.clone().into_utf8().is_ok());
+        assert!(PathBuf::from(s).into_utf8().is_ok());
     }
 }
 
 #[cfg(all(test, windows))]
 mod test {
-    use std::os::windows::ffi::OsStringExt as _;
     use super::*;
+    use std::os::windows::ffi::OsStringExt as _;
     #[test]
     fn test_not_utf8() {
-        let wide: &[u16] = &[0x0068, 0x0065, 0x006C, 0x006C, 0x006F, 0xD800, 0x0077, 0x006F, 0x0072, 0x006C, 0x0064];
+        let wide: &[u16] = &[
+            0x0068, 0x0065, 0x006C, 0x006C, 0x006F, 0xD800, 0x0077, 0x006F, 0x0072, 0x006C, 0x0064,
+        ];
         let s = OsString::from_wide(wide);
         let result = s.as_utf8().unwrap_err().to_string();
         assert_eq!(result, r#"not utf-8: "hello\u{d800}world""#);
@@ -87,7 +103,9 @@ mod test {
     }
     #[test]
     fn test_utf8() {
-        let wide: &[u16] = &[0x0068, 0x0065, 0x006C, 0x006C, 0x006F, 0x0020, 0x0077, 0x006F, 0x0072, 0x006C, 0x0064];
+        let wide: &[u16] = &[
+            0x0068, 0x0065, 0x006C, 0x006C, 0x006F, 0x0020, 0x0077, 0x006F, 0x0072, 0x006C, 0x0064,
+        ];
         let s = OsString::from_wide(wide);
         assert!(s.as_utf8().is_ok());
         assert!(Path::new(&s).as_utf8().is_ok());

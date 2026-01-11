@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
-use crate::Context as _;
+use cu::Context as _;
 
 /// # File System Paths and Strings
 /// Rust works with [`String`](std::string)s, which are UTF-8 encoded bytes.
-/// However, not all operating systems work with UTF-8. That's why Rust has 
+/// However, not all operating systems work with UTF-8. That's why Rust has
 /// [`OsString`](std::ffi::OsString), which has platform-specific implementations.
 /// And `PathBuf`s are wrappers for `OsString`.
 ///
@@ -39,20 +39,19 @@ use crate::Context as _;
 /// The path extensions also have utilities for working with file system specifically,
 /// (such as normalizing it), which is why they require the `fs` feature.
 ///
-/// - [`OsStrExtension`]
-/// - [`OsStrExtensionOwned`]
+/// - [`OsStrExtension`](trait@crate::str::OsStrExtension)
+/// - [`OsStrExtensionOwned`](trait@crate::str::OsStrExtensionOwned)
 /// - `PathExtension` - requires `fs` feature
 pub trait PathExtension {
     /// Get file name. Error if the file name is not UTF-8 or other error occurs
-    fn file_name_str(&self) -> crate::Result<&str>;
-
-    /// Get the path as UTF-8, error if it's not UTF-8
-    fn as_utf8(&self) -> crate::Result<&str>;
+    fn file_name_str(&self) -> cu::Result<&str>;
 
     /// Check that the path exists, or fail with an error
-    fn check_exists(&self) -> crate::Result<()>;
+    fn ensure_exists(&self) -> cu::Result<()>;
 
     /// Return the simplified path if the path has a Windows UNC prefix
+    ///
+    /// The behavior is the same cross-platform.
     fn simplified(&self) -> &Path;
 
     /// Get absolute path for a path.
@@ -67,33 +66,36 @@ pub trait PathExtension {
     ///
     /// On Windows only, it returns the most compatible form using the `dunce` crate instead of
     /// UNC, and the drive letter is also normalized to upper case
-    fn normalize(&self) -> crate::Result<PathBuf>;
+    fn normalize(&self) -> cu::Result<PathBuf>;
 
     /// Like `normalize`, but with the additional guarantee that the path exists
-    fn normalize_exists(&self) -> crate::Result<PathBuf> {
+    fn normalize_exists(&self) -> cu::Result<PathBuf> {
         let x = self.normalize()?;
-        x.check_exists()?;
+        x.ensure_exists()?;
         Ok(x)
     }
 
     /// Like `normalize`, but with the additional guarantee that:
-    /// - The file name of the output will be the same as the input
+    /// - The file name of the output will be the same as the input. This is because
+    ///   the executable can be a multicall binary that behaves differently
+    ///   depending on the executable name.
     /// - The path exists and is not a directory
-    fn normalize_executable(&self) -> crate::Result<PathBuf>;
+    fn normalize_executable(&self) -> cu::Result<PathBuf>;
 
     /// Get the parent path as an absolute path
     ///
     /// Path navigation is very complex and that's why we are paying a little performance
     /// cost and always returning `PathBuf`, and always converting the path to absolute.
     ///
-    /// For path manipulating (i.e. as a OsStr), instead of navigation, use std `parent()`
+    /// For path manipulation (i.e. as a OsStr), instead of navigation, use std `parent()`
     /// instead
-    fn parent_abs(&self) -> crate::Result<PathBuf> {
+    #[inline(always)]
+    fn parent_abs(&self) -> cu::Result<PathBuf> {
         self.parent_abs_times(1)
     }
 
     /// Effecitvely chaining `parent_abs` `x` times
-    fn parent_abs_times(&self, x: usize) -> crate::Result<PathBuf>;
+    fn parent_abs_times(&self, x: usize) -> cu::Result<PathBuf>;
 
     /// Try converting self to a relative path from current working directory.
     ///
@@ -106,41 +108,24 @@ pub trait PathExtension {
     fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path>;
 
     /// Start building a child process with the path as the executable
+    ///
+    /// See [Spawn Commands](crate::CommandBuilder)
     #[cfg(feature = "process")]
-    fn command(&self) -> crate::CommandBuilder;
-}
-
-/// Extension to paths
-///
-/// Most of these are related to file system, and not purely path processing.
-/// Therefore this is tied to the `fs` feature.
-pub trait PathExtensionOwned {
-    /// Get the path as UTF-8, error if it's not UTF-8
-    fn into_utf8(self) -> crate::Result<String>;
+    fn command(&self) -> cu::CommandBuilder;
 }
 
 impl PathExtension for Path {
-    fn file_name_str(&self) -> crate::Result<&str> {
+    fn file_name_str(&self) -> cu::Result<&str> {
         let file_name = self
             .file_name()
-            .with_context(|| format!("cannot get file name for path: {}", self.display()))?;
+            .with_context(|| format!("cannot get file name for path: '{}'", self.display()))?;
         // to_str is ok on all platforms, because Rust internally
         // represent OsStrings on Windows as WTF-8
         // see https://doc.rust-lang.org/src/std/sys_common/wtf8.rs.html
         let Some(file_name) = file_name.to_str() else {
-            crate::bail!("file name is not valid UTF-8: {}", self.display());
+            crate::bail!("file name is not utf-8: '{}'", self.display());
         };
         Ok(file_name)
-    }
-
-    fn as_utf8(&self) -> crate::Result<&str> {
-        // to_str is ok on all platforms, because Rust internally
-        // represent OsStrings on Windows as WTF-8
-        // see https://doc.rust-lang.org/src/std/sys_common/wtf8.rs.html
-        let Some(path) = self.to_str() else {
-            crate::bail!("path is not valid UTF-8: {}", self.display());
-        };
-        Ok(path)
     }
 
     fn simplified(&self) -> &Path {
@@ -151,14 +136,14 @@ impl PathExtension for Path {
         }
     }
 
-    fn check_exists(&self) -> crate::Result<()> {
+    fn ensure_exists(&self) -> cu::Result<()> {
         if !self.exists() {
             crate::bail!("path '{}' does not exist.", self.display());
         }
         Ok(())
     }
 
-    fn normalize(&self) -> crate::Result<PathBuf> {
+    fn normalize(&self) -> cu::Result<PathBuf> {
         if let Ok(x) = dunce::canonicalize(self) {
             return Ok(x);
         };
@@ -167,9 +152,8 @@ impl PathExtension for Path {
         }
 
         let Ok(mut base) = dunce::canonicalize(".") else {
-            crate::warn!("failed to normalize current directory");
             crate::bail!(
-                "cannot normalize current directory when normalizing relative path: {}",
+                "failed to normalize current directory when normalizing relative path: '{}'",
                 self.display()
             );
         };
@@ -185,9 +169,8 @@ impl PathExtension for Path {
             fallback_normalize_absolute(self)?
         } else {
             let Ok(mut base) = dunce::canonicalize(".") else {
-                crate::warn!("failed to normalize current directory");
                 crate::bail!(
-                    "cannot normalize current directory when normalizing relative path: {}",
+                    "failed to normalize current directory when normalizing relative path: '{}'",
                     self.display()
                 );
             };
@@ -222,36 +205,9 @@ impl PathExtension for Path {
         Ok(out)
     }
 
+    #[inline(always)]
     fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path> {
-        let path = path.as_ref();
-        let res = match (self.is_absolute(), path.is_absolute()) {
-            (true, true) => pathdiff::diff_paths(self, path),
-            (true, false) => {
-                let Ok(base) = path.normalize() else {
-                    return Cow::Borrowed(self);
-                };
-                pathdiff::diff_paths(self, base.as_path())
-            }
-            (false, true) => {
-                let Ok(self_) = self.normalize() else {
-                    return Cow::Borrowed(self);
-                };
-                pathdiff::diff_paths(self_.as_path(), path)
-            }
-            (false, false) => {
-                let Ok(self_) = self.normalize() else {
-                    return Cow::Borrowed(self);
-                };
-                let Ok(base) = path.normalize() else {
-                    return Cow::Borrowed(self);
-                };
-                pathdiff::diff_paths(self_.as_path(), base.as_path())
-            }
-        };
-        match res {
-            None => Cow::Borrowed(self),
-            Some(x) => Cow::Owned(x),
-        }
+        try_to_rel_from(self, path.as_ref())
     }
 
     #[cfg(feature = "process")]
@@ -301,47 +257,61 @@ fn fallback_normalize_absolute(path: &Path) -> crate::Result<PathBuf> {
     }
 }
 
-macro_rules! impl_for_as_ref_path {
-    ($type:ty) => {
-        impl PathExtension for $type {
-            fn file_name_str(&self) -> crate::Result<&str> {
-                AsRef::<Path>::as_ref(self).file_name_str()
-            }
-            fn as_utf8(&self) -> crate::Result<&str> {
-                AsRef::<Path>::as_ref(self).as_utf8()
-            }
-            fn simplified(&self) -> &Path {
-                AsRef::<Path>::as_ref(self).simplified()
-            }
-            fn normalize(&self) -> crate::Result<PathBuf> {
-                AsRef::<Path>::as_ref(self).normalize()
-            }
-            fn normalize_executable(&self) -> crate::Result<PathBuf> {
-                AsRef::<Path>::as_ref(self).normalize_executable()
-            }
-            fn check_exists(&self) -> crate::Result<()> {
-                AsRef::<Path>::as_ref(self).check_exists()
-            }
-            fn parent_abs_times(&self, x: usize) -> crate::Result<PathBuf> {
-                AsRef::<Path>::as_ref(self).parent_abs_times(x)
-            }
-            fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path> {
-                AsRef::<Path>::as_ref(self).try_to_rel_from(path)
-            }
-            #[cfg(feature = "process")]
-            fn command(&self) -> crate::CommandBuilder {
-                AsRef::<Path>::as_ref(self).command()
-            }
+fn try_to_rel_from<'a>(self_: &'a Path, path: &Path) -> Cow<'a, Path> {
+    let res = match (self_.is_absolute(), path.is_absolute()) {
+        (true, true) => pathdiff::diff_paths(self_, path),
+        (true, false) => {
+            let Ok(base) = path.normalize() else {
+                return Cow::Borrowed(self_);
+            };
+            pathdiff::diff_paths(self_, base.as_path())
+        }
+        (false, true) => {
+            let Ok(self_) = self_.normalize() else {
+                return Cow::Borrowed(self_);
+            };
+            pathdiff::diff_paths(self_.as_path(), path)
+        }
+        (false, false) => {
+            let Ok(self_abs) = self_.normalize() else {
+                return Cow::Borrowed(self_);
+            };
+            let Ok(base) = path.normalize() else {
+                return Cow::Borrowed(self_);
+            };
+            pathdiff::diff_paths(self_abs.as_path(), base.as_path())
         }
     };
+    match res {
+        None => Cow::Borrowed(self_),
+        Some(x) => Cow::Owned(x),
+    }
 }
 
-impl_for_as_ref_path!(PathBuf);
-
-impl PathExtensionOwned for PathBuf {
-    fn into_utf8(self) -> crate::Result<String> {
-        self.into_os_string()
-            .into_string()
-            .map_err(|e| crate::fmterr!("path is not valid UTF-8: {}", e.display()))
+impl PathExtension for PathBuf {
+    fn file_name_str(&self) -> crate::Result<&str> {
+        self.as_path().file_name_str()
+    }
+    fn simplified(&self) -> &Path {
+        self.as_path().simplified()
+    }
+    fn normalize(&self) -> crate::Result<PathBuf> {
+        self.as_path().normalize()
+    }
+    fn normalize_executable(&self) -> crate::Result<PathBuf> {
+        self.as_path().normalize_executable()
+    }
+    fn ensure_exists(&self) -> crate::Result<()> {
+        self.as_path().ensure_exists()
+    }
+    fn parent_abs_times(&self, x: usize) -> crate::Result<PathBuf> {
+        self.as_path().parent_abs_times(x)
+    }
+    fn try_to_rel_from(&self, path: impl AsRef<Path>) -> Cow<'_, Path> {
+        self.as_path().try_to_rel_from(path)
+    }
+    #[cfg(feature = "process")]
+    fn command(&self) -> crate::CommandBuilder {
+        self.as_path().command()
     }
 }

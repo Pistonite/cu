@@ -66,6 +66,7 @@ pub fn zero(s: &mut String) {
 }
 
 // Safety: the string must be dropped afterwards
+#[allow(clippy::ptr_arg)]
 unsafe fn do_zero(s: &mut String) {
     // SAFETY: we don't use the string again
     for c in unsafe { s.as_bytes_mut() } {

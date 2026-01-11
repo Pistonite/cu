@@ -18,7 +18,7 @@ required-features = ["bin"]
 
 [features]
 default = ["bin"]
-bin = ["cu/cli", "cu/process", "cu/coroutine-heavy"]
+bin = ["cu/cli", "cu/process", "cu/coroutine-heavy", "cu/json"]
 common = ["cu/__test", "cu/cli"]
 
 __test-print_levels = []

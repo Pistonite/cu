@@ -9,3 +9,8 @@ includes:
 tasks:
   run:
     - cargo run --features bin -- {{.CLI_ARGS}}
+  check:
+    - task: cargo:clippy-all
+    - task: cargo:fmt-check
+  fix:
+    - task: cargo:fmt-fix

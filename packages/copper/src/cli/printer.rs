@@ -4,11 +4,15 @@ use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex, Weak};
 use std::thread::JoinHandle;
 
-use oneshot::{Receiver as OnceRecv, Sender as OnceSend};
+#[cfg(feature = "prompt")]
+use oneshot::Receiver as OnceRecv;
+use oneshot::Sender as OnceSend;
 
 use crate::cli::fmt::{self, FormatBuffer, ansi};
+#[cfg(feature = "prompt-password")]
+use crate::cli::password;
 use crate::cli::progress::{BarFormatter, BarResult, ProgressBar};
-use crate::cli::{THREAD_NAME, TICK_INTERVAL, Tick, password};
+use crate::cli::{THREAD_NAME, TICK_INTERVAL, Tick};
 use crate::lv;
 
 /// Global printer state
@@ -71,6 +75,7 @@ impl Printer {
             buffered: String::new(),
         }
     }
+    #[cfg(feature = "prompt")]
     pub(crate) fn show_prompt(
         &mut self,
         prompt: &str,

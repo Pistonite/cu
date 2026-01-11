@@ -77,7 +77,6 @@ pub fn init_options(color: lv::Color, level: lv::Print, prompt: Option<lv::Promp
     #[cfg(not(feature = "prompt"))]
     {
         let _ = prompt;
-        PROMPT_LEVEL.set(lv::Prompt::No);
     }
 
     lv::PRINT_LEVEL.set(level);

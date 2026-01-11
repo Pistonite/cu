@@ -29,6 +29,7 @@ impl FormatBuffer {
         self.buffer.as_str()
     }
     /// Take the formatted buffer content out, leaving empty string
+    #[allow(unused)] // prompt uses it
     pub fn take(&mut self) -> String {
         std::mem::take(&mut self.buffer)
     }

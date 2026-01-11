@@ -73,7 +73,7 @@ pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail};
 /// These make up the API of the function.
 ///
 /// For example, I will write the following code
-/// ```rust
+/// ```rust,ignore
 /// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///

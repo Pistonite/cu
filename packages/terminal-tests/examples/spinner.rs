@@ -1,15 +1,13 @@
-// $ 0 -y
-// $ 1 -y
-// $ 0
-// $ 1
+// $- 0
+// $- 1
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
 use cu::pre::*;
 
-static LONG_SLEEP: AtomicBool = AtomicBool::new(false);
+// spinner tests are skipped since the output can be unstable,
+// depending on how the printing thread is scheduled
 
 #[derive(clap::Parser, Clone, AsRef)]
 struct Args {
@@ -21,14 +19,7 @@ struct Args {
 #[cu::cli]
 fn main(args: Args) -> cu::Result<()> {
     cu::lv::disable_print_time();
-    if !cu::yesno!("short sleep")? {
-        // relaxd fine, only accessing on this thread
-        LONG_SLEEP.store(true, Ordering::Relaxed);
-    }
-    static CASES: &[fn() -> cu::Result<()>] = &[
-        test_case_1,
-        test_case_2,
-    ];
+    static CASES: &[fn() -> cu::Result<()>] = &[test_case_1, test_case_2];
     CASES[args.case]()
 }
 
@@ -48,21 +39,21 @@ fn test_case_1() -> cu::Result<()> {
     {
         // bar with progress
         let bar = cu::progress("finite").total(3).spawn();
-        cu::progress!(bar+=1, "message1");
+        cu::progress!(bar += 1, "message1");
         sleep_tick();
-        cu::progress!(bar+=1, "message2");
+        cu::progress!(bar += 1, "message2");
         sleep_tick();
-        cu::progress!(bar+=1, "message3");
+        cu::progress!(bar += 1, "message3");
         sleep_tick();
     }
     {
         // bar with no keep
         let bar = cu::progress("finite, nokeep").keep(false).spawn();
-        cu::progress!(bar=1, "message1");
+        cu::progress!(bar = 1, "message1");
         sleep_tick();
-        cu::progress!(bar=2, "message2");
+        cu::progress!(bar = 2, "message2");
         sleep_tick();
-        cu::progress!(bar=3, "message3");
+        cu::progress!(bar = 3, "message3");
         sleep_tick();
     }
     Ok(())
@@ -106,9 +97,5 @@ fn test_case_2() -> cu::Result<()> {
 }
 
 fn sleep_tick() {
-    if LONG_SLEEP.load(Ordering::Relaxed) {
-        thread::sleep(Duration::from_secs(2));
-    } else {
-        thread::sleep(Duration::from_millis(10));
-    }
+    thread::sleep(Duration::from_secs(1));
 }

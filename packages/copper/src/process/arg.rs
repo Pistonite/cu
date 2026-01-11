@@ -1,5 +1,6 @@
 use tokio::process::Command as TokioCommand;
 
+#[cfg(feature = "print")]
 use crate::cli::fmt;
 
 /// Add arguments to the command
