@@ -84,7 +84,7 @@ impl Child {
         &mut self,
         timeout: Duration,
     ) -> crate::Result<Option<ExitStatus>> {
-        let mut ms = 100;
+        let ms = 100;
         let mut total_ms = 0;
         loop {
             match self.inner.try_wait() {
@@ -94,18 +94,17 @@ impl Child {
                     crate::rethrow!(e, "io error while waiting {}", self.name)
                 }
             }
+            tokio::time::sleep(Duration::from_millis(ms)).await;
             total_ms += ms;
             if Duration::from_millis(total_ms) >= timeout {
                 break;
             }
-            tokio::time::sleep(Duration::from_millis(ms)).await;
-            ms *= 4;
         }
         Ok(None)
     }
 
     pub fn wait_timeout(&mut self, timeout: Duration) -> crate::Result<Option<ExitStatus>> {
-        let mut ms = 100;
+        let ms = 100;
         let mut total_ms = 0;
         loop {
             match self.inner.try_wait() {
@@ -120,7 +119,6 @@ impl Child {
             if Duration::from_millis(total_ms) >= timeout {
                 break;
             }
-            ms *= 4;
         }
         Ok(None)
     }
