@@ -12,8 +12,13 @@ pub fn term_width() -> Option<usize> {
 
 /// Get the terminal height, capped as some internal amount
 pub fn term_width_height() -> Option<(usize, usize)> {
-    use terminal_size::*;
-    terminal_size().map(|(Width(w), Height(h))| ((w as usize).min(400), (h as usize).min(400)))
+    if cfg!(feature = "__test") {
+        // fix the size in test
+        Some((60, 20))
+    } else {
+        use terminal_size::*;
+        terminal_size().map(|(Width(w), Height(h))| ((w as usize).min(400), (h as usize).min(400)))
+    }
 }
 
 pub(crate) struct FormatBuffer {

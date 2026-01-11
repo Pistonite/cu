@@ -163,18 +163,21 @@ impl From<Print> for log::LevelFilter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Prompt {
-    /// Show prompts interactively
+    /// Show all prompts interactively
     Interactive,
-    /// Automatically answer "Yes" to all yes/no prompts, and `Auto` for regular prompts
-    Yes,
-    /// Do not allow prompts (non-interactive). Attempting to show prompt will error
-    No,
+    /// Automatically answer "Yes" to all yes/no prompts, and show other prompts interactively
+    YesOrInteractive,
+    /// Automatically answer "Yes" to all yes/no prompts, and do not allow other prompts
+    YesOrBlock,
+    /// Do not allow any type of prompts (non-interactive). Attempting to show prompt will error
+    Block,
 }
 impl From<u8> for Prompt {
     fn from(value: u8) -> Self {
         match value {
-            1 => Self::Yes,
-            2 => Self::No,
+            1 => Self::YesOrInteractive,
+            2 => Self::YesOrBlock,
+            3 => Self::Block,
             _ => Self::Interactive,
         }
     }

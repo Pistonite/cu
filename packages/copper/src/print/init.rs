@@ -22,7 +22,7 @@ pub fn log_init(lv: &str) {
         "vv" => lv::Print::VerboseVerbose,
         _ => lv::Print::Normal,
     };
-    init_print_options(lv::Color::Auto, level, Some(lv::Prompt::No));
+    init_print_options(lv::Color::Auto, level, Some(lv::Prompt::Block));
 }
 
 /// Set global print options. This is usually called from clap args
@@ -59,7 +59,7 @@ pub fn init_print_options(color: lv::Color, level: lv::Print, prompt: Option<lv:
                     })
                     .unwrap_or_default();
                 if is_ci {
-                    lv::Prompt::No
+                    lv::Prompt::Block
                 } else {
                     lv::Prompt::Interactive
                 }

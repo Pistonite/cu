@@ -17,15 +17,6 @@ impl Args {
 /// Run with cargo run --example print --features prompt,cli
 #[cu::cli(flags = "inner", preprocess = Args::preprocess)]
 fn main(_: Args) -> cu::Result<()> {
-    cu::print!("today's weather is {}", "good");
-    cu::hint!("today's weather is {}", "ok");
-    cu::info!(
-        "this is an info messagenmultilineaa 你好 sldkfjals🤖kdjflkasjdflkjasldkfjaklsdjflkjasldkfjlaksjdflkajsdklfjlaksjdfkljasldkfjlasldkjflaskdjflaksjdlfkajsldkfjkasjdlfkjaskldjflajsdlkfjlaskjdfklajsdf"
-    );
-    cu::warn!("this is a warn message\n");
-    cu::error!("this is error message\n\n");
-    cu::debug!("this is debug message\n2\n\n");
-    cu::trace!("this is trace message\n\n2\n");
     if !cu::yesno!("continue?")? {
         cu::warn!("you chose to not continue!");
         return Ok(());

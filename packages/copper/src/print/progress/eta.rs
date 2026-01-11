@@ -3,6 +3,7 @@ use std::time::Instant;
 use crate::print::{TICK_INTERVAL, Tick};
 
 /// Estimate the time for progress bar
+#[derive(Debug)]
 pub struct Estimater {
     /// Time when the progress started
     start: Instant,

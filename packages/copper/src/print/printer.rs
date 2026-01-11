@@ -75,13 +75,18 @@ impl Default for Printer {
         let stdout = std::io::stdout();
         let stderr = std::io::stderr();
         let is_stdin_terminal = std::io::stdin().is_terminal();
-        let is_terminal = stdout.is_terminal();
-        let bar_target = if is_terminal {
-            Some(Target::Stdout)
-        } else if stderr.is_terminal() {
-            Some(Target::Stderr)
+        let (bar_target, is_terminal) = if cfg!(feature = "__test") {
+            (Some(Target::Stdout), true)
         } else {
-            None
+            let is_terminal = stdout.is_terminal();
+            let bar_target = if is_terminal {
+                Some(Target::Stdout)
+            } else if stderr.is_terminal() {
+                Some(Target::Stderr)
+            } else {
+                None
+            };
+            (bar_target, is_terminal)
         };
         let colors = ansi::colors(is_terminal);
         let controls = ansi::controls(is_terminal);

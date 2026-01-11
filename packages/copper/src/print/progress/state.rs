@@ -10,6 +10,7 @@ const CHAR_BAR: char = '\u{2502}';
 const CHAR_TICK: char = '\u{2514}';
 
 /// Internal, immutable state of progress bar
+#[derive(Debug)]
 pub struct StateImmut {
     /// An ID
     pub id: usize,
@@ -34,6 +35,7 @@ pub struct StateImmut {
 }
 
 /// Internal mutable state
+#[derive(Debug)]
 pub struct State {
     unreal_total: u64,
     unreal_current: u64,
@@ -255,7 +257,7 @@ impl State {
             let _ = write!(
                 out,
                 "  ... and {} more",
-                state.max_display_children - num_displayed
+                num_displayed - state.max_display_children
             );
             out.push_str(fmt.bar_color);
             out.push('\n');
@@ -465,7 +467,7 @@ fn format_message_with_width(out: &mut String, mut width: usize, message: &str) 
     }
     width
 }
-
+#[derive(Debug)]
 enum ChildState {
     /// The done message (if `keep` is true)
     Done(String),

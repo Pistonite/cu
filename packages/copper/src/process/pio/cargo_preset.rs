@@ -354,8 +354,8 @@ impl PrintState {
             }
             "build-finished" => match payload.success {
                 Some(true) => {
-                    todo!() // show done message, mark bar done
-                    // crate::trace!("cargo build successful");
+                    self.bar.done_by_ref();
+                    crate::trace!("cargo build successful");
                 }
                 _ => {
                     crate::trace!("cargo build failed");

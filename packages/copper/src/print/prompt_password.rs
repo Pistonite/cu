@@ -189,7 +189,8 @@ macro_rules! special_chars {
     }
 }
 special_chars! { '!' | '#' | '$' | '%' | '&' | '(' | ')' | '*' | '+' | ',' | '-' | '.' | '/' | ':' | ';' | '<' | '=' | '>' | '?' | '@' | '[' | ']' | '^' | '_' | '`' | '{' | '|' | '}' | '~'}
-pub fn check_password_legality(s: &str) -> crate::Result<()> {
+/// Check if the password contains all "legal" characters (and is non-empty)
+pub fn password_chars_legal(s: &str) -> crate::Result<()> {
     if s.is_empty() {
         crate::bail!("password cannot be empty");
     }

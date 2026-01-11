@@ -16,8 +16,8 @@ mod prompt;
 pub use prompt::*;
 #[cfg(feature = "prompt-password")]
 mod prompt_password;
-#[cfg(feature = "prompt-password")]
-pub use prompt_password::check_password_legality;
+// #[cfg(feature = "prompt-password")]
+// pub use prompt_password::check_password_legality;
 
 // 50ms between each cycle
 pub(crate) const TICK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(10);

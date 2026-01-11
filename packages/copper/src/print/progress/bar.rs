@@ -192,6 +192,7 @@ macro_rules! progress {
 */
 
 /// Builder for a progress bar
+#[derive(Debug, Clone)] // Clone sometimes needed to build by ref.. without unsafe
 pub struct ProgressBarBuilder {
     /// The message prefix for the progress bar
     message: String,
@@ -417,7 +418,7 @@ fn next_id() -> usize {
     static ID: AtomicUsize = AtomicUsize::new(1);
     ID.fetch_add(1, Ordering::SeqCst)
 }
-
+#[derive(Debug)]
 pub struct ProgressBar {
     pub(crate) state: StateImmut,
     state_mut: Mutex<State>,
@@ -469,6 +470,16 @@ impl ProgressBar {
     /// If the progress is finite, then interrupted state is automatically
     /// determined (`current != total`)
     pub fn done(self: Arc<Self>) {
+        if self.state.unbounded {
+            if let Ok(mut bar) = self.state_mut.lock() {
+                bar.set_current(1);
+                bar.set_total(1);
+            }
+        }
+    }
+
+    /// Same as [`done`](Self::done), but does not drop the bar.
+    pub fn done_by_ref(&self) {
         if self.state.unbounded {
             if let Ok(mut bar) = self.state_mut.lock() {
                 bar.set_current(1);

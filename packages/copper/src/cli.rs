@@ -261,21 +261,20 @@ impl Flags {
             match self.non_interactive.min(i8::MAX as u8) as i8
                 - self.interactive.min(i8::MAX as u8) as i8
             {
-                ..0 => {
+                ..=0 => {
                     if self.yes {
-                        Some(lv::Prompt::Yes)
+                        Some(lv::Prompt::YesOrInteractive)
                     } else {
                         Some(lv::Prompt::Interactive)
                     }
                 }
-                0 => {
+                _ => {
                     if self.yes {
-                        Some(lv::Prompt::Yes)
+                        Some(lv::Prompt::YesOrBlock)
                     } else {
-                        None
+                        Some(lv::Prompt::Block)
                     }
                 }
-                _ => Some(lv::Prompt::No),
             }
             #[cfg(not(feature = "prompt"))]
             {

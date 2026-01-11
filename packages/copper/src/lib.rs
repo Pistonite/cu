@@ -1,12 +1,11 @@
+//! # Cu = Copper
 //! Batteries-included common utils
 //!
 //! (If you are viewing this on docs.rs, please use the [self-hosted
 //! version](https://cu.pistonite.dev) instead)
 //!
-//! # Install
-//! Since crates.io does not have namespaces, this crate has a prefix.
-//! You should manually rename it to `cu`, as that's what the proc-macros
-//! expect.
+//! # Quick start
+//! When installing, rename the crate to `cu` in `Cargo.toml`:
 //! ```toml
 //! # Cargo.toml
 //! # ...
@@ -15,24 +14,51 @@
 //! version = "..." # check by running `cargo info pistonite-cu`
 //! features = [ "full" ] # see docs
 //!
-//! # ...
 //! [dependencies]
+//! # ...
 //! ```
 //!
-//! # General Principal
-//! `cu` tries to be as short as possible with imports. Common and misc
-//! utilities are exported directly by the crate and should be used
-//! as `cu::xxx` directly. Sub-functionalities are bundled when makes
-//! sense, and should be called from submodules directly, like `cu::fs::xxx`
-//! or `cu::co::xxx`. The submodules are usually 2-4 characters.
-//!
-//! The only time to use `use` to import from `cu`, is with the prelude module
-//! `pre`:
+//! The goal with using `cu` is use only one `use` statement:
 //! ```rust
 //! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //! ```
-//! This imports traits like [`Context`] and [`PathExtension`] into scope.
+//! This brings into scope a few things:
+//! - Traits that are expected to be used, such as `anyhow::Context`
+//! - Re-exports of modules, such as `json` if the `json` feature is enabled
+//!
+//! If a function or type is not included with `pre::*`, that means the canonical
+//! style for using it is with the full path, for example, you would write:
+//!
+//! ```rust,no_run
+//! # use pistonite_cu as cu;
+//! use cu::pre::*;
+//!
+//! fn read_file() -> cu::Result<()> {
+//!     cu::fs::read_string("foo/bar.txt")?;
+//!     cu::info!("successfully read file");
+//!     Ok(())
+//! }
+//! ```
+//!
+//! instead of the below:
+//! ```rust,no_run
+//! # use pistonite_cu as cu;
+//! use cu::pre::*;
+//! use cu::{Result, fs, info};
+//! // ^ don't include extra uses!
+//! //   the biggest disadvantage of this is
+//! //   it's easy to confuse with types in the standard library
+//!
+//! fn read_file() -> Result<()> {
+//!     fs::read_string("foo/bar.txt")?;
+//!     info!("successfully read file");
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # Quick Reference
+//! - [Error Handling](macro@crate::check) (via [`anyhow`](https://docs.rs/anyhow))
 //!
 //! # Feature Reference:
 //! - `cli`, `print`, `prompt`:
@@ -47,7 +73,12 @@
 
 #![cfg_attr(any(docsrs, feature = "nightly"), feature(doc_cfg))]
 
+// for macros
 extern crate self as cu;
+
+// --- Error Handling (does not require any feature flag) ---
+mod error_handling;
+pub use error_handling::*;
 
 #[cfg(feature = "process")]
 mod process;
@@ -87,8 +118,8 @@ pub mod co;
 /// Low level printing utils and integration with log and clap
 #[cfg(feature = "print")]
 mod print;
-#[cfg(feature = "prompt-password")]
-pub use print::check_password_legality;
+// #[cfg(feature = "prompt-password")]
+// pub use print::check_password_legality;
 #[cfg(feature = "print")]
 pub use print::{
     ProgressBar, ProgressBarBuilder, ZeroWhenDropString, init_print_options, log_init, progress,
@@ -119,11 +150,10 @@ mod misc;
 pub use misc::*;
 
 // re-exports from libraries
-pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail, ensure};
 pub use log::{debug, error, info, trace, warn};
 pub use pistonite_cu_proc_macros::error_ctx;
 #[cfg(feature = "coroutine")]
-pub use tokio::{join, try_join};
+pub use tokio::{join, try_join, select};
 
 #[doc(hidden)]
 pub mod __priv {

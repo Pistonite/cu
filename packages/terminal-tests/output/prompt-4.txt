@@ -1,0 +1,24 @@
+$ 
+STDOUT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+H] testing prompts^LF
+^CR
+\x1B[K!] continue? [y/n]^LF
+-: ^CR
+\x1B[K\x1B[1A\x1B[K!] continue? [y/n]^LF
+^CR
+\x1B[K^CR
+\x1B[K!] what's your favorite programming language?^LF
+-: ^CR
+\x1B[K\x1B[1A\x1B[K!] what's your favorite programming language?^LF
+^CR
+\x1B[KI] you answered: json^LF
+E] fatal: the answer is incorrect^LF
+H] use -vv or set RUST_BACKTRACE=1 to display the error back^LF
+ | trace.^LF
+I] finished in 0.00s^LF
+^<EOF
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+STDERR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+^<EOF
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+status: exit status: 1

@@ -1,0 +1,26 @@
+[package]
+name = "terminal-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+shell-words = "1.1.1"
+
+[dependencies.cu]
+package = "pistonite-cu"
+path = "../copper"
+
+[[bin]]
+name = "terminal-tests"
+path = "src/main.rs"
+required-features = ["bin"]
+
+[features]
+default = ["bin"]
+bin = ["cu/cli", "cu/process", "cu/coroutine-heavy"]
+common = ["cu/__test", "cu/cli"]
+
+__test-print_levels = []
+__test-prompt = ["cu/prompt"]
+__test-prompt_password = ["cu/prompt-password"]

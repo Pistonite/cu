@@ -1,0 +1,12 @@
+$ -q
+STDOUT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+E] this is error message^LF
+ | ^LF
+:: today's weather is good^LF
+H] today's weather is ok^LF
+^<EOF
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+STDERR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+^<EOF
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+status: exit status: 0

@@ -54,6 +54,10 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Syste
 version = "1.49.0" 
 features = [ "macros", "rt-multi-thread" ]
 optional = true
+
+
+[dev-dependencies]
+
 [dev-dependencies.tokio]
 version = "1.49.0" 
 features = [ "macros", "rt-multi-thread", "time" ]
@@ -113,6 +117,9 @@ nightly = []
 release-nolog= ["log/release_max_level_off"]
 release-nodebuglog = ["log/release_max_level_info"]
 derive = ["dep:derive_more"]
+
+# Internally used to enable test features
+__test = []
 
 [[example]]
 name = "print"
