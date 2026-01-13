@@ -159,6 +159,8 @@ mod password;
 #[cfg(feature = "prompt-password")]
 pub use password::password_chars_legal;
 
+mod ctrlc;
+
 /// Formatting utils
 pub(crate) mod fmt;
 

@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 /// An atomic wrapper with an underlying atomic storage and conversion to
 /// a type T.
 ///
@@ -77,4 +79,9 @@ impl_atomic_type! {
     bool => AtomicBool, new_bool,
     isize => AtomicIsize, new_isize,
     usize => AtomicUsize, new_usize,
+}
+
+pub(crate) fn next_atomic_usize() -> usize {
+    static ID: AtomicUsize = AtomicUsize::new(1);
+    ID.fetch_add(1, Ordering::SeqCst)
 }
