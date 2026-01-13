@@ -77,7 +77,10 @@ fn test_case_2() -> cu::Result<()> {
             sleep_tick();
 
             if i == 5 {
-                cu::prompt!("what's your favorite fruit?")?;
+                // this message should be displayed above the progress area
+                cu::warn!("hi there");
+                let answer = cu::prompt!("what's your favorite fruit?")?;
+                cu::info!("{answer} is also my favorite fruit!");
             }
         }
         drop(bar4);

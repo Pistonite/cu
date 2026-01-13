@@ -35,25 +35,6 @@ pub(crate) const fn colors(use_color: bool) -> Colors {
     if use_color { COLOR } else { NOCOLOR }
 }
 
-/// Control codes definition
-#[derive(Clone, Copy)]
-pub(crate) struct Controls {
-    pub move_to_begin_and_clear: &'static str,
-}
-
-static NOCONTROL: Controls = Controls {
-    move_to_begin_and_clear: "",
-};
-
-static CONTROL: Controls = Controls {
-    move_to_begin_and_clear: "\r\x1b[K",
-};
-
-#[inline]
-pub(crate) const fn controls(use_controls: bool) -> Controls {
-    if use_controls { CONTROL } else { NOCONTROL }
-}
-
 /// Iterator of (char, width)
 pub(crate) fn with_width(x: std::str::Chars<'_>) -> AnsiWidthIter<'_> {
     AnsiWidthIter {

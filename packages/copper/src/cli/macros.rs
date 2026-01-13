@@ -33,25 +33,66 @@ macro_rules! hint {
 /// # cu::Ok(())
 /// ```
 ///
+/// if the prompt is for password, use the `prompt-password` feature (which implies `prompt`)
+/// to enable `prompt_password!` macro.
+///
 /// See other macros for advanced usage:
 /// - [`cu::yesno!`](macro@crate::yesno): Display a `[y/n]` prompt which loops
 ///   until user chooses yes or no.
 /// - [`cu::prompt_password!`](macro@crate::prompt_password):
-///   Display a prompt where the input will be hidden
+///   Display a prompt where the input will be hidden.
 /// - [`cu::prompt_validate!`](macro@crate::prompt_validate) (and
 ///   [`prompt_password_validate!`](macro@crate::prompt_password_validate)) to loop the prompt until a validation function passes.
 ///
-/// With the `prompt` feature enabled, you can
-/// use [`prompt!`](crate::prompt) and [`yesno!`](crate::yesno) to show prompts.
+/// # Multiple Prompts
+/// If multiple prompts are requested (for example from many threads), they are put into a FIFO
+/// queue. Only one prompt will be displayed to the user at a time.
 ///
-/// The prompts are thread-safe, meaning
-/// You can call them from multiple threads, and they will be queued to prompt the user one after
-/// the other. Prompts are always shown regardless of verbosity. But when stdout is redirected,
-/// they will not render in terminal.
-/// Show a prompt
+/// # Interaction with Progress Bars
+/// If there are both progress bars and a prompt active, the prompt is displayed below
+/// the progress bars. This lines up with the common expectation that prompts are shown
+/// at the bottom of the output. Progress bars will also be paused - otherwise the user
+/// will be typing their answer all over in the animated area.
 ///
-/// Use the `prompt-password` feature and [`prompt_password!`](crate::prompt_password) macro
-/// if prompting for a password, which will hide user's input from the console
+/// This brings one interesting use case, which is printing other messages related
+/// to the prompt before the prompt. For example:
+/// ```rust,no_run
+/// # use pistonite_cu as cu;
+/// // ... imagine a progress bar is active here
+/// cu::warn!(
+///     "this is an important warning about the prompt! read this carefully when answering!"
+/// );
+/// let _ = cu::prompt!("please enter important information")?;
+/// # cu::Ok(())
+/// ```
+///
+/// The warning message is guaranteed to be printed before the prompt. However, because
+/// there are progress bars active, the warning message and the prompt will be separated
+/// by the progress bar. The user might miss the important message.
+///
+/// ```text
+/// W] this is an important warning about the prompt! read this carefully when answering!
+///  ][42/100] progress running...
+/// !] please enter important information
+/// -:
+/// ```
+///
+/// The way to address this is to print any message related to the prompt within the prompt
+/// macro:
+/// ```rust,no_run
+/// # use pistonite_cu as cu;
+/// // ... imagine a progress bar is active here
+/// let _ = cu::prompt!(r"this is an important warning about the prompt! read this carefully when answering!
+/// please enter important information")?;
+/// # cu::Ok(())
+/// ```
+/// output:
+/// ```text
+///  ][42/100] progress running...
+/// !] this is an important warning about the prompt! read this carefully when answering!
+///  | please enter important information
+/// -:
+/// ```
 ///
 #[cfg(feature = "prompt")]
 #[macro_export]
