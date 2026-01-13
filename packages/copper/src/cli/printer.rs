@@ -325,7 +325,7 @@ impl PrintingThreadHandle {
     }
     /// Assign a new handle
     fn assign(&mut self, handle: Option<JoinHandle<()>>) {
-        self.needs_join = handle.is_some();
+        self.needs_join = handle.is_none();
         self.handle = handle;
     }
 }
