@@ -160,6 +160,11 @@ mod password;
 pub use password::password_chars_legal;
 
 mod ctrlc;
+pub use ctrlc::{catch_ctrlc, CtrlcSignal};
+#[cfg(feature = "cli")]
+pub use ctrlc::add_global_ctrlc_handler;
+#[cfg(feature = "coroutine")]
+pub use ctrlc::co_catch_ctrlc;
 
 /// Formatting utils
 pub(crate) mod fmt;
