@@ -52,7 +52,7 @@ tasks:
   doc:
     cmds:
       # note: require nightly toolchain in CI
-      - cargo doc --no-deps --features full,nightly -p pistonite_cu,pistonite_cu_proc_macros,pistonite_pm
+      - cargo doc --no-deps --features full,nightly -p pistonite-cu -p pistonite-cu-proc-macros -p pistonite-pm
       - cmd: >
           echo "Generating index redirect";
           echo "<!DOCTYPE html>" > target/doc/index.html;
