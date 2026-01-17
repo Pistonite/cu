@@ -104,7 +104,7 @@ pub mod cli;
 #[cfg(feature = "prompt-password")]
 pub use cli::password_chars_legal;
 #[cfg(feature = "print")]
-pub use cli::{ProgressBar, ProgressBarBuilder, progress, CtrlcSignal};
+pub use cli::{CtrlcSignal, ProgressBar, ProgressBarBuilder, progress};
 #[cfg(feature = "cli")]
 pub use pistonite_cu_proc_macros::cli;
 

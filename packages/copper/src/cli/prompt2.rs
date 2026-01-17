@@ -1,4 +1,3 @@
-
 type ValidatorFn = Box<dyn FnMut(&mut String) -> cu::Result<bool>>;
 
 /// Create a new prompt builder with the given message.
@@ -8,7 +7,6 @@ pub fn prompt(message: impl Into<String>) -> PromptBuilder {
         validator: None,
     }
 }
-
 
 /// Initial prompt builder (can call `yesno()`, `password()`, or use directly)
 pub struct PromptBuilder {

@@ -1,13 +1,10 @@
-//! Global prompt thread for reading user input.
-
 use std::io;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{LazyLock, Mutex};
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 use cu::pre::*;
-
 
 static READ_STDIN: LazyLock<Mutex<Receiver<io::Result<String>>>> = LazyLock::new(|| {
     let (send, recv) = mpsc::sync_channel(0);
@@ -67,7 +64,10 @@ pub fn read_plaintext(ctrlc: cu::CtrlcSignal) -> cu::Result<Option<cu::ZString>>
 /// Returns `Ok(None)` if ctrlc is triggered.
 pub fn read_password(ctrlc: cu::CtrlcSignal) -> cu::Result<Option<cu::ZString>> {
     let (send, recv) = oneshot::channel();
-    let (reader, _guard) = cu::check!(password::open_password_input(), "failed to open password input")?;
+    let (reader, _guard) = cu::check!(
+        password::open_password_input(),
+        "failed to open password input"
+    )?;
 
     // prevent multiple callers from reading tty at the same time
     thread::spawn(move || {
@@ -77,7 +77,7 @@ pub fn read_password(ctrlc: cu::CtrlcSignal) -> cu::Result<Option<cu::ZString>> 
         let mut password = cu::ZString::default();
         let result = match reader.read_line(&mut password) {
             Err(e) => Err(e),
-            Ok(_) => Ok(password)
+            Ok(_) => Ok(password),
         };
         let _ = send.send(result);
     });
@@ -109,9 +109,9 @@ pub fn read_password(ctrlc: cu::CtrlcSignal) -> cu::Result<Option<cu::ZString>> 
 /// SPDX-License-Identifier: Apache-2.0
 /// Copyright (c) https://github.com/conradkleinespel/rpassword
 mod password {
+    use std::fs::File;
     use std::io::{self, BufReader};
     use std::sync::{Mutex, MutexGuard};
-    use std::fs::File;
 
     pub struct PasswordInputGuard {
         hidden_input_guard: imp::HiddenInputGuard,
@@ -122,14 +122,20 @@ mod password {
         static READ_PASSWORD: Mutex<()> = Mutex::new(());
         let tty_guard = READ_PASSWORD.lock().ok();
         let (reader, hidden_input_guard) = imp::open_console()?;
-        Ok((reader, PasswordInputGuard { hidden_input_guard, tty_guard }))
+        Ok((
+            reader,
+            PasswordInputGuard {
+                hidden_input_guard,
+                tty_guard,
+            },
+        ))
     }
     #[cfg(unix)]
     mod imp {
-        use std::io::{self, BufReader};
-        use std::fs::File;
-        use std::os::unix::io::AsRawFd;
         use libc::{ECHO, ECHONL, TCSANOW, c_int, tcsetattr, termios};
+        use std::fs::File;
+        use std::io::{self, BufReader};
+        use std::os::unix::io::AsRawFd;
 
         pub fn open_console() -> io::Result<(BufReader<File>, HiddenInputGuard)> {
             // open tty as fd
@@ -141,7 +147,7 @@ mod password {
         }
         pub struct HiddenInputGuard {
             fd: i32,
-            original: termios,
+            original_attr: termios,
         }
         impl HiddenInputGuard {
             fn try_new(fd: i32) -> io::Result<Self> {
@@ -149,21 +155,21 @@ mod password {
                 // and the second one will act as a backup for when we want to set the
                 // terminal back to its original state.
                 let mut term = safe_tcgetattr(fd)?;
-                let original = safe_tcgetattr(fd)?;
+                let original_attr = safe_tcgetattr(fd)?;
                 // Hide the password. This is what makes this function useful.
                 term.c_lflag &= !ECHO;
                 // But don't hide the NL character when the user hits ENTER.
                 term.c_lflag |= ECHONL;
                 // Save the settings for now.
                 io_result(unsafe { tcsetattr(fd, TCSANOW, &term) })?;
-                Ok(Self { fd, original })
+                Ok(Self { fd, original_attr })
             }
         }
         impl Drop for HiddenInputGuard {
             fn drop(&mut self) {
                 // Set the mode back to normal
                 unsafe {
-                    tcsetattr(self.fd, TCSANOW, &self.original);
+                    tcsetattr(self.fd, TCSANOW, &self.original_attr);
                 }
             }
         }
@@ -182,90 +188,73 @@ mod password {
 
     #[cfg(windows)]
     mod imp {
-        use super::*;
-        pub type THandle = i32;
-        pub fn read_password() -> io::Result<cu::ZString> {
-            todo!()
-        }
-    use std::io::{self, BufRead, BufReader};
-    use std::os::windows::io::FromRawHandle;
-    use windows_sys::Win32::Foundation::{
-        GENERIC_READ, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE,
-    };
-    use windows_sys::Win32::Storage::FileSystem::{
-        CreateFileA, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
-    };
-    use windows_sys::Win32::System::Console::{
-        CONSOLE_MODE, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, GetConsoleMode, SetConsoleMode,
-    };
-    use windows_sys::core::PCSTR;
-
-    struct HiddenInput {
-        mode: u32,
-        handle: HANDLE,
-    }
-
-    impl HiddenInput {
-        fn new(handle: HANDLE) -> io::Result<HiddenInput> {
-            let mut mode = 0;
-
-            // Get the old mode so we can reset back to it when we are done
-            if unsafe { GetConsoleMode(handle, &mut mode as *mut CONSOLE_MODE) } == 0 {
-                return Err(io::Error::last_os_error());
-            }
-
-            // We want to be able to read line by line, and we still want backspace to work
-            let new_mode_flags = ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT;
-            if unsafe { SetConsoleMode(handle, new_mode_flags) } == 0 {
-                return Err(io::Error::last_os_error());
-            }
-
-            Ok(HiddenInput { mode, handle })
-        }
-    }
-
-    impl Drop for HiddenInput {
-        fn drop(&mut self) {
-            // Set the mode back to normal
-            unsafe {
-                SetConsoleMode(self.handle, self.mode);
-            }
-        }
-    }
-
-    /// Reads a password from the TTY
-    pub fn read_password() -> io::Result<crate::ZString> {
-        let handle = unsafe {
-            CreateFileA(
-                c"CONIN$".as_ptr() as PCSTR,
-                GENERIC_READ | GENERIC_WRITE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                std::ptr::null(),
-                OPEN_EXISTING,
-                0,
-                INVALID_HANDLE_VALUE,
-            )
+        use std::fs::File;
+        use std::io::{self, BufReader};
+        use std::os::windows::io::FromRawHandle;
+        use windows_sys::Win32::Foundation::{
+            GENERIC_READ, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE,
         };
+        use windows_sys::Win32::Storage::FileSystem::{
+            CreateFileA, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+        };
+        use windows_sys::Win32::System::Console::{
+            CONSOLE_MODE, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, GetConsoleMode, SetConsoleMode,
+        };
+        use windows_sys::core::PCSTR;
 
-        if handle == INVALID_HANDLE_VALUE {
-            return Err(io::Error::last_os_error());
+        pub fn open_console() -> io::Result<(BufReader<File>, HiddenInputGuard)> {
+            let handle = unsafe {
+                CreateFileA(
+                    c"CONIN$".as_ptr() as PCSTR,
+                    GENERIC_READ | GENERIC_WRITE,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    std::ptr::null(),
+                    OPEN_EXISTING,
+                    0,
+                    INVALID_HANDLE_VALUE,
+                )
+            };
+
+            if handle == INVALID_HANDLE_VALUE {
+                return Err(io::Error::last_os_error());
+            }
+            let guard = HiddenInputGuard::try_new(handle)?;
+            let reader = BufReader::new(unsafe { std::fs::File::from_raw_handle(handle as _) });
+            Ok((reader, guard))
         }
 
-        let mut stream = BufReader::new(unsafe { std::fs::File::from_raw_handle(handle as _) });
-        read_password_from_handle_with_hidden_input(&mut stream, handle)
-    }
-
-    /// Reads a password from a given file handle
-    fn read_password_from_handle_with_hidden_input(
-        reader: &mut impl BufRead,
-        handle: HANDLE,
-    ) -> io::Result<crate::ZString> {
-        let mut password = crate::ZString::default();
-        {
-            let _hidden_input = HiddenInput::new(handle)?;
-            reader.read_line(&mut password)?;
+        pub struct HiddenInputGuard {
+            handle: HANDLE,
+            original_mode: u32,
         }
-        Ok(password.trim().to_string().into())
-    }
+        impl HiddenInputGuard {
+            fn try_new(handle: HANDLE) -> io::Result<Self> {
+                let mut original_mode = 0u32;
+
+                // Get the old mode so we can reset back to it when we are done
+                if unsafe { GetConsoleMode(handle, &mut original_mode as *mut CONSOLE_MODE) } == 0 {
+                    return Err(io::Error::last_os_error());
+                }
+
+                // We want to be able to read line by line, and we still want backspace to work
+                let new_mode_flags = ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT;
+                if unsafe { SetConsoleMode(handle, new_mode_flags) } == 0 {
+                    return Err(io::Error::last_os_error());
+                }
+
+                Ok(Self {
+                    handle,
+                    original_mode,
+                })
+            }
+        }
+        impl Drop for HiddenInputGuard {
+            fn drop(&mut self) {
+                // Set the mode back to normal
+                unsafe {
+                    SetConsoleMode(self.handle, self.original_mode);
+                }
+            }
+        }
     }
 }

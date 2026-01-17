@@ -55,7 +55,6 @@ mod unix {
         }
     }
 
-
     fn safe_tcgetattr(fd: c_int) -> io::Result<termios> {
         let mut term = mem::MaybeUninit::<termios>::uninit();
         io_result(unsafe { ::libc::tcgetattr(fd, term.as_mut_ptr()) })?;
