@@ -8,6 +8,7 @@
 
 #[cu::cli]
 fn main(_: cu::cli::Flags) -> cu::Result<()> {
+    cu::lv::disable_print_time();
     cu::hint!("testing prompts");
     if !cu::yesno!("continue?")? {
         cu::warn!("you chose to not continue!");

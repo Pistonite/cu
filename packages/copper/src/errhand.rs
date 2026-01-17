@@ -45,9 +45,10 @@ pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail};
 /// - [`cu::unimplemented!`](macro@crate::unimplemented)
 ///   and [`cu::unreachable!`](macro@crate::unreachable)
 ///   that are similar to the std macros, but instead of `panic!`, they will `bail!`
-/// - [`cu::ensure`](macro@crate::ensure) is unlike `anyhow::ensure`, that
+/// - [`cu::ensure!`](macro@crate::ensure) is unlike `anyhow::ensure`, that
 ///   it evaluates to a `Result<()>` instead of generates a return.
 ///   It also does not automatically generate debug information.
+/// - [`cu::some!`] checks an `Option` and returns `Ok(None)` if the option is `None`.
 ///
 /// Here are other `anyhow` re-exports that are less commonly used
 /// - `anyhow::anyhow` is `cu::fmterr`
@@ -218,6 +219,28 @@ macro_rules! ensure {
             Ok(())
         }
     }};
+}
+
+/// Check if an expression is `Some`
+///
+/// This is a convienence macro to achieve a similar effect
+/// of `?` on an option, in a function that returns `Result<Option<T>>`
+///
+/// Effectively expands to
+/// ```text
+/// match <expr> {
+///     Some(x) => x,
+///     None => return Ok(None),
+/// }
+/// ```
+#[macro_export]
+macro_rules! some {
+    ($result:expr) => {
+        match $result {
+            Some(x) => x,
+            None => return Ok(None),
+        }
+    };
 }
 
 /// Invoke a print macro, then panic with the same message

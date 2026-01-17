@@ -12,7 +12,6 @@ D] this is debug message^LF
  | ^LF
 :: today's weather is good^LF
 H] today's weather is ok^LF
-I] finished in 0.00s^LF
 ^<EOF
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 STDERR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

@@ -159,6 +159,11 @@ mod password;
 #[cfg(feature = "prompt-password")]
 pub use password::password_chars_legal;
 
+mod ctrlc;
+#[cfg(feature = "cli")]
+pub use ctrlc::add_global_ctrlc_handler;
+pub use ctrlc::{CtrlcBuilder, CtrlcSignal, ctrlc_frame};
+
 /// Formatting utils
 pub(crate) mod fmt;
 

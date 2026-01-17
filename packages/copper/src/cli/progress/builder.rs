@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::cli::progress::{Estimater, ProgressBar, State, StateImmut};
 
@@ -193,7 +192,7 @@ impl ProgressBarBuilder {
             None
         };
         let state_immut = StateImmut {
-            id: next_id(),
+            id: crate::next_atomic_usize(),
             parent: self.parent.as_ref().map(Arc::clone),
             prefix: self.message,
             done_message,
@@ -208,9 +207,4 @@ impl ProgressBarBuilder {
 
         ProgressBar::spawn(state_immut, state, self.parent)
     }
-}
-
-fn next_id() -> usize {
-    static ID: AtomicUsize = AtomicUsize::new(1);
-    ID.fetch_add(1, Ordering::SeqCst)
 }

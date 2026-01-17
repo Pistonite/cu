@@ -10,12 +10,11 @@ E] this is error message^LF
 D] this is debug message^LF
  | 2^LF
  | ^LF
-*] [print_levels print_levels.rs:20] this is trace message^LF
+*] [print_levels print_levels.rs:21] this is trace message^LF
  | ^LF
  | 2^LF
 :: today's weather is good^LF
 H] today's weather is ok^LF
-I] finished in 0.00s^LF
 ^<EOF
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 STDERR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

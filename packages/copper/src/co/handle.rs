@@ -16,6 +16,11 @@ impl<T> Handle<T> {
         self.into()
     }
 
+    /// Test if the task has finished and is ready to be joined
+    pub fn is_finished(&self) -> bool {
+        self.0.is_finished()
+    }
+
     /// Abort the task, trying to `join` or `co_join` an aborted
     /// task (if it's not already completed) will return an error indicating
     /// it's already aborted.

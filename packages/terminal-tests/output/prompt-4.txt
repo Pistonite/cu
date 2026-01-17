@@ -13,7 +13,6 @@ H] testing prompts^LF
 ^CR
 \x1B[KI] you answered: json^LF
 E] fatal: the answer is incorrect^LF
-I] finished in 0.00s^LF
 ^<EOF
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 STDERR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

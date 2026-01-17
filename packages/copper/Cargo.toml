@@ -24,6 +24,7 @@ terminal_size = { version = "0.4.3", optional = true }
 unicode-width = { version = "0.2.2", features = ["cjk"], optional = true }
 clap = { version = "4.5.54", features = ["derive"], optional = true }
 regex = { version = "1.12.2", optional = true }
+ctrlc = { version = "3.5.1", optional = true }
 
 # --- Coroutine ---
 num_cpus = { version = "1.17.0", optional = true }
@@ -74,7 +75,7 @@ full = [
 ]
 
 # --- Command Line Interface ---
-print = ["dep:oneshot", "dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width"]
+print = ["dep:oneshot", "dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width", "dep:ctrlc"]
 cli = ["dep:clap", "print"]
 prompt = ["print"]
 prompt-password = ["prompt"]
@@ -82,7 +83,8 @@ prompt-password = ["prompt"]
 # --- Coroutine ---
 coroutine = [
     "dep:tokio", "dep:num_cpus",
-    "tokio/sync", "tokio/io-util", "tokio/io-std"
+    "tokio/sync", "tokio/io-util", "tokio/io-std",
+    "tokio/time",
 ]
 coroutine-heavy = ["coroutine"] # enable heavy coroutine drived by multi-threaded tokio runtime
 
@@ -91,7 +93,6 @@ process = [ # enable spawning child processes
     "coroutine", "fs",
     "dep:spin",
     "tokio/process",
-    "tokio/time",
 ]
 fs = [ # enable file system and path util
     "dep:which", "dep:pathdiff", "dep:dunce", "dep:filetime", "dep:glob",
@@ -134,3 +135,7 @@ required-features = ["fs", "cli"]
 [[example]]
 name = "cargo"
 required-features = ["process", "cli", "json"]
+
+[[example]]
+name = "ctrlc"
+required-features = ["cli", "coroutine"]
