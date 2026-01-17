@@ -62,7 +62,7 @@
 //! - [Logging](mod@crate::lv) (via [`log`](https://docs.rs/log))
 //! - [Printing and Command Line Interface](mod@crate::cli) (CLI arg parsing via
 //!   [`clap`](https://docs.rs/clap))
-//! - [Handling Ctrl-C](fn@crate::cli::catch_ctrlc)
+//! - [Handling Ctrl-C](fn@crate::cli::ctrlc_frame)
 //! - [Progress Bars](fn@crate::progress)
 //! - [Prompting](macro@crate::prompt)
 //! - [Coroutines (Async)](mod@crate::co) (via [`tokio`](https://docs.rs/tokio))

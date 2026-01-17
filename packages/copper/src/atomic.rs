@@ -81,6 +81,7 @@ impl_atomic_type! {
     usize => AtomicUsize, new_usize,
 }
 
+#[allow(unused)]
 pub(crate) fn next_atomic_usize() -> usize {
     static ID: AtomicUsize = AtomicUsize::new(1);
     ID.fetch_add(1, Ordering::SeqCst)

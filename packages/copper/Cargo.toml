@@ -62,7 +62,7 @@ version = "1.49.0"
 features = [ "macros", "rt-multi-thread", "time" ]
 
 [features]
-default = ["full"]
+default = []
 full = [
     "cli",
     "coroutine-heavy",
@@ -75,15 +75,16 @@ full = [
 ]
 
 # --- Command Line Interface ---
-print = ["dep:oneshot", "dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width"]
-cli = ["dep:clap", "print", "ctrlc"]
+print = ["dep:oneshot", "dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width", "dep:ctrlc"]
+cli = ["dep:clap", "print"]
 prompt = ["print"]
 prompt-password = ["prompt"]
 
 # --- Coroutine ---
 coroutine = [
     "dep:tokio", "dep:num_cpus",
-    "tokio/sync", "tokio/io-util", "tokio/io-std"
+    "tokio/sync", "tokio/io-util", "tokio/io-std",
+    "tokio/time",
 ]
 coroutine-heavy = ["coroutine"] # enable heavy coroutine drived by multi-threaded tokio runtime
 
@@ -92,7 +93,6 @@ process = [ # enable spawning child processes
     "coroutine", "fs",
     "dep:spin",
     "tokio/process",
-    "tokio/time",
 ]
 fs = [ # enable file system and path util
     "dep:which", "dep:pathdiff", "dep:dunce", "dep:filetime", "dep:glob",
@@ -135,3 +135,7 @@ required-features = ["fs", "cli"]
 [[example]]
 name = "cargo"
 required-features = ["process", "cli", "json"]
+
+[[example]]
+name = "ctrlc"
+required-features = ["cli", "coroutine"]

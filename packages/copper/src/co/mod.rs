@@ -72,7 +72,7 @@
 //! ```
 
 // re-exports
-pub use tokio::{join, select, try_join, time::sleep};
+pub use tokio::{join, select, time::sleep, try_join};
 
 mod runtime;
 #[cfg(not(feature = "coroutine-heavy"))]

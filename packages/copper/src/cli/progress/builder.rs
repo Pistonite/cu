@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::cli::progress::{Estimater, ProgressBar, State, StateImmut};
 
@@ -209,4 +208,3 @@ impl ProgressBarBuilder {
         ProgressBar::spawn(state_immut, state, self.parent)
     }
 }
-
