@@ -7,9 +7,8 @@
 //! - `cli`: Use this if your crate is the end binary (i.e. not a library).
 //!   This integrates and re-exports [`clap`](https://docs.rs/clap).
 //!   - This turns on `print` automatically
-//! - `prompt`: This implies `print` and will also enable the ability to show prompts in the terminal.
-//! - `prompt-password`: This implies `prompt` (which implies `print`), and allows prompting for
-//!   password (which hides the input when user types into the terminal)
+//! - `prompt`: This implies `print` and will also enable the ability to show prompts in the terminal,
+//!   including password prompts (which hide the input when user types into the terminal).
 //!
 //! # Integration with `clap`
 //!
@@ -158,6 +157,9 @@ pub use prompt::{__prompt, __prompt_with_validation, __prompt_yesno};
 mod password;
 #[cfg(feature = "prompt-password")]
 pub use password::password_chars_legal;
+#[cfg(feature = "prompt")]
+mod prompt2;
+mod prompter;
 
 mod ctrlc;
 #[cfg(feature = "cli")]

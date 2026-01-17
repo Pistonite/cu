@@ -33,8 +33,7 @@ macro_rules! hint {
 /// # cu::Ok(())
 /// ```
 ///
-/// if the prompt is for password, use the `prompt-password` feature (which implies `prompt`)
-/// to enable `prompt_password!` macro.
+/// The `prompt` feature also enables the `prompt_password!` macro for password input.
 ///
 /// See other macros for advanced usage:
 /// - [`cu::yesno!`](macro@crate::yesno): Display a `[y/n]` prompt which loops

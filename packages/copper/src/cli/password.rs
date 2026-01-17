@@ -55,13 +55,6 @@ mod unix {
         }
     }
 
-    /// Turns a C function return into an IO Result
-    fn io_result(ret: c_int) -> io::Result<()> {
-        match ret {
-            0 => Ok(()),
-            _ => Err(io::Error::last_os_error()),
-        }
-    }
 
     fn safe_tcgetattr(fd: c_int) -> io::Result<termios> {
         let mut term = mem::MaybeUninit::<termios>::uninit();

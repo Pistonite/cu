@@ -98,13 +98,13 @@ pub use pistonite_cu_proc_macros::context;
 pub mod lv;
 pub use lv::{debug, error, info, trace, warn};
 
-// --- Command Line Interface (print/cli/prompt/prompt-password feature) ---
+// --- Command Line Interface (print/cli/prompt feature) ---
 #[cfg(feature = "print")]
 pub mod cli;
 #[cfg(feature = "prompt-password")]
 pub use cli::password_chars_legal;
 #[cfg(feature = "print")]
-pub use cli::{ProgressBar, ProgressBarBuilder, progress};
+pub use cli::{ProgressBar, ProgressBarBuilder, progress, CtrlcSignal};
 #[cfg(feature = "cli")]
 pub use pistonite_cu_proc_macros::cli;
 

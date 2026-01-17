@@ -77,7 +77,7 @@ impl Printer {
         &mut self,
         prompt: &str,
         is_password: bool,
-    ) -> OnceRecv<io::Result<cu::ZString>> {
+    ) -> OnceRecv<io::Result<Option<cu::ZString>>> {
         // format the prompt
         let mut lines = prompt.lines();
         self.format_buffer.reset(self.colors.gray, self.colors.cyan);
@@ -279,15 +279,8 @@ impl Printer {
     }
 }
 
-fn read_plaintext(buf: &mut String) -> io::Result<cu::ZString> {
-    buf.clear();
-    io::stdin()
-        .read_line(buf)
-        .map(|_| buf.trim().to_string().into())
-}
-
 struct PromptTask {
-    send: OnceSend<io::Result<cu::ZString>>,
+    send: OnceSend<io::Result<Option<cu::ZString>>>,
     prompt: String,
     #[cfg(feature = "prompt-password")]
     is_password: bool,
@@ -614,4 +607,11 @@ enum Target {
     Stdout,
     /// Print to Stderr
     Stderr,
+}
+
+fn read_plaintext(buf: &mut String) -> io::Result<cu::ZString> {
+    buf.clear();
+    io::stdin()
+        .read_line(buf)
+        .map(|_| buf.trim().to_string().into())
 }

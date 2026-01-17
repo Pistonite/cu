@@ -62,11 +62,11 @@ version = "1.49.0"
 features = [ "macros", "rt-multi-thread", "time" ]
 
 [features]
-default = []
+default = ["full"]
 full = [
     "cli",
     "coroutine-heavy",
-    "prompt-password",
+    "prompt",
     "process",
     "json",
     "yaml",
@@ -78,7 +78,6 @@ full = [
 print = ["dep:oneshot", "dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width", "dep:ctrlc"]
 cli = ["dep:clap", "print"]
 prompt = ["print"]
-prompt-password = ["prompt"]
 
 # --- Coroutine ---
 coroutine = [
