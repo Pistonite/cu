@@ -8,7 +8,6 @@ H] testing prompts^LF
 ^CR
 \x1B[KI] you answered: rust^LF
 I] the answer is correct^LF
-I] finished in 0.00s^LF
 ^<EOF
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 STDERR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

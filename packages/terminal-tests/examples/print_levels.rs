@@ -11,6 +11,7 @@
 
 #[cu::cli]
 fn main(_: cu::cli::Flags) -> cu::Result<()> {
+    cu::lv::disable_print_time();
     cu::info!(
         "this is an info messagenmultilineaa 你好 sldkfjals🤖kdjflkasjdflkjasldkfjaklsdjflkjasldkfjlaksjdflkajsdklfjlaksjdfkljasldkfjlasldkjflaskdjflaksjdlfkajsldkfjkasjdlfkjaskldjflajsdlkfjlaskjdfklajsdf"
     );

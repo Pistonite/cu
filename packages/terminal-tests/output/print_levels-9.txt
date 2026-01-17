@@ -10,12 +10,11 @@ STDOUT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 \x1B[90mD]\x1B[96m this is debug message^LF
 \x1B[90m | \x1B[96m2^LF
 \x1B[90m | \x1B[96m^LF
-\x1B[95m*]\x1B[95m [print_levels print_levels.rs:20] this is trace message^LF
+\x1B[95m*]\x1B[95m [print_levels print_levels.rs:21] this is trace message^LF
 \x1B[90m | \x1B[95m^LF
 \x1B[90m | \x1B[95m2^LF
 \x1B[90m::\x1B[0m today's weather is good^LF
 \x1B[96mH\x1B[90m]\x1B[93m today's weather is ok^LF
-\x1B[92mI\x1B[90m]\x1B[0m finished in 0.00s^LF
 ^<EOF
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 STDERR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
