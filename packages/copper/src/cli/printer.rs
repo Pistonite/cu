@@ -8,10 +8,10 @@ use std::thread::JoinHandle;
 use oneshot::Receiver as OnceRecv;
 use oneshot::Sender as OnceSend;
 
+use crate::cli::ctrlc;
 use crate::cli::fmt::{self, FormatBuffer, ansi};
-#[cfg(feature = "prompt-password")]
-use crate::cli::password;
 use crate::cli::progress::{BarFormatter, BarResult, ProgressBar};
+use crate::cli::prompter;
 use crate::cli::{THREAD_NAME, TICK_INTERVAL, Tick};
 use crate::lv;
 
@@ -77,7 +77,7 @@ impl Printer {
         &mut self,
         prompt: &str,
         is_password: bool,
-    ) -> OnceRecv<io::Result<Option<cu::ZString>>> {
+    ) -> OnceRecv<cu::Result<Option<cu::ZString>>> {
         // format the prompt
         let mut lines = prompt.lines();
         self.format_buffer.reset(self.colors.gray, self.colors.cyan);
@@ -92,7 +92,7 @@ impl Printer {
             self.format_buffer.new_line();
             self.format_buffer.push_str(line);
         }
-        if cfg!(feature = "prompt-password") && is_password {
+        if is_password {
             self.format_buffer.push_str(": ");
         } else {
             self.format_buffer.push_lf();
@@ -101,21 +101,11 @@ impl Printer {
         }
 
         let (send, recv) = oneshot::channel();
-        #[cfg(feature = "prompt-password")]
-        {
-            self.pending_prompts.push_back(PromptTask {
-                send,
-                prompt: self.format_buffer.take(),
-                is_password,
-            });
-        }
-        #[cfg(not(feature = "prompt-password"))]
-        {
-            self.pending_prompts.push_back(PromptTask {
-                send,
-                prompt: self.format_buffer.take(),
-            });
-        }
+        self.pending_prompts.push_back(PromptTask {
+            send,
+            prompt: self.format_buffer.take(),
+            is_password,
+        });
         self.start_print_task_if_needed();
         recv
     }
@@ -280,9 +270,8 @@ impl Printer {
 }
 
 struct PromptTask {
-    send: OnceSend<io::Result<Option<cu::ZString>>>,
+    send: OnceSend<cu::Result<Option<cu::ZString>>>,
     prompt: String,
-    #[cfg(feature = "prompt-password")]
     is_password: bool,
 }
 
@@ -391,7 +380,7 @@ impl PrintingThread {
                     // for user input
                     drop(printer_guard);
                     // process this prompt
-                    let (result, _) = self.read_prompt(&task);
+                    let result = read_prompt(&task);
                     // since there is no animation, we don't need to re-print the prompt
                     // send the result of the prompt
                     let _ = task.send.send(result);
@@ -426,11 +415,11 @@ impl PrintingThread {
                     self.lines += l;
 
                     // process this prompt
-                    let (result, is_password) = self.read_prompt(&task);
+                    let result = read_prompt(&task);
 
                     // now we need to re-print the prompt above the progress bars
                     // by adding it to the buffer
-                    if !is_password {
+                    if !task.is_password {
                         while !task.prompt.ends_with('\n') {
                             task.prompt.pop();
                         }
@@ -549,22 +538,6 @@ impl PrintingThread {
         self.lines = 0;
     }
 
-    fn read_prompt(&mut self, _task: &PromptTask) -> (io::Result<cu::ZString>, bool) {
-        #[cfg(feature = "prompt-password")]
-        let (result, is_password) = if _task.is_password {
-            (password::read_password(), true)
-        } else {
-            (read_plaintext(&mut self.temp), false)
-        };
-        #[cfg(not(feature = "prompt-password"))]
-        let (result, is_password) = (read_plaintext(&mut self.temp), false);
-
-        // clear sensitive information in the memory
-        crate::str::zero(&mut self.temp);
-
-        (result, is_password)
-    }
-
     /// Print `buffer` to progress bar target
     fn print_buffer_to_anime_target(&mut self, printer: &mut Printer) {
         use std::io::Write as _;
@@ -608,10 +581,17 @@ enum Target {
     /// Print to Stderr
     Stderr,
 }
-
-fn read_plaintext(buf: &mut String) -> io::Result<cu::ZString> {
-    buf.clear();
-    io::stdin()
-        .read_line(buf)
-        .map(|_| buf.trim().to_string().into())
+fn read_prompt(task: &PromptTask) -> cu::Result<Option<cu::ZString>> {
+    let is_password = task.is_password;
+    let result = ctrlc::ctrlc_frame().execute(|ctrlc| {
+        if is_password {
+            prompter::read_password(ctrlc)
+        } else {
+            prompter::read_plaintext(ctrlc)
+        }
+    })?;
+    match result {
+        None | Some(None) => Ok(None),
+        Some(Some(x)) => Ok(Some(x)),
+    }
 }

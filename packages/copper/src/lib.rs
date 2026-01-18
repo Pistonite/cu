@@ -64,7 +64,7 @@
 //!   [`clap`](https://docs.rs/clap))
 //! - [Handling Ctrl-C](fn@crate::cli::ctrlc_frame)
 //! - [Progress Bars](fn@crate::progress)
-//! - [Prompting](macro@crate::prompt)
+//! - [Prompting](fn@crate::prompt)
 //! - [Coroutines (Async)](mod@crate::co) (via [`tokio`](https://docs.rs/tokio))
 //! - [File System Paths and Strings](trait@crate::str::PathExtension)
 //! - [File System Operations](mod@crate::fs)
@@ -101,10 +101,10 @@ pub use lv::{debug, error, info, trace, warn};
 // --- Command Line Interface (print/cli/prompt feature) ---
 #[cfg(feature = "print")]
 pub mod cli;
-#[cfg(feature = "prompt-password")]
-pub use cli::password_chars_legal;
 #[cfg(feature = "print")]
-pub use cli::{CtrlcSignal, ProgressBar, ProgressBarBuilder, progress};
+pub use cli::{CtrlcSignal, ProgressBar, progress};
+#[cfg(feature = "prompt")]
+pub use cli::{password_chars_legal, prompt, yesno};
 #[cfg(feature = "cli")]
 pub use pistonite_cu_proc_macros::cli;
 

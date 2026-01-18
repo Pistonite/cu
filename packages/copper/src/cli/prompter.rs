@@ -69,7 +69,6 @@ pub fn read_password(ctrlc: cu::CtrlcSignal) -> cu::Result<Option<cu::ZString>> 
         "failed to open password input"
     )?;
 
-    // prevent multiple callers from reading tty at the same time
     thread::spawn(move || {
         use std::io::BufRead as _;
 
