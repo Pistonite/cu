@@ -326,7 +326,7 @@ mod password {
     #[cfg(windows)]
     mod imp {
         use std::fs::File;
-        use std::io::{self, BufReader};
+        use std::io;
         use std::os::windows::io::FromRawHandle;
         use windows_sys::Win32::Foundation::{
             GENERIC_READ, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE,
@@ -339,31 +339,57 @@ mod password {
         };
         use windows_sys::core::PCSTR;
 
-        pub fn open_console() -> io::Result<(BufReader<File>, HiddenInputGuard)> {
-            let handle = unsafe {
-                CreateFileA(
-                    c"CONIN$".as_ptr() as PCSTR,
-                    GENERIC_READ | GENERIC_WRITE,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE,
-                    std::ptr::null(),
-                    OPEN_EXISTING,
-                    0,
-                    INVALID_HANDLE_VALUE,
-                )
-            };
+        pub type HandleType = HANDLE;
 
-            if handle == INVALID_HANDLE_VALUE {
-                return Err(io::Error::last_os_error());
+        impl super::Handle {
+            pub fn open() -> io::Result<Self> {
+                let handle = unsafe {
+                    CreateFileA(
+                        c"CONIN$".as_ptr() as PCSTR,
+                        GENERIC_READ | GENERIC_WRITE,
+                        FILE_SHARE_READ | FILE_SHARE_WRITE,
+                        std::ptr::null(),
+                        OPEN_EXISTING,
+                        0,
+                        INVALID_HANDLE_VALUE,
+                    )
+                };
+
+                if handle == INVALID_HANDLE_VALUE {
+                    return Err(io::Error::last_os_error());
+                }
+                let file = unsafe { File::from_raw_handle(handle as _) };
+                Ok(Self {
+                    inner: handle,
+                    file,
+                })
             }
-            let guard = HiddenInputGuard::try_new(handle)?;
-            let reader = BufReader::new(unsafe { std::fs::File::from_raw_handle(handle as _) });
-            Ok((reader, guard))
+
+            pub fn into_reader(self) -> io::Result<super::Reader> {
+                let guard = HiddenInputGuard::try_new(self.inner)?;
+                let reader = io::BufReader::new(self.file);
+                Ok(super::Reader {
+                    inner: reader,
+                    guard,
+                })
+            }
+
+            pub fn into_guard(self) -> io::Result<super::Guard> {
+                let guard = HiddenInputGuard::try_new(self.inner)?;
+                Ok(super::Guard {
+                    inner: self.file,
+                    guard,
+                })
+            }
         }
 
         pub struct HiddenInputGuard {
             handle: HANDLE,
             original_mode: u32,
         }
+        // SAFETY: HANDLE is just an opaque pointer-sized identifier for a kernel object.
+        // It is safe to send between threads as it doesn't provide interior mutability.
+        unsafe impl Send for HiddenInputGuard {}
         impl HiddenInputGuard {
             fn try_new(handle: HANDLE) -> io::Result<Self> {
                 let mut original_mode = 0u32;
