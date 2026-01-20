@@ -10,7 +10,8 @@ E] this is error message^LF
 D] this is debug message^LF
  | 2^LF
  | ^LF
-*] [print_levels print_levels.rs:21] this is trace message^LF
+*] [tt_print_levels tt_print_levels.rs:21] this is trace mes^LF
+ | sage^LF
  | ^LF
  | 2^LF
 :: today's weather is good^LF

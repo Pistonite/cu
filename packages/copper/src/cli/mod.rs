@@ -7,9 +7,8 @@
 //! - `cli`: Use this if your crate is the end binary (i.e. not a library).
 //!   This integrates and re-exports [`clap`](https://docs.rs/clap).
 //!   - This turns on `print` automatically
-//! - `prompt`: This implies `print` and will also enable the ability to show prompts in the terminal.
-//! - `prompt-password`: This implies `prompt` (which implies `print`), and allows prompting for
-//!   password (which hides the input when user types into the terminal)
+//! - `prompt`: This implies `print` and will also enable the ability to show prompts in the terminal,
+//!   including password prompts (which hide the input when user types into the terminal).
 //!
 //! # Integration with `clap`
 //!
@@ -124,11 +123,15 @@
 //! when you want to manually invoke a command parser. These
 //! respect the `--color` option passed to the program.
 //!
+//! # Ctrl-C Signals
+//! We wrap the [`ctrlc`](https://docs.rs/ctrlc) crate because it only allows
+//! for one global handler. See [Handling Ctrl-C](fn@crate::cli::ctrlc_frame)
+//!
 //! # Progress Bars
 //! See [Progress Bars](fn@crate::progress)
 //!
 //! # Prompting
-//! See [Prompting](macro@crate::prompt)
+//! See [Prompting](fn@crate::prompt)
 //!
 #[cfg(feature = "cli")]
 mod flags;
@@ -153,10 +156,12 @@ pub use progress::{ProgressBar, ProgressBarBuilder, progress};
 #[cfg(feature = "prompt")]
 mod prompt;
 #[cfg(feature = "prompt")]
-pub use prompt::{__prompt, __prompt_with_validation, __prompt_yesno};
-#[cfg(feature = "prompt-password")]
+pub use prompt::{PromptBuilder, prompt, yesno};
+#[cfg(feature = "prompt")]
 mod password;
-#[cfg(feature = "prompt-password")]
+#[cfg(feature = "prompt")]
+mod prompter;
+#[cfg(feature = "prompt")]
 pub use password::password_chars_legal;
 
 mod ctrlc;

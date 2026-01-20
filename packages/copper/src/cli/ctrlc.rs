@@ -96,7 +96,8 @@ pub fn add_global_ctrlc_handler<F: FnMut() + Send + 'static>(handler: F) -> cu::
 /// and easier to reason about program states when aborting.
 ///
 /// If you prefer automatically cancellation, consider this pattern:
-/// ```rust,ignore
+#[cfg_attr(not(feature = "coroutine"), doc = "```rust,ignore")]
+#[cfg_attr(feature = "coroutine", doc = "```rust,no_run")]
 /// # use pistonite_cu as cu;
 /// # async fn main_() -> cu::Result<()> {
 /// let (send, mut recv) = tokio::sync::mpsc::unbounded_channel();

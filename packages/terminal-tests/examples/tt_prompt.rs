@@ -16,7 +16,7 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
     }
     let answer = cu::prompt!("what's your favorite programming language?")?;
     cu::info!("you answered: {answer}");
-    if answer != "rust" {
+    if &*answer != "rust" {
         cu::bail!("the answer is incorrect");
     }
     cu::info!("the answer is correct");

@@ -30,7 +30,8 @@
 //! If a function or type is not included with `pre::*`, that means the canonical
 //! style for using it is with the full path, for example, you would write:
 //!
-//! ```rust,ignore
+#![cfg_attr(not(feature = "fs"), doc = "```rust,ignore")]
+#![cfg_attr(feature = "fs", doc = "```rust,no_run")]
 //! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //!
@@ -42,7 +43,8 @@
 //! ```
 //!
 //! instead of the below:
-//! ```rust,ignore
+#![cfg_attr(not(feature = "fs"), doc = "```rust,ignore")]
+#![cfg_attr(feature = "fs", doc = "```rust,no_run")]
 //! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //! use cu::{Result, fs, info};
@@ -64,7 +66,7 @@
 //!   [`clap`](https://docs.rs/clap))
 //! - [Handling Ctrl-C](fn@crate::cli::ctrlc_frame)
 //! - [Progress Bars](fn@crate::progress)
-//! - [Prompting](macro@crate::prompt)
+//! - [Prompting](fn@crate::prompt)
 //! - [Coroutines (Async)](mod@crate::co) (via [`tokio`](https://docs.rs/tokio))
 //! - [File System Paths and Strings](trait@crate::str::PathExtension)
 //! - [File System Operations](mod@crate::fs)
@@ -98,13 +100,13 @@ pub use pistonite_cu_proc_macros::context;
 pub mod lv;
 pub use lv::{debug, error, info, trace, warn};
 
-// --- Command Line Interface (print/cli/prompt/prompt-password feature) ---
+// --- Command Line Interface (print/cli/prompt feature) ---
 #[cfg(feature = "print")]
 pub mod cli;
-#[cfg(feature = "prompt-password")]
-pub use cli::password_chars_legal;
 #[cfg(feature = "print")]
-pub use cli::{ProgressBar, ProgressBarBuilder, progress};
+pub use cli::{CtrlcSignal, ProgressBar, progress};
+#[cfg(feature = "prompt")]
+pub use cli::{password_chars_legal, prompt, yesno};
 #[cfg(feature = "cli")]
 pub use pistonite_cu_proc_macros::cli;
 

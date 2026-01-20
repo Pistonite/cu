@@ -6,9 +6,10 @@ use regex::Regex;
 use tokio::io::AsyncBufReadExt as _;
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
+use crate::BoxedFuture;
+use crate::cli::{ProgressBar, ProgressBarBuilder};
 use crate::lv::Lv;
 use crate::process::{Command, Preset, pio};
-use crate::{BoxedFuture, ProgressBar, ProgressBarBuilder};
 
 /// Display progress of cargo task with a progress bar, and emitting
 /// status messages and diagnostic messages using this crate's printing utilities.

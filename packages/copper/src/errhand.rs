@@ -74,7 +74,8 @@ pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail};
 /// These make up the API of the function.
 ///
 /// For example, I will write the following code
-/// ```rust,ignore
+#[cfg_attr(not(feature = "fs"), doc = "```rust,ignore")]
+#[cfg_attr(feature = "fs", doc = "```rust,no_run")]
 /// # use pistonite_cu as cu;
 /// use cu::pre::*;
 ///

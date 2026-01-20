@@ -4,8 +4,9 @@ use std::sync::Arc;
 use spin::mutex::SpinMutex;
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
+use crate::cli::{ProgressBar, ProgressBarBuilder};
 use crate::lv::Lv;
-use crate::{Atomic, BoxedFuture, ProgressBar, ProgressBarBuilder};
+use crate::{Atomic, BoxedFuture};
 
 use super::{ChildOutConfig, ChildOutTask, Driver, DriverOutput};
 
