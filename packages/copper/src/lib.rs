@@ -30,7 +30,8 @@
 //! If a function or type is not included with `pre::*`, that means the canonical
 //! style for using it is with the full path, for example, you would write:
 //!
-//! ```rust,ignore
+#![cfg_attr(not(feature = "fs"), doc = "```rust,ignore")]
+#![cfg_attr(feature = "fs", doc = "```rust,no_run")]
 //! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //!
@@ -42,7 +43,8 @@
 //! ```
 //!
 //! instead of the below:
-//! ```rust,ignore
+#![cfg_attr(not(feature = "fs"), doc = "```rust,ignore")]
+#![cfg_attr(feature = "fs", doc = "```rust,no_run")]
 //! # use pistonite_cu as cu;
 //! use cu::pre::*;
 //! use cu::{Result, fs, info};
