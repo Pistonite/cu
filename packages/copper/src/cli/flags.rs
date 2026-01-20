@@ -281,7 +281,9 @@ fn handle_result(start: Instant, result: crate::Result<()>) -> std::process::Exi
             }
         }
         if crate::lv::is_print_time_enabled() {
-            crate::info!("finished in {elapsed:.2}s");
+            // use debug so the error trace is the last line,
+            // so user is directed to see what is the most important
+            crate::debug!("finished in {elapsed:.2}s");
         }
         std::process::ExitCode::FAILURE
     } else {

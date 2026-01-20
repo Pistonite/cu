@@ -62,7 +62,7 @@ version = "1.49.0"
 features = [ "macros", "rt-multi-thread", "time" ]
 
 [features]
-default = ["full"]
+default = []
 full = [
     "cli",
     "coroutine-heavy",
@@ -120,8 +120,8 @@ derive = ["dep:derive_more"]
 __test = []
 
 [[example]]
-name = "prompt_password"
-required-features = ["prompt-password", "cli", "parse"]
+name = "prompt"
+required-features = ["prompt", "cli", "parse"]
 
 [[example]]
 name = "process"

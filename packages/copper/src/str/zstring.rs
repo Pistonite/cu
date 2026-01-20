@@ -12,6 +12,12 @@ impl std::fmt::Display for ZString {
         self.0.fmt(f)
     }
 }
+impl std::fmt::Debug for ZString {
+    #[inline(always)]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 impl From<String> for ZString {
     #[inline(always)]
     fn from(value: String) -> Self {
@@ -54,6 +60,30 @@ impl std::ops::DerefMut for ZString {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+impl PartialEq<str> for ZString {
+    #[inline(always)]
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+impl PartialEq<&str> for ZString {
+    #[inline(always)]
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+impl PartialEq<String> for ZString {
+    #[inline(always)]
+    fn eq(&self, other: &String) -> bool {
+        &self.0 == other
+    }
+}
+impl PartialEq<&String> for ZString {
+    #[inline(always)]
+    fn eq(&self, other: &&String) -> bool {
+        &self.0 == *other
     }
 }
 

@@ -1,3 +1,4 @@
+#[cfg(feature = "prompt")]
 use std::collections::VecDeque;
 use std::io::{self, IsTerminal as _};
 use std::ops::ControlFlow;
@@ -5,12 +6,13 @@ use std::sync::{Arc, Mutex, Weak};
 use std::thread::JoinHandle;
 
 #[cfg(feature = "prompt")]
-use oneshot::Receiver as OnceRecv;
-use oneshot::Sender as OnceSend;
+use oneshot::{Receiver as OnceRecv, Sender as OnceSend};
 
+#[cfg(feature = "prompt")]
 use crate::cli::ctrlc;
 use crate::cli::fmt::{self, FormatBuffer, ansi};
 use crate::cli::progress::{BarFormatter, BarResult, ProgressBar};
+#[cfg(feature = "prompt")]
 use crate::cli::prompter;
 use crate::cli::{THREAD_NAME, TICK_INTERVAL, Tick};
 use crate::lv;
@@ -18,6 +20,7 @@ use crate::lv;
 /// Global printer state
 pub(crate) static PRINTER: Mutex<Option<Printer>> = Mutex::new(None);
 pub(crate) struct Printer {
+    #[allow(unused)]
     is_stdin_terminal: bool,
     /// Handle to stdout
     stdout: io::Stdout,
@@ -32,6 +35,7 @@ pub(crate) struct Printer {
     /// will still be printed to stderr
     anime_target: Option<Target>,
     bars: Vec<Weak<ProgressBar>>,
+    #[cfg(feature = "prompt")]
     pending_prompts: VecDeque<PromptTask>,
 
     /// Buffer for automatically do certain formatting
@@ -66,6 +70,7 @@ impl Printer {
             print_task: Default::default(),
             anime_target,
             bars: Default::default(),
+            #[cfg(feature = "prompt")]
             pending_prompts: Default::default(),
 
             format_buffer: FormatBuffer::new(),
@@ -261,14 +266,18 @@ impl Printer {
         // we need to force the last bar to join the printing thread before
         // the program exits
         let bar_strong_count = self.bars.iter().filter(|x| x.upgrade().is_some()).count();
-        if bar_strong_count == 0 && self.pending_prompts.is_empty() {
-            self.print_task.take()
-        } else {
-            None
+        if bar_strong_count != 0 {
+            return None;
         }
+        #[cfg(feature = "prompt")]
+        if !self.pending_prompts.is_empty() {
+            return None;
+        }
+        self.print_task.take()
     }
 }
 
+#[cfg(feature = "prompt")]
 struct PromptTask {
     send: OnceSend<cu::Result<Option<cu::ZString>>>,
     prompt: String,
@@ -350,6 +359,14 @@ impl PrintingThread {
     fn run_loop(&mut self) -> ControlFlow<()> {
         // first check if there are any pending prompts
         // scope for locking the printer for checking prompts
+        #[cfg(not(feature = "prompt"))]
+        let mut printer_guard = {
+            let Ok(printer_guard) = PRINTER.lock() else {
+                return ControlFlow::Break(());
+            };
+            printer_guard
+        };
+        #[cfg(feature = "prompt")]
         let mut printer_guard = {
             let Ok(mut printer_guard) = PRINTER.lock() else {
                 return ControlFlow::Break(());
@@ -409,13 +426,19 @@ impl PrintingThread {
                     let mut l = task.prompt.lines().count() as i32;
                     // however, if stdin is not terminal, then user won't press enter,
                     // and we actually have 1 fewer line
-                    if !is_stdin_terminal {
-                        l = l.saturating_sub(1)
-                    }
-                    self.lines += l;
+                    // if it's password, it's always read from terminal
+                    let mut no_newline_after_prompt = !is_stdin_terminal && !task.is_password;
 
                     // process this prompt
                     let result = read_prompt(&task);
+                    if let Ok(None) = &result {
+                        // user cancelled, so there is no newline input from the user
+                        no_newline_after_prompt = true;
+                    }
+                    if no_newline_after_prompt {
+                        l = l.saturating_sub(1)
+                    }
+                    self.lines += l;
 
                     // now we need to re-print the prompt above the progress bars
                     // by adding it to the buffer
@@ -459,7 +482,10 @@ impl PrintingThread {
             printer.flush_buffered_to_stdout();
         }
         let bars_empty = printer.bars.is_empty();
+        #[cfg(feature = "prompt")]
         let prompts_empty = printer.pending_prompts.is_empty();
+        #[cfg(not(feature = "prompt"))]
+        let prompts_empty = true;
 
         if bars_empty && printer.anime_target.is_some() {
             // erase the bars
@@ -581,6 +607,7 @@ enum Target {
     /// Print to Stderr
     Stderr,
 }
+#[cfg(feature = "prompt")]
 fn read_prompt(task: &PromptTask) -> cu::Result<Option<cu::ZString>> {
     let is_password = task.is_password;
     let result = ctrlc::ctrlc_frame().execute(|ctrlc| {

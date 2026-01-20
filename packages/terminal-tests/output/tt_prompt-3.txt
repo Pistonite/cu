@@ -1,10 +1,17 @@
-$ -y
+$ 
 STDOUT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 H] testing prompts^LF
 ^CR
-\x1B[K!] what's your favorite programming language?^LF
+\x1B[K!] continue? [y/n]^LF
 -: ^CR
-\x1B[K\x1B[1A\x1B[K!] what's your favorite programming language?^LF
+\x1B[K\x1B[1A\x1B[K!] continue? [y/n]^LF
+^CR
+\x1B[K^CR
+\x1B[K!] what's your favorite programming language? (Ctrl-C to can^LF
+ | cel)^LF
+-: ^CR
+\x1B[K\x1B[1A\x1B[K\x1B[1A\x1B[K!] what's your favorite programming language? (Ctrl-C to can^LF
+ | cel)^LF
 ^CR
 \x1B[KI] you answered: rust^LF
 I] the answer is correct^LF
