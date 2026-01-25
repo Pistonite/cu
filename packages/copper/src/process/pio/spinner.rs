@@ -93,6 +93,20 @@ impl Spinner {
     pub fn debug(self) -> Self { self.config.lv.set(crate::lv::D); self }
     /// Print any non-progress outputs as trace messages
     pub fn trace(self) -> Self { self.config.lv.set(crate::lv::T); self }
+
+    /// Configure the progress bar that will be spawned
+    #[inline(always)]
+    pub fn configure_spinner<F: FnOnce(ProgressBarBuilder) -> ProgressBarBuilder>(
+        self,
+        f: F,
+    ) -> Self {
+        let mut bar = self.config.bar.lock();
+        if let Err(builder) = bar.clone() {
+            *bar = Err(f(builder));
+        }
+        drop(bar);
+        self
+    }
 }
 struct SpinnerInner {
     lv: Atomic<u8, Lv>,

@@ -170,10 +170,10 @@ macro_rules! rethrow {
 /// and return an error instead of panicking
 #[macro_export]
 macro_rules! unimplemented {
-    () => {
+    () => {{
         $crate::trace!("unexpected: not implemented reached");
-        return $crate::Error::msg("not implemented");
-    };
+        return Err($crate::Error::msg("not implemented"));
+    }};
     ($($args:tt)*) => {{
         let msg = format!("{}", format_args!($(args)*));
         $crate::trace!("unexpected: not implemented reached: {msg}");
@@ -186,10 +186,10 @@ macro_rules! unimplemented {
 /// This might be less performant in release builds
 #[macro_export]
 macro_rules! unreachable {
-    () => {
+    () => {{
         $crate::trace!("unexpected: entered unreachable code");
-        return $crate::Error::msg("unreachable");
-    };
+        return Err($crate::Error::msg("unreachable"));
+    }};
     ($($args:tt)*) => {{
         let msg = format!("{}", format_args!($(args)*));
         $crate::trace!("unexpected: entered unreachable code: {msg}");
