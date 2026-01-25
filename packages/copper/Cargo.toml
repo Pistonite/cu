@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -11,14 +11,14 @@ exclude = [
 ]
 
 [dependencies]
-pistonite-cu-proc-macros = { version = "0.2.5", path = "../copper-proc-macros" }
+pistonite-cu-proc-macros = { version = "0.2.6", path = "../copper-proc-macros" }
 
 # --- Always enabled ---
 anyhow = "1.0.100"
 log = "0.4.29"
 
 # --- Command Line Interface ---
-oneshot = { version = "0.1.11", optional = true }
+oneshot = { version = "0.1.12", optional = true }
 env_filter = { version = "0.1.4", optional = true }
 terminal_size = { version = "0.4.3", optional = true }
 unicode-width = { version = "0.2.2", features = ["cjk"], optional = true }
@@ -36,7 +36,7 @@ tokio = { version = "1.49.0", optional = true, features = [
 dunce = {version="1.0.5", optional = true}
 which = {version = "8.0.0", optional = true }
 pathdiff = {version = "0.2.3", optional=true}
-filetime = { version = "0.2.26", optional = true}
+filetime = { version = "0.2.27", optional = true}
 glob = { version = "0.3.3", optional = true }
 spin = {version = "0.10.0", optional = true} # for PIO
 
