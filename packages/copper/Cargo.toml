@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.7.2"
+version = "0.7.3"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -18,11 +18,11 @@ anyhow = "1.0.100"
 log = "0.4.29"
 
 # --- Command Line Interface ---
-oneshot = { version = "0.1.12", optional = true }
+oneshot = { version = "0.1.13", optional = true }
 env_filter = { version = "0.1.4", optional = true }
 terminal_size = { version = "0.4.3", optional = true }
 unicode-width = { version = "0.2.2", features = ["cjk"], optional = true }
-clap = { version = "4.5.54", features = ["derive"], optional = true }
+clap = { version = "4.5.55", features = ["derive"], optional = true }
 regex = { version = "1.12.2", optional = true }
 ctrlc = { version = "3.5.1", optional = true }
 
