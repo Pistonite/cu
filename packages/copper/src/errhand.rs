@@ -175,7 +175,7 @@ macro_rules! unimplemented {
         return Err($crate::Error::msg("not implemented"));
     }};
     ($($args:tt)*) => {{
-        let msg = format!("{}", format_args!($(args)*));
+        let msg = format!("{}", format_args!($($args)*));
         $crate::trace!("unexpected: not implemented reached: {msg}");
         $crate::bail!("not implemented: {msg}")
     }}

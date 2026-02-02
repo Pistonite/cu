@@ -30,6 +30,8 @@
 /// ```
 pub mod json {
     use crate::{Context, Parse};
+    #[cfg(feature = "parse-impl")]
+    pub use ::serde_json::{de, error, map, ser, value};
     use serde::{Deserialize, Serialize};
     pub use serde_json::{Map, Number, Value};
 

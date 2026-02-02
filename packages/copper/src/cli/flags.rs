@@ -285,11 +285,29 @@ fn handle_result(start: Instant, result: crate::Result<()>) -> std::process::Exi
             // so user is directed to see what is the most important
             crate::debug!("finished in {elapsed:.2}s");
         }
+        reset_color();
         std::process::ExitCode::FAILURE
     } else {
         if crate::lv::is_print_time_enabled() {
             crate::info!("finished in {elapsed:.2}s");
         }
+        reset_color();
         std::process::ExitCode::SUCCESS
+    }
+}
+
+fn reset_color() {
+    use std::io::IsTerminal as _;
+    use std::io::Write as _;
+    let mut stdout = std::io::stdout();
+    if stdout.is_terminal() {
+        let _ = write!(stdout, "\x1b[0m");
+        let _ = stdout.flush();
+        return;
+    }
+    let mut stderr = std::io::stderr();
+    if stderr.is_terminal() {
+        let _ = write!(stderr, "\x1b[0m");
+        let _ = stderr.flush();
     }
 }
