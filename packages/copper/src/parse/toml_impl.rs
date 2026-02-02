@@ -41,6 +41,8 @@ pub mod toml {
     use crate::{Context, Parse};
     pub use ::toml::value::{Date, Datetime, Offset, Time};
     pub use ::toml::{Spanned, Table, Value, value::Array as Vec};
+    #[cfg(feature = "parse-impl")]
+    pub use ::toml::{de, map, ser, value};
     use serde::{Deserialize, Serialize};
 
     /// TOML parse delegate. See [`toml`](module@crate::toml)

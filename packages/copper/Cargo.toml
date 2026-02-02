@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.7.3"
+version = "0.7.4"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -106,6 +106,7 @@ json-preserve-order = ["json", "serde_json/preserve_order"]
 yaml = ["parse", "serde", "dep:serde_yaml_ng"]
 toml = ["parse", "serde", "dep:toml"]
 toml-preserve-order = ["toml", "toml/preserve_order"]
+parse-impl = ["parse"] # re-export implementation details, such as toml::ser
 
 # Internally used to document where nightly feature is used
 # (in particular, doc_cfg)
