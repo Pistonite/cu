@@ -440,6 +440,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     /// Show the prompt and use the async runtime to wait for input.
     ///
     /// If the user presses `Ctrl-C`, `None` will be returned.
+    #[cfg(feature = "coroutine")]
     pub async fn co_run(self) -> cu::Result<Option<cu::ZString>> {
         check_prompt_level(false)?;
         co_run_prompt_loop(
@@ -480,6 +481,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     ///
     /// If the user presses `Ctrl-C`, the default value set by [`if_cancel`](Self::if_cancel)
     /// will be returned.
+    #[cfg(feature = "coroutine")]
     pub async fn co_run(self) -> cu::Result<cu::ZString> {
         check_prompt_level(false)?;
         // unwrap: safety from builder
@@ -523,6 +525,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     ///
     /// If the user presses `Ctrl-C`, an error with message "operation cancelled by user"
     /// will be returned.
+    #[cfg(feature = "coroutine")]
     pub async fn co_run(self) -> cu::Result<cu::ZString> {
         check_prompt_level(false)?;
         match co_run_prompt_loop(
@@ -627,6 +630,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     /// Show the prompt and use the async runtime to wait for input.
     ///
     /// If the user presses `Ctrl-C`, `None` will be returned.
+    #[cfg(feature = "coroutine")]
     pub async fn co_run(self) -> cu::Result<Option<bool>> {
         if check_prompt_level(true)? {
             return Ok(Some(true));
@@ -660,6 +664,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     ///
     /// If the user presses `Ctrl-C`, an error with message "operation cancelled by user"
     /// will be returned.
+    #[cfg(feature = "coroutine")]
     pub async fn co_run(self) -> cu::Result<bool> {
         if check_prompt_level(true)? {
             return Ok(true);
@@ -694,6 +699,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     ///
     /// If the user presses `Ctrl-C`, the default value set by [`if_cancel`](Self::if_cancel)
     /// will be returned.
+    #[cfg(feature = "coroutine")]
     pub async fn co_run(self) -> cu::Result<bool> {
         if check_prompt_level(true)? {
             return Ok(true);
@@ -726,6 +732,7 @@ fn run_yesno_loop(message: String, is_password: bool) -> cu::Result<Option<bool>
     )?);
     Ok(Some(answer))
 }
+#[cfg(feature = "coroutine")]
 async fn co_run_yesno_loop(message: String, is_password: bool) -> cu::Result<Option<bool>> {
     let mut answer = false;
     let _ = cu::some!(
@@ -782,6 +789,7 @@ fn run_prompt_loop<F: FnMut(&mut String) -> cu::Result<bool>>(
     }
 }
 #[inline(always)]
+#[cfg(feature = "coroutine")]
 async fn co_run_prompt_loop<F: FnMut(&mut String) -> cu::Result<bool>>(
     message: String,
     is_password: bool,
