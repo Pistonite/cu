@@ -149,6 +149,7 @@ type AnswerRecv = oneshot::Receiver<cu::Result<Option<cu::ZString>>>;
 /// -:
 /// ```
 #[inline(always)]
+#[must_use = "prompt() returns a builder; you must call run() or co_run() to start the prompt"]
 pub fn prompt(
     message: impl Into<String>,
 ) -> PromptBuilder<cu::ZString, Cancellable, impl FnMut(&mut String) -> cu::Result<bool>> {
@@ -174,6 +175,7 @@ pub fn prompt(
 /// # cu::Ok(())
 /// ```
 #[inline(always)]
+#[must_use = "yesno() returns a builder; you must call run() or co_run() to start the prompt"]
 pub fn yesno(
     message: impl Into<String>,
 ) -> PromptBuilder<bool, DefaultIfCancel, impl FnMut(&mut String) -> cu::Result<bool>> {
@@ -211,6 +213,7 @@ pub struct PromptBuilder<
 
 impl<TOutput> PromptBuilder<TOutput, Cancellable, fn(&mut String) -> cu::Result<bool>> {
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     fn new(message: impl Into<String>) -> Self {
         PromptBuilder {
             message: message.into(),
@@ -240,6 +243,7 @@ impl<TCancel: PromptCancelConfig, TValidate: FnMut(&mut String) -> cu::Result<bo
     /// # Ok(()) }
     /// ```
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     pub fn password(mut self) -> Self {
         self.is_password = true;
         self
@@ -260,6 +264,7 @@ impl<TCancel: PromptCancelConfig, TValidate: FnMut(&mut String) -> cu::Result<bo
     /// # Ok(()) }
     /// ```
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     pub fn trim_trailing_whitespace(mut self, trim: bool) -> Self {
         self.trim_trailing_whitespace = trim;
         self
@@ -308,6 +313,7 @@ impl<TCancel: PromptCancelConfig, TValidate: FnMut(&mut String) -> cu::Result<bo
     /// # cu::Ok(())
     /// ```
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     pub fn validate_with<F>(self, validator: F) -> PromptBuilder<cu::ZString, TCancel, F>
     where
         F: FnMut(&mut String) -> cu::Result<bool>,
@@ -344,6 +350,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     /// # Ok(()) }
     /// ```
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     pub fn yesno(mut self) -> PromptBuilder<bool, Cancellable, TValidate> {
         self.message.push_str(" [y/n]");
         PromptBuilder {
@@ -378,6 +385,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     /// `Option<ZString>` - Just that the prompt creator has control over
     /// the outcome of the prompt, rather than the prompt consumer accessing the outcome.
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     pub fn if_cancel(
         self,
         default: impl Into<String>,
@@ -407,6 +415,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     /// # Ok(()) }
     /// ```
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     pub fn or_cancel(mut self) -> PromptBuilder<cu::ZString, BailIfCancel, TValidate> {
         self.message.push_str(" (Ctrl-C to cancel)");
         PromptBuilder {
@@ -568,6 +577,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     /// `Option<bool>` - Just that the prompt creator has control over
     /// the outcome of the prompt, rather than the prompt consumer accessing the outcome.
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     pub fn if_cancel(self, default: bool) -> PromptBuilder<bool, DefaultIfCancel, TValidate> {
         PromptBuilder {
             message: self.message,
@@ -600,6 +610,7 @@ impl<TValidate: FnMut(&mut String) -> cu::Result<bool>>
     /// # }
     /// ```
     #[inline(always)]
+    #[must_use = "you must call run() or co_run() to start the prompt"]
     pub fn or_cancel(mut self) -> PromptBuilder<bool, BailIfCancel, TValidate> {
         self.message.push_str(" (Ctrl-C to cancel)");
         PromptBuilder {
