@@ -147,7 +147,7 @@ pub use macros::__print_with_level;
 
 mod thread_name;
 use thread_name::THREAD_NAME;
-pub use thread_name::set_thread_name;
+pub use thread_name::{reset_thread_name, set_thread_name};
 mod printer;
 
 mod progress;
