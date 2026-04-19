@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -11,7 +11,7 @@ exclude = [
 ]
 
 [dependencies]
-pistonite-cu-proc-macros = { version = "0.2.7", path = "../copper-proc-macros" }
+pistonite-cu-proc-macros = { version = "0.2.8", path = "../copper-proc-macros" }
 
 # --- Always enabled ---
 anyhow = "1.0.102"
@@ -19,16 +19,16 @@ log = "0.4.29"
 
 # --- Command Line Interface ---
 oneshot = { version = "0.2.1", optional = true, features = ["std"] }
-env_filter = { version = "1.0.0", optional = true }
-terminal_size = { version = "0.4.3", optional = true }
+env_filter = { version = "1.0.1", optional = true }
+terminal_size = { version = "0.4.4", optional = true }
 unicode-width = { version = "0.2.2", features = ["cjk"], optional = true }
-clap = { version = "4.5.60", features = ["derive"], optional = true }
+clap = { version = "4.6.1", features = ["derive"], optional = true }
 regex = { version = "1.12.3", optional = true }
 ctrlc = { version = "3.5.2", optional = true }
 
 # --- Coroutine ---
 num_cpus = { version = "1.17.0", optional = true }
-tokio = { version = "1.50.0", optional = true, features = [
+tokio = { version = "1.52.1", optional = true, features = [
     "macros", "rt-multi-thread"
 ] }
 
@@ -44,13 +44,13 @@ spin = {version = "0.10.0", optional = true} # for PIO
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.149", optional = true }
 serde_yaml_ng = { version = "0.10.0", optional = true }
-toml = { version = "1.0.6", optional = true }
+toml = { version = "1.1.2", optional = true }
 
 # derive
 derive_more = { version = "2.1.1", features = ["full"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.183"
+libc = "0.2.185"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_Console", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System_SystemServices"] }
@@ -58,7 +58,7 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Syste
 [dev-dependencies]
 
 [dev-dependencies.tokio]
-version = "1.50.0" 
+version = "1.52.1" 
 features = [ "macros", "rt-multi-thread", "time" ]
 
 [features]

@@ -23,10 +23,16 @@ pub fn expand(attr: TokenStream, input: TokenStream) -> pm::Result<TokenStream2>
         None => pm::quote! { (|_| {}) },
     };
 
+    let fn_log_config_impl = match attrs.log_config {
+        Some(value) => pm::quote! { { #value } },
+        None => pm::quote! { |_| cu::cli::DefaultLogConfig  },
+    };
+
     let main_impl = if is_async {
         pm::quote! {
             cu::cli::__co_run(
                 #fn_preproc_impl,
+                #fn_log_config_impl,
                 #generated_main_name,
                 #fn_flag_impl
             )
@@ -35,6 +41,7 @@ pub fn expand(attr: TokenStream, input: TokenStream) -> pm::Result<TokenStream2>
         pm::quote! {
             cu::cli::__run(
                 #fn_preproc_impl,
+                #fn_log_config_impl,
                 #generated_main_name,
                 #fn_flag_impl
             )
@@ -78,6 +85,10 @@ fn parse_attributes(attr: TokenStream) -> pm::Result<ParsedAttributes> {
             out.preprocess_fn = Some(attr.value);
             continue;
         }
+        if attr.path.is_ident("log_config") {
+            out.log_config = Some(attr.value);
+            continue;
+        }
         pm::bail!(attr, "unknown attribute");
     }
     Ok(out)
@@ -86,4 +97,5 @@ fn parse_attributes(attr: TokenStream) -> pm::Result<ParsedAttributes> {
 struct ParsedAttributes {
     flags_ident: Option<syn::Ident>,
     preprocess_fn: Option<syn::Expr>,
+    log_config: Option<syn::Expr>,
 }

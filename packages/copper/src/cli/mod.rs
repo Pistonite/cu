@@ -141,7 +141,7 @@ pub use flags::__co_run;
 pub use flags::{__run, Flags, print_help, try_parse};
 
 mod print_init;
-pub use print_init::level;
+pub use print_init::{DefaultLogConfig, LogConfig, level};
 mod macros;
 pub use macros::__print_with_level;
 

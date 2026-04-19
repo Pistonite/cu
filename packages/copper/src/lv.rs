@@ -1,6 +1,6 @@
 //! # Logging
 //!
-//! *Does not require any feature flag
+//! *Does not require any feature flag*
 //!
 //! The logging macros (`debug`, `info`, `trace`, `warn`, `error`) are
 //! re-exported from the [`log`](https://docs.rs/log) crate and are
@@ -14,8 +14,12 @@
 //! When the `cli` feature is enabled, you also get log integration
 //! with CLI flags and other terminal-printing features.
 //! See [Command Line Interface](mod@crate::cli)
+//!
+//! `cu::lv` shorthands should be used within this library (for example
+//! `cu::lv::D` for debug). You can also call `.into()` to convert it
+//! to `log::Level`. Additionally `cu::lv::LogLevel` is a re-export of `log::Level`.
 
-pub use log::{debug, error, info, trace, warn};
+pub use log::{Level as LogLevel, Record as LogRecord, debug, error, info, trace, warn};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -273,6 +277,20 @@ impl From<log::Level> for Lv {
         }
     }
 }
+impl From<Lv> for log::Level {
+    fn from(value: Lv) -> Self {
+        match value {
+            Lv::Error => log::Level::Error,
+            Lv::Hint => log::Level::Warn,
+            Lv::Print => log::Level::Info,
+            Lv::Warn => log::Level::Warn,
+            Lv::Info => log::Level::Info,
+            Lv::Debug => log::Level::Debug,
+            Lv::Trace => log::Level::Trace,
+            Lv::Off => log::Level::Error,
+        }
+    }
+}
 impl From<u8> for Lv {
     fn from(value: u8) -> Self {
         match value {
@@ -292,6 +310,22 @@ impl From<Lv> for u8 {
         value as u8
     }
 }
+
+impl std::fmt::Display for Lv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Lv::Error => "error".fmt(f),
+            Lv::Hint => "hint".fmt(f),
+            Lv::Print => "print".fmt(f),
+            Lv::Warn => "warn".fmt(f),
+            Lv::Info => "info".fmt(f),
+            Lv::Debug => "debug".fmt(f),
+            Lv::Trace => "trace".fmt(f),
+            Lv::Off => "off".fmt(f),
+        }
+    }
+}
+
 /// Error
 pub const E: Lv = Lv::Error;
 /// Hint

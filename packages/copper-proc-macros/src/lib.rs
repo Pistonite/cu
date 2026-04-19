@@ -97,6 +97,10 @@ use pm::pre::*;
 /// }
 /// ```
 ///
+/// ## Attributes
+///
+/// ### `preprocess`
+///
 /// The attribute can also take a `preprocess` function
 /// to process flags before initializing the CLI system.
 /// This can be useful to merge multiple Flags instance
@@ -138,6 +142,43 @@ use pm::pre::*;
 /// }
 /// ```
 ///
+/// ### `log_config`
+/// `log_config` takes a function that returns a `LogConfig` trait implementation,
+/// which can be used to alter how each `LogRecord` is displayed.
+///
+/// Below is an example that: overrides info messages in `some_library` to be debug messages
+/// if the print level is info, and always show module path for that library.
+///
+/// ```rust,ignore
+/// # use pistonite_cu as cu;
+/// use cu::pre::*;
+///
+/// struct LogConfig(cu::lv::PrintLevel);
+/// impl LogConfig {
+///     pub fn new(flags: &cu::cli::Flags) -> Self {
+///         Self(flags.print_level())
+///     }
+/// }
+/// impl cu::cli::LogConfig for LogConfig {
+///     fn process(&self, record: &cu::lv::LogRecord) -> (cu::lv::Lv, bool) {
+///         if self.0 == cu::lv::PrintLevel::Normal {
+///             if let Some(m) = record.module_path() {
+///                 if m == "some_library" {
+///                     let level: cu::lv::Lv = record.level().into();
+///                     let is_info = level == cu::lv::I;
+///                     return (if is_info { cu::lv::D } else { level }, true);
+///                 }
+///             }
+///         }
+///         cu::cli::DefaultLogConfig.process(record)
+///     }
+/// }
+///
+/// #[cu::cli(log_config = LogConfig::new)]
+/// fn main(_: cu::cli::Flags) -> cu::Result<()> {
+///     Ok(())
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn cli(attr: TokenStream, input: TokenStream) -> TokenStream {
     pm::flatten(cli::expand(attr, input))
