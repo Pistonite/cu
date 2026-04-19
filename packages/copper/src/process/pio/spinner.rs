@@ -191,8 +191,14 @@ impl SpinnerTask {
                 DriverOutput::Line(line) => {
                     if lv != Lv::Off {
                         crate::cli::__print_with_level(lv, format_args!("{prefix}{line}"));
-                        // erase the progress line if we decide to print it out
-                        crate::progress!(bar, "")
+                        if lv.enabled() {
+                            // erase the progress line if we decide to print it out
+                            crate::progress!(bar, "")
+                        } else {
+                            // the level is not visible in due to log level setting,
+                            // so we still print it as a progress line
+                            crate::progress!(bar, "{line}")
+                        }
                     } else {
                         crate::progress!(bar, "{line}")
                     }

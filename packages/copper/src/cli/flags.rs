@@ -1,10 +1,13 @@
 use std::ffi::OsString;
+use std::sync::Arc;
 use std::time::Instant;
 
 use clap::{Command, CommandFactory, FromArgMatches, Parser};
 
+use crate::cli::LogConfig;
 use crate::lv;
 
+/// Common flags for `cu::cli`
 #[derive(Default, Debug, Clone, PartialEq, Parser)]
 pub struct Flags {
     /// Verbose. More -v makes it more verbose (opposite of --quiet)
@@ -43,9 +46,8 @@ impl Flags {
     /// This is unsafe because it modifies environment variables.
     /// The [`cu::cli`](macro@crate::cli) macro generates safe call to this
     /// when the program only has the main thread.
-    pub unsafe fn apply(&self) {
-        let level = (self.verbose as i8 - self.quiet as i8).clamp(-2, 2);
-        let level: lv::Print = level.into();
+    pub unsafe fn apply(&self, log_config: Arc<dyn LogConfig + Send + Sync>) {
+        let level = self.print_level();
         if level == lv::Print::VerboseVerbose {
             if std::env::var("RUST_BACKTRACE")
                 .unwrap_or_default()
@@ -80,7 +82,12 @@ impl Flags {
                 None
             }
         };
-        super::print_init::init_options(self.color.unwrap_or_default(), level, prompt);
+        super::print_init::init_options(self.color.unwrap_or_default(), level, prompt, log_config);
+    }
+
+    pub fn print_level(&self) -> lv::Print {
+        let level = (self.verbose as i8 - self.quiet as i8).clamp(-2, 2);
+        level.into()
     }
 
     /// Merge `other` into self. Options in other will be applied on top of self (equivalent
@@ -111,16 +118,25 @@ impl Flags {
 #[doc(hidden)]
 pub unsafe fn __run<
     TArg: clap::Parser,
+    TLogConfig: LogConfig + Send + Sync + 'static,
     FPreproc: FnOnce(&mut TArg),
+    FLogConfig: FnOnce(&Flags) -> TLogConfig,
     FExecute: FnOnce(TArg) -> crate::Result<()>,
     FFlag: FnOnce(&TArg) -> &Flags,
 >(
     fn_preproc: FPreproc,
+    fn_log_config: FLogConfig,
     fn_execute: FExecute,
     fn_flag: FFlag,
 ) -> std::process::ExitCode {
     let start = std::time::Instant::now();
-    let args = unsafe { parse_args_or_help::<TArg, FPreproc, FFlag>(fn_preproc, fn_flag) };
+    let args = unsafe {
+        parse_args_or_help::<TArg, TLogConfig, FPreproc, FLogConfig, FFlag>(
+            fn_preproc,
+            fn_log_config,
+            fn_flag,
+        )
+    };
     let result = fn_execute(args);
     handle_result(start, result)
 }
@@ -135,17 +151,26 @@ pub unsafe fn __run<
 #[doc(hidden)]
 pub unsafe fn __co_run<
     TArg: clap::Parser + Send + 'static,
+    TLogConfig: LogConfig + Send + Sync + 'static,
     FPreproc: FnOnce(&mut TArg),
+    FLogConfig: FnOnce(&Flags) -> TLogConfig,
     FExecute: FnOnce(TArg) -> TResult + Send + 'static,
     TResult: Future<Output = crate::Result<()>> + Send + 'static,
     FFlag: FnOnce(&TArg) -> &Flags,
 >(
     fn_preproc: FPreproc,
+    fn_log_config: FLogConfig,
     fn_execute: FExecute,
     fn_flag: FFlag,
 ) -> std::process::ExitCode {
     let start = std::time::Instant::now();
-    let args = unsafe { parse_args_or_help::<TArg, FPreproc, FFlag>(fn_preproc, fn_flag) };
+    let args = unsafe {
+        parse_args_or_help::<TArg, TLogConfig, FPreproc, FLogConfig, FFlag>(
+            fn_preproc,
+            fn_log_config,
+            fn_flag,
+        )
+    };
     #[cfg(not(feature = "coroutine-heavy"))]
     let result = crate::co::block(async move { fn_execute(args).await });
     #[cfg(feature = "coroutine-heavy")]
@@ -156,16 +181,20 @@ pub unsafe fn __co_run<
 
 unsafe fn parse_args_or_help<
     TArg: Parser,
+    TLogConfig: LogConfig + Send + Sync + 'static,
     FPreproc: FnOnce(&mut TArg),
+    FLogConfig: FnOnce(&Flags) -> TLogConfig,
     FFlag: FnOnce(&TArg) -> &Flags,
 >(
     fn_preproc: FPreproc,
+    fn_log_config: FLogConfig,
     fn_flag: FFlag,
 ) -> TArg {
     let mut parsed = parse_args::<TArg>();
     fn_preproc(&mut parsed);
     let flags = fn_flag(&parsed);
-    unsafe { flags.apply() };
+    let log_config: Arc<dyn LogConfig + Send + Sync> = Arc::new(fn_log_config(flags));
+    unsafe { flags.apply(log_config) };
     parsed
 }
 

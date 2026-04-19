@@ -1,5 +1,5 @@
-use std::sync::OnceLock;
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, OnceLock};
 
 use cu::cli::printer::{PRINTER, Printer};
 #[cfg(feature = "prompt")]
@@ -7,11 +7,7 @@ use cu::cli::prompt::PROMPT_LEVEL;
 use cu::lv;
 use env_filter::{Builder as LogEnvBuilder, Filter as LogEnvFilter};
 
-static LOG_FILTER: OnceLock<LogEnvFilter> = OnceLock::new();
-/// Set the global log filter
-pub(crate) fn set_log_filter(filter: LogEnvFilter) {
-    let _ = LOG_FILTER.set(filter);
-}
+static LOGGER: OnceLock<LogImpl> = OnceLock::new();
 
 /// Shorthand to quickly setup logging. Can be useful in tests.
 ///
@@ -26,27 +22,35 @@ pub fn level(lv: &str) {
         "vv" => lv::Print::VerboseVerbose,
         _ => lv::Print::Normal,
     };
-    init_options(lv::Color::Auto, level, Some(lv::Prompt::Block));
+    init_options(
+        lv::Color::Auto,
+        level,
+        Some(lv::Prompt::Block),
+        Arc::new(DefaultLogConfig),
+    );
 }
 
 /// Set global print options. This is usually called from clap args
 ///
 /// If prompt option is `None`, it will be `Interactive` unless env var `CI` is `true` or `1`, in which case it becomes `No`.
 /// Prompt option is ignored unless `prompt` feature is enabled
-pub fn init_options(color: lv::Color, level: lv::Print, prompt: Option<lv::Prompt>) {
+pub fn init_options(
+    color: lv::Color,
+    level: lv::Print,
+    prompt: Option<lv::Prompt>,
+    log_config: Arc<dyn LogConfig + Send + Sync>,
+) {
     // not using cu::env_var, since we are before log initialization
     let env_rust_log = std::env::var("RUST_LOG");
-    let log_level = match env_rust_log {
+    let (log_level_filter, log_filter) = match env_rust_log {
         Ok(value) if !value.is_empty() => {
-            let mut builder = LogEnvBuilder::new();
-            let filter = builder.parse(&value).build();
-            let log_level = filter.filter();
-            set_log_filter(filter);
-            log_level.max(level.into())
+            let filter = LogEnvBuilder::new().parse(&value).build();
+            let log_level_filter = filter.filter();
+            (log_level_filter.max(level.into()), Some(filter))
         }
-        _ => level.into(),
+        _ => (level.into(), None),
     };
-    log::set_max_level(log_level);
+    log::set_max_level(log_level_filter);
 
     let use_color = color.is_colored_for_stdout();
     lv::USE_COLOR.store(use_color, Ordering::Release);
@@ -80,52 +84,49 @@ pub fn init_options(color: lv::Color, level: lv::Print, prompt: Option<lv::Promp
     }
 
     lv::PRINT_LEVEL.set(level);
-    let _ = log::set_logger(&LogImpl);
+
+    let _ = LOGGER.set(LogImpl {
+        filter: log_filter,
+        config: log_config,
+    });
+    log::set_logger(LOGGER.get().unwrap()).unwrap();
 }
-struct LogImpl;
+struct LogImpl {
+    filter: Option<LogEnvFilter>,
+    config: Arc<dyn LogConfig + Send + Sync>,
+}
 impl log::Log for LogImpl {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        match LOG_FILTER.get() {
+        match &self.filter {
             Some(filter) => filter.enabled(metadata),
             None => lv::Lv::from(metadata.level()).can_print(lv::PRINT_LEVEL.get()),
         }
     }
 
     fn log(&self, record: &log::Record) {
-        if !self.enabled(record.metadata()) {
-            return;
+        let (level, show_module) = self.config.process(record);
+        if level != record.level().into() {
+            let metadata = log::Metadata::builder()
+                .level(level.into())
+                .target(record.metadata().target())
+                .build();
+            if !self.enabled(&metadata) {
+                return;
+            }
+        } else {
+            if !self.enabled(record.metadata()) {
+                return;
+            }
         }
-        let typ: lv::Lv = record.level().into();
-        let message = if typ == lv::T {
+        let message = if show_module {
             // enable source location logging in trace messages
             let mut message = String::new();
-            message.push('[');
-            if let Some(p) = record.module_path() {
-                // aliased crate, use the shorthand
-                if let Some(rest) = p.strip_prefix("pistonite_") {
-                    message.push_str(rest);
-                } else {
-                    message.push_str(p);
-                }
-                message.push(' ');
-            }
-            if let Some(f) = record.file() {
-                let name = match f.rfind(['/', '\\']) {
-                    None => f,
-                    Some(i) => &f[i + 1..],
-                };
-                message.push_str(name);
-            }
-            if let Some(l) = record.line() {
-                message.push(':');
-                message.push_str(&format!("{l}"));
-            }
-            if message.len() > 1 {
-                message += "] ";
-            } else {
-                message.clear();
-            }
-
+            format_module_prefix(
+                &mut message,
+                record.module_path(),
+                record.file(),
+                record.line(),
+            );
             use std::fmt::Write;
             let _: Result<_, _> = write!(&mut message, "{}", record.args());
             message
@@ -134,10 +135,58 @@ impl log::Log for LogImpl {
         };
         if let Ok(mut printer) = PRINTER.lock() {
             if let Some(printer) = printer.as_mut() {
-                printer.print_message(typ, &message);
+                printer.print_message(level, &message);
             }
         }
     }
 
     fn flush(&self) {}
+}
+
+fn format_module_prefix(
+    message: &mut String,
+    module: Option<&str>,
+    file: Option<&str>,
+    line: Option<u32>,
+) {
+    if module.is_none() && file.is_none() {
+        return;
+    }
+    message.push('[');
+    if let Some(p) = module {
+        // aliased crate, use the shorthand
+        if let Some(rest) = p.strip_prefix("pistonite_") {
+            message.push_str(rest);
+        } else {
+            message.push_str(p);
+        }
+        message.push(' ');
+    }
+    if let Some(f) = file {
+        let name = match f.rfind(['/', '\\']) {
+            None => f,
+            Some(i) => &f[i + 1..],
+        };
+        message.push_str(name);
+        if let Some(l) = line {
+            message.push(':');
+            message.push_str(&format!("{l}"));
+        }
+    }
+    message.push_str("] ");
+}
+
+/// Hook to configure the level and format before logging
+pub trait LogConfig {
+    /// Process a log record, return the level to log and if
+    /// the module path should be shown
+    fn process(&self, record: &lv::LogRecord) -> (lv::Lv, bool);
+}
+/// The default [`LogConfig`]
+pub struct DefaultLogConfig;
+impl LogConfig for DefaultLogConfig {
+    fn process(&self, record: &lv::LogRecord) -> (lv::Lv, bool) {
+        let level: lv::Lv = record.level().into();
+        (record.level().into(), level == lv::T)
+    }
 }
