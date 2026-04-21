@@ -8,9 +8,15 @@ includes:
 
 tasks:
   run:
-    - cargo run --features bin -- {{.CLI_ARGS}}
+    desc: Run terminal tests
+    cmds:
+      - cargo run --features bin -- {{.CLI_ARGS}}
   check:
-    - task: cargo:clippy-all
-    - task: cargo:fmt-check
+    desc: Run linters to check the code
+    cmds:
+      - task: cargo:clippy-all
+      - task: cargo:fmt-check
   fix:
-    - task: cargo:fmt-fix
+    desc: Fix style issues
+    cmds:
+      - task: cargo:fmt-fix

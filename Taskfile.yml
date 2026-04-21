@@ -18,17 +18,21 @@ includes:
 
 tasks:
   install-cargo-extra-tools:
+    desc: Install or upgrade extra tools needed for development using cargo onto the system
     aliases: [icets]
     cmds:
       - task: cargo-binstall
         vars:
           PACKAGES: shwoop
 
-  clone-mono-dev:
-    - rm -rf mono-dev
-    - git clone https://github.com/Pistonight/mono-dev --depth 1
+  install:
+    desc: Install or sync project dependencies
+    cmds:
+      - rm -rf mono-dev
+      - git clone https://github.com/Pistonight/mono-dev --depth 1
 
   check:
+    desc: Run linters to check the code
     cmds:
       - task: pm:check
       - task: cu-proc-macros:check
@@ -36,6 +40,7 @@ tasks:
       - task: terminal-tests:check
 
   fix:
+    desc: Fix style issues
     cmds:
       - task: pm:fix
       - task: cu-proc-macros:fix
@@ -43,15 +48,18 @@ tasks:
       - task: terminal-tests:fix
 
   test:
+    desc: Run tests
     cmds:
       - task: pm:test
       - task: cu:test
       - task: terminal-tests:run
 
   dev-doc:
+    desc: Watch and serve documentation
     cmds:
       - task: cargo:watch-serve-doc
         vars:
+          SHWOOP_ARGS: -w packages
           CARGO_ARGS: --features full,nightly
           TOOLCHAIN: +nightly
 
@@ -69,6 +77,7 @@ tasks:
         silent: true
 
   publish:
+    desc: Publish a release
     cmds:
       # order matters
       - task: pm:publish
@@ -76,4 +85,6 @@ tasks:
       - task: cu:publish
 
   upgrade:
-    - cargo upgrade
+    desc: Upgrade tools and/or dependencies
+    cmds:
+      - cargo upgrade

@@ -8,14 +8,22 @@ includes:
 
 tasks:
   check:
-    - task: cargo:clippy-all
-    - task: cargo:fmt-check
+    desc: Run linters to check the code
+    cmds:
+      - task: cargo:clippy-all
+      - task: cargo:fmt-check
   fix:
-    - task: cargo:fmt-fix
+    desc: Fix style issues
+    cmds:
+      - task: cargo:fmt-fix
   publish:
-    - cmd: cargo publish
-      ignore_error: true
+    desc: Publish a release
+    cmds:
+      - cmd: cargo publish
+        ignore_error: true
   test:
-    - cargo test
-    - cargo test --features full
-    - cargo test --no-default-features --features full
+    desc: Run tests
+    cmds:
+      - cargo test
+      - cargo test --features full
+      - cargo test --no-default-features --features full

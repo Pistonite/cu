@@ -1,6 +1,6 @@
 //! Binary path registry
 //!
-//! This util to provide a unified way of getting the path of a program to run,
+//! This util provides a unified way of getting the path of a program to run,
 //! for example, let's say you are making a build script for a project, and
 //! you want to find the compiler program `gcc` in the following manner:
 //! - Most users would use the project-provided toolchain at `./toolchain/compiler/gcc`
