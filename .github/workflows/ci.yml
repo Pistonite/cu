@@ -8,26 +8,23 @@ on:
       - main
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
-          mono-dev: packages
           rust: stable
       - run: task check
   test:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
-          mono-dev: packages
           rust: stable
       - run: task test
   doc:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
-          mono-dev: packages
           rust: nightly
-      - run: task doc
+      - run: task doc-ci

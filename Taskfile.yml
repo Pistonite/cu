@@ -2,12 +2,12 @@ version: '3'
 
 includes:
   common:
-    taskfile: ./packages/mono-dev/task/common.yaml
+    taskfile: ./mono-dev/task/common.yaml
     flatten: true
     optional: true
 
   cargo:
-    taskfile: ./packages/mono-dev/task/cargo.yaml
+    taskfile: ./mono-dev/task/cargo.yaml
     optional: true
     internal: true
 
@@ -18,38 +18,53 @@ includes:
 
 tasks:
   install-cargo-extra-tools:
+    desc: Install or upgrade extra tools needed for development using cargo onto the system
     aliases: [icets]
     cmds:
       - task: cargo-binstall
         vars:
-          PACKAGES: cargo-watch live-server
+          PACKAGES: shwoop
 
   install:
-    - rm -rf packages/mono-dev
-    - mkdir -p packages
-    - git clone https://github.com/Pistonight/mono-dev --depth 1 packages/mono-dev
+    desc: Install or sync project dependencies
+    cmds:
+      - rm -rf mono-dev
+      - git clone https://github.com/Pistonight/mono-dev --depth 1
 
   check:
+    desc: Run linters to check the code
     cmds:
       - task: pm:check
       - task: cu-proc-macros:check
       - task: cu:check
       - task: terminal-tests:check
 
+  fix:
+    desc: Fix style issues
+    cmds:
+      - task: pm:fix
+      - task: cu-proc-macros:fix
+      - task: cu:fix
+      - task: terminal-tests:fix
+
   test:
+    desc: Run tests
     cmds:
       - task: pm:test
       - task: cu:test
       - task: terminal-tests:run
 
   dev-doc:
+    desc: Watch and serve documentation
     cmds:
       - task: cargo:watch-serve-doc
         vars:
+          SHWOOP_ARGS: -w packages
           CARGO_ARGS: --features full,nightly
           TOOLCHAIN: +nightly
 
-  doc:
+  doc-ci:
+    desc: (CI Only) Build documentation
     cmds:
       # note: require nightly toolchain in CI
       - cargo doc --no-deps --features full,nightly -p pistonite-cu -p pistonite-cu-proc-macros -p pistonite-pm
@@ -62,8 +77,14 @@ tasks:
         silent: true
 
   publish:
+    desc: Publish a release
     cmds:
       # order matters
       - task: pm:publish
       - task: cu-proc-macros:publish
       - task: cu:publish
+
+  upgrade:
+    desc: Upgrade tools and/or dependencies
+    cmds:
+      - cargo upgrade
