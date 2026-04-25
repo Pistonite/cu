@@ -109,6 +109,7 @@ pub fn progress(message: impl Into<String>) -> ProgressBarBuilder {
 }
 
 mod eta;
+
 pub use eta::Estimater;
 mod state;
 pub use state::ProgressBar;
@@ -119,6 +120,9 @@ mod util;
 pub use util::{BarFormatter, BarResult};
 use util::{ChildState, ChildStateStrong};
 mod macros;
+
+/// Convenience type for `Arc<cu::ProgressBar>`
+pub type ProgressHandle = std::sync::Arc<ProgressBar>;
 
 // spawn_iter stuff, keep for reference, not sure if needed yet
 // .enumerate seems more readable
