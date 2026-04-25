@@ -151,7 +151,7 @@ pub use thread_name::{reset_thread_name, set_thread_name};
 mod printer;
 
 mod progress;
-pub use progress::{ProgressBar, ProgressBarBuilder, progress};
+pub use progress::{ProgressBar, ProgressBarBuilder, ProgressHandle, progress};
 
 #[cfg(feature = "prompt")]
 mod prompt;

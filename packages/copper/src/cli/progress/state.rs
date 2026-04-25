@@ -88,6 +88,37 @@ impl ProgressBar {
         ProgressBarBuilder::new(message.into()).parent(Some(Arc::clone(self)))
     }
 
+    /// Set the message to be printed and mark the bar as done
+    pub fn done_with_message(self: Arc<Self>, message: &str) {
+        self.set_done_message(message);
+        self.done();
+    }
+
+    /// Set the message to be printed and mark the bar as done
+    pub fn done_by_ref_with_message(&self, message: &str) {
+        self.set_done_message(message);
+        self.done_by_ref();
+    }
+
+    /// Change the message to be printed when the bar is done.
+    /// Useful if information is not available yet when the bar is spawned.
+    ///
+    /// This does NOT mark the bar as done, use [`done_with_message`](Self::done_with_message)
+    /// for that.
+    pub fn set_done_message(&self, message: &str) {
+        if let Ok(mut bar) = self.state_mut.lock() {
+            bar.set_done_message(message);
+        }
+    }
+
+    /// Change the message to be printed when the bar is interrupted.
+    /// Useful if information is not available yet when the bar is spawned.
+    pub fn set_interrupted_message(&self, message: &str) {
+        if let Ok(mut bar) = self.state_mut.lock() {
+            bar.set_interrupted_message(message);
+        }
+    }
+
     /// Mark the progress bar as done and drop the handle.
     ///
     /// This needs to be called if the bar is unbounded. Otherwise,
@@ -172,11 +203,6 @@ pub struct StateImmut {
     pub parent: Option<Arc<ProgressBar>>,
     /// The prefix message (corresponds to message in the builder)
     pub prefix: String,
-    /// None means don't keep the progress bar printed
-    /// (the default done message is formatted at spawn time)
-    pub done_message: Option<String>,
-    /// None means use the default
-    pub interrupted_message: Option<String>,
     /// If percentage field is shown
     pub show_percentage: bool,
     /// If the steps are unbounded
@@ -194,15 +220,27 @@ pub struct State {
     unreal_total: u64,
     unreal_current: u64,
     message: String,
+    /// None means don't keep the progress bar printed
+    /// (the default done message is formatted at spawn time)
+    done_message: Option<String>,
+    /// None means use the default
+    interrupted_message: Option<String>,
     eta: Option<Estimater>,
     children: Vec<ChildState>,
 }
 impl State {
-    pub fn new(total: u64, eta: Option<Estimater>) -> Self {
+    pub fn new(
+        total: u64,
+        eta: Option<Estimater>,
+        done_message: Option<String>,
+        interrupted_message: Option<String>,
+    ) -> Self {
         Self {
             unreal_total: total,
             unreal_current: 0,
             message: String::new(),
+            done_message,
+            interrupted_message,
             eta,
             children: vec![],
         }
@@ -270,7 +308,7 @@ impl State {
         let is_interrupted = (self.unreal_current == 0 && self.unreal_total == 0)
             || (self.unreal_current < self.unreal_total);
         if !is_interrupted {
-            match &state.done_message {
+            match &self.done_message {
                 None => BarResult::DontKeep,
                 Some(message) => {
                     let message =
@@ -279,7 +317,7 @@ impl State {
                 }
             }
         } else {
-            match &state.interrupted_message {
+            match &self.interrupted_message {
                 None => {
                     let message = if state.prefix.is_empty() {
                         self.format_finish_message(
@@ -308,6 +346,30 @@ impl State {
     pub fn set_message(&mut self, message: &str) {
         self.message.clear();
         self.message.push_str(message);
+    }
+
+    pub fn set_done_message(&mut self, message: &str) {
+        match &mut self.done_message {
+            None => {
+                self.done_message = Some(message.to_string());
+            }
+            Some(msg) => {
+                msg.clear();
+                msg.push_str(message);
+            }
+        }
+    }
+
+    pub fn set_interrupted_message(&mut self, message: &str) {
+        match &mut self.interrupted_message {
+            None => {
+                self.interrupted_message = Some(message.to_string());
+            }
+            Some(msg) => {
+                msg.clear();
+                msg.push_str(message);
+            }
+        }
     }
 
     /// Format the bar into the out buffer at the depth

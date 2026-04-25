@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -50,7 +50,7 @@ toml = { version = "1.1.2", optional = true }
 derive_more = { version = "2.1.1", features = ["full"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.185"
+libc = "0.2.186"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_Console", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System_SystemServices"] }

@@ -195,15 +195,18 @@ impl ProgressBarBuilder {
             id: crate::next_atomic_usize(),
             parent: self.parent.as_ref().map(Arc::clone),
             prefix: self.message,
-            done_message,
-            interrupted_message: self.interrupted_message,
             show_percentage: self.show_percentage,
             unbounded: self.total.is_none(),
             display_bytes: self.total_is_in_bytes,
             max_display_children: self.max_display_children,
         };
         let eta = self.show_eta.then(Estimater::new);
-        let state = State::new(self.total.unwrap_or(0), eta);
+        let state = State::new(
+            self.total.unwrap_or(0),
+            eta,
+            done_message,
+            self.interrupted_message,
+        );
 
         ProgressBar::spawn(state_immut, state, self.parent)
     }
