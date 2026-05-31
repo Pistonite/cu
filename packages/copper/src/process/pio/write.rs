@@ -27,6 +27,7 @@ use super::{ChildInConfig, ChildInTask};
 ///
 /// assert_eq!(b"foobar\n".to_vec(), out.join()??);
 /// # Ok(()) }
+/// # #[cfg(not(unix))] fn main() {}
 /// ```
 #[inline(always)]
 pub fn write<B: AsRef<[u8]> + Send + 'static>(buf: B) -> Write<B> {
