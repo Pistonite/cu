@@ -24,6 +24,7 @@ use super::{ChildOutConfig, ChildOutTask};
 ///
 /// assert_eq!(b"Hello, world!\n".to_vec(), out.join()??);
 /// # Ok(()) }
+/// # #[cfg(not(unix))] fn main() {}
 /// ```
 #[inline(always)]
 pub fn buffer() -> Buffer {
@@ -87,6 +88,7 @@ impl ChildOutTask for BufferTask {
 ///
 /// assert_eq!("Hello, world!\n", out.join()??);
 /// # Ok(()) }
+/// # #[cfg(not(unix))] fn main() {}
 /// ```
 #[inline(always)]
 pub fn string() -> BufferString {
@@ -175,6 +177,7 @@ async fn read_to_end(r: Result<ChildStdout, ChildStderr>) -> crate::Result<Vec<u
 ///
 /// child.wait_nz()?;
 /// # Ok(())}
+/// # #[cfg(not(unix))] fn main() {}
 /// ```
 ///
 /// # Blocking
@@ -285,6 +288,7 @@ impl Iterator for LinesOutput {
 ///
 /// child.co_wait_nz().await?;
 /// # Ok(())}
+/// # #[cfg(not(unix))] fn main() {}
 /// ```
 #[inline(always)]
 pub fn co_lines() -> CoLines {

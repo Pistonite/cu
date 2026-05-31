@@ -8,6 +8,7 @@ includes:
 
 tasks:
   run:
+    platforms: [linux, darwin]
     desc: Run terminal tests
     cmds:
       - cargo run --features bin -- {{.CLI_ARGS}}
