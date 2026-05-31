@@ -14,8 +14,15 @@ jobs:
         with:
           rust: stable
       - run: task check
-  test:
+  test-linux:
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          rust: stable
+      - run: task test
+  test-windows:
+    runs-on: blacksmith-4vcpu-windows-2025
     steps:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
