@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -15,7 +15,7 @@ pistonite-cu-proc-macros = { version = "0.2.8", path = "../copper-proc-macros" }
 
 # --- Always enabled ---
 anyhow = "1.0.102"
-log = "0.4.29"
+log = "0.4.30"
 
 # --- Command Line Interface ---
 oneshot = { version = "0.2.1", optional = true, features = ["std"] }
@@ -28,7 +28,7 @@ ctrlc = { version = "3.5.2", optional = true }
 
 # --- Coroutine ---
 num_cpus = { version = "1.17.0", optional = true }
-tokio = { version = "1.52.1", optional = true, features = [
+tokio = { version = "1.52.3", optional = true, features = [
     "macros", "rt-multi-thread"
 ] }
 
@@ -36,13 +36,13 @@ tokio = { version = "1.52.1", optional = true, features = [
 dunce = {version="1.0.5", optional = true}
 which = {version = "8.0.2", optional = true }
 pathdiff = {version = "0.2.3", optional=true}
-filetime = { version = "0.2.27", optional = true}
+filetime = { version = "0.2.29", optional = true}
 glob = { version = "0.3.3", optional = true }
-spin = {version = "0.10.0", optional = true} # for PIO
+spin = {version = "0.12.0", optional = true} # for PIO
 
 # serde
 serde = { version = "1.0.228", features = ["derive"], optional = true }
-serde_json = { version = "1.0.149", optional = true }
+serde_json = { version = "1.0.150", optional = true }
 serde_yaml_ng = { version = "0.10.0", optional = true }
 toml = { version = "1.1.2", optional = true }
 
@@ -58,7 +58,7 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Syste
 [dev-dependencies]
 
 [dev-dependencies.tokio]
-version = "1.52.1" 
+version = "1.52.3" 
 features = [ "macros", "rt-multi-thread", "time" ]
 
 [features]

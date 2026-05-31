@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::process::Stdio;
 use std::sync::{Arc, LazyLock};
 
@@ -266,7 +265,7 @@ struct PrintState {
     other_lv: Lv,
     bar: Arc<ProgressBar>,
     done_count: usize,
-    in_progress: BTreeSet<String>,
+    in_progress: Vec<String>, // using a vec to preserve order
     buf: String,
     diagnostic_hook: Option<DianogsticHook>,
     stderr_printing_message_lv: Option<Lv>,
@@ -316,7 +315,7 @@ impl PrintState {
                     return;
                 }
                 self.done_count += 1;
-                self.in_progress.remove(target.name);
+                self.in_progress.retain(|x| x != target.name);
                 self.update_bar();
             }
             "compiler-message" => {
@@ -409,7 +408,7 @@ impl PrintState {
             None => line,
             Some(i) => &line[..i],
         };
-        self.in_progress.insert(crate_name.replace('-', "_"));
+        self.in_progress.push(crate_name.replace('-', "_"));
         self.update_bar();
     }
 
