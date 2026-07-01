@@ -369,11 +369,19 @@ impl PrintState {
         static STATUS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new("^((\x1b[^m]*m)|\\s)*(Compiling|Checking)((\x1b[^m]*m)|\\s)*").unwrap()
         });
+        static OTHER_STATUS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new("^((\x1b[^m]*m)|\\s)*(Downloading|Downloaded)((\x1b[^m]*m)|\\s)*").unwrap()
+        });
         static ERROR_REGEX: LazyLock<Regex> =
             LazyLock::new(|| Regex::new("^((\x1b[^m]*m)|\\s)*error").unwrap());
         static WARNING_REGEX: LazyLock<Regex> =
             LazyLock::new(|| Regex::new("^((\x1b[^m]*m)|\\s)*warning").unwrap());
         let Some(m) = STATUS_REGEX.find(line) else {
+            if OTHER_STATUS_REGEX.is_match(line) {
+                crate::cli::__print_with_level(self.other_lv, format_args!("{line}"));
+                self.stderr_printing_message_lv = None;
+                return;
+            }
             // some error/warning messages aren't emited to stdout,
             // so we use a regex to match and print them
             if let Some(lv) = self.stderr_printing_message_lv {
