@@ -232,11 +232,11 @@ impl<T> RobustHandle<T> {
     /// use std::time::Duration;
     ///
     /// let handle = cu::co::spawn(async move {
-    ///     tokio::time::sleep(Duration::from_millis(10)).await;
+    ///     tokio::time::sleep(Duration::from_millis(100)).await;
     ///     42
     /// }).into_robust();
     ///
-    /// std::thread::sleep(Duration::from_millis(20));
+    /// std::thread::sleep(Duration::from_millis(200));
     /// assert!(handle.abort(), "task is not joined yet, so abort is possible");
     /// match handle.join_maybe_aborted_robust() {
     ///     Err(e) => panic!("join failed: {e}"),
