@@ -22,7 +22,7 @@
 //! ```rust,no_run
 //! # use pistonite_cu as cu;
 //! fn print_files() -> cu::Result<()> {
-//!     for entry in cu::fs::walk2::walk(".")? {
+//!     for entry in cu::fs::walk(".")? {
 //!         let entry = entry?;
 //!         cu::info!("{}", entry.path().display());
 //!     }
@@ -35,7 +35,7 @@
 //! ```rust,no_run
 //! # use pistonite_cu as cu;
 //! fn print_sources() -> cu::Result<()> {
-//!     let mut builder = cu::fs::walk2::walker("src");
+//!     let mut builder = cu::fs::walker("src");
 //!     builder.git(true).follow_links(true);
 //!     builder.glob_includes(["**/*.{rs,toml}"].into_iter())?;
 //!     for entry in builder.walk()? {
@@ -51,8 +51,8 @@ use std::fs::{FileType, Metadata};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-use ignore::{WalkBuilder as IgnoreWalkBuilder, Walk as IgnoreWalk, DirEntry as IgnoreDirEntry};
 use ignore::overrides::OverrideBuilder;
+use ignore::{DirEntry as IgnoreDirEntry, Walk as IgnoreWalk, WalkBuilder as IgnoreWalkBuilder};
 
 use crate::pre::*;
 
@@ -64,7 +64,7 @@ use crate::pre::*;
 /// ```rust,no_run
 /// # use pistonite_cu as cu;
 /// fn walk_dirs_too() -> cu::Result<()> {
-///     let mut builder = cu::fs::walk2::walker(".");
+///     let mut builder = cu::fs::walker(".");
 ///     builder.include_dir_entries(true);
 ///     for entry in builder.walk()? {
 ///         let entry = entry?;
@@ -94,7 +94,7 @@ pub fn walker(root: impl AsRef<Path>) -> WalkBuilder {
 /// # use pistonite_cu as cu;
 /// fn count_files() -> cu::Result<usize> {
 ///     let mut count = 0;
-///     for entry in cu::fs::walk2::walk(".")? {
+///     for entry in cu::fs::walk(".")? {
 ///         let _entry = entry?;
 ///         count += 1;
 ///     }
@@ -117,7 +117,7 @@ pub fn walk(root: impl AsRef<Path>) -> cu::Result<Walk> {
 /// ```rust,no_run
 /// # use pistonite_cu as cu;
 /// fn configured() -> cu::Result<()> {
-///     let mut builder = cu::fs::walk2::walker(".");
+///     let mut builder = cu::fs::walker(".");
 ///     builder.ignore_hidden(true).include_dir_entries(true);
 ///     for entry in builder.walk()? {
 ///         let entry = entry?;
@@ -153,7 +153,6 @@ impl WalkBuilder {
         s
     }
 
-    
     /// Return the inner WalkBuilder from the `ignore` crate for advanced configuration.
     /// Note that the `overrides` matcher will be replaced when building the walker
     pub fn as_inner_mut(&mut self) -> &mut IgnoreWalkBuilder {
@@ -170,7 +169,7 @@ impl WalkBuilder {
     /// ```rust,no_run
     /// # use pistonite_cu as cu;
     /// fn only_sources() -> cu::Result<()> {
-    ///     let mut builder = cu::fs::walk2::walker(".");
+    ///     let mut builder = cu::fs::walker(".");
     ///     // include Rust and TOML files anywhere in the tree
     ///     builder.glob_includes(["**/*.{rs,toml}"].into_iter())?;
     ///     for entry in builder.walk()? {
@@ -179,10 +178,16 @@ impl WalkBuilder {
     ///     Ok(())
     /// }
     /// ```
-    pub fn glob_includes(&mut self, globs: impl Iterator<Item=impl AsRef<str>>) -> crate::Result<&mut Self> {
+    pub fn glob_includes(
+        &mut self,
+        globs: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> crate::Result<&mut Self> {
         for g in globs {
             let g = g.as_ref();
-            crate::check!(self.overrides.add(g), "failed to add glob include pattern: '{g}'")?;
+            crate::check!(
+                self.overrides.add(g),
+                "failed to add glob include pattern: '{g}'"
+            )?;
             self.has_overrides = true;
         }
         Ok(self)
@@ -197,7 +202,7 @@ impl WalkBuilder {
     /// ```rust,no_run
     /// # use pistonite_cu as cu;
     /// fn skip_logs_and_tmp() -> cu::Result<()> {
-    ///     let mut builder = cu::fs::walk2::walker(".");
+    ///     let mut builder = cu::fs::walker(".");
     ///     builder.glob_excludes(["**/*.{log,tmp}"].into_iter())?;
     ///     for entry in builder.walk()? {
     ///         cu::info!("{}", entry?.path().display());
@@ -205,13 +210,19 @@ impl WalkBuilder {
     ///     Ok(())
     /// }
     /// ```
-    pub fn glob_excludes(&mut self, globs: impl Iterator<Item=impl AsRef<str>>) -> crate::Result<&mut Self> {
+    pub fn glob_excludes(
+        &mut self,
+        globs: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> crate::Result<&mut Self> {
         let mut s = String::new();
         s.push('!');
         for g in globs {
             let g = g.as_ref();
             s.push_str(g);
-            crate::check!(self.overrides.add(&s), "failed to add glob exclude pattern: '{s}'")?;
+            crate::check!(
+                self.overrides.add(&s),
+                "failed to add glob exclude pattern: '{s}'"
+            )?;
             s.truncate(1);
             self.has_overrides = true;
         }
@@ -278,7 +289,10 @@ impl WalkBuilder {
     /// Fails if any configured glob patterns cannot be compiled.
     pub fn walk(mut self) -> cu::Result<Walk> {
         if self.has_overrides {
-            let overrides = cu::check!(self.overrides.build(), "walk: failed to build glob pattern overrides")?;
+            let overrides = cu::check!(
+                self.overrides.build(),
+                "walk: failed to build glob pattern overrides"
+            )?;
             self.inner.overrides(overrides);
         }
         let walk = self.inner.build();
@@ -300,7 +314,7 @@ impl WalkBuilder {
 /// ```rust,no_run
 /// # use pistonite_cu as cu;
 /// fn list() -> cu::Result<()> {
-///     for entry in cu::fs::walk2::walk(".")? {
+///     for entry in cu::fs::walk(".")? {
 ///         let entry = entry?;
 ///         cu::info!("depth {}: {}", entry.depth(), entry.path().display());
 ///     }
@@ -310,7 +324,7 @@ impl WalkBuilder {
 pub struct Walk {
     inner: IgnoreWalk,
     include_dir_entries: bool,
-    root: Arc<PathBuf>
+    root: Arc<PathBuf>,
 }
 
 impl Iterator for Walk {
@@ -328,7 +342,7 @@ impl Iterator for Walk {
 impl Walk {
     fn next_internal(&mut self) -> crate::Result<Option<WalkEntry>> {
         let (entry, file_type) = loop {
-            let entry = crate::some!(self.inner.next()); 
+            let entry = crate::some!(self.inner.next());
             let entry = crate::check!(entry, "walk: failed to read the next entry")?;
             match entry.file_type() {
                 None => {
@@ -348,10 +362,16 @@ impl Walk {
                         continue;
                     }
                     if t.is_symlink() && entry.path().is_dir() {
-                        crate::trace!("walk: skipping symlinked directory: '{}'", entry.path().display());
+                        crate::trace!(
+                            "walk: skipping symlinked directory: '{}'",
+                            entry.path().display()
+                        );
                         continue;
                     }
-                    crate::trace!("walk: skipping entry with unknown file type: '{}'", entry.path().display());
+                    crate::trace!(
+                        "walk: skipping entry with unknown file type: '{}'",
+                        entry.path().display()
+                    );
                     continue;
                 }
             }
@@ -359,7 +379,7 @@ impl Walk {
         Ok(Some(WalkEntry {
             root: Arc::clone(&self.root),
             inner: entry,
-            file_type
+            file_type,
         }))
     }
 }
@@ -369,6 +389,7 @@ impl Walk {
 /// Provides access to the entry's [`path`](Self::path), its
 /// [`depth`](Self::depth) relative to the walk root, its
 /// [`file_type`](Self::file_type), and lazily-read [`metadata`](Self::metadata).
+#[derive(Debug)]
 pub struct WalkEntry {
     root: Arc<PathBuf>,
     inner: IgnoreDirEntry,
@@ -404,7 +425,7 @@ impl WalkEntry {
     /// ```rust,no_run
     /// # use pistonite_cu as cu;
     /// fn print_relative() -> cu::Result<()> {
-    ///     for entry in cu::fs::walk2::walk("src")? {
+    ///     for entry in cu::fs::walk("src")? {
     ///         let entry = entry?;
     ///         if let Some(rel) = entry.rel_path()? {
     ///             cu::info!("{}", rel.display());
@@ -418,16 +439,21 @@ impl WalkEntry {
         let root_norm = self.root.normalize()?;
         // note we cannot normalize the path after join since it might be a symlink
         let path_norm = root_norm.join(self.inner.path());
-        let mut root_iter = root_norm.components().filter(|x| !matches!(x, Component::CurDir));
-        let mut path_iter = path_norm.components().filter(|x| !matches!(x, Component::CurDir));
-        loop {
-            let Some(root_comp) = root_iter.next() else {
-                break;
-            };
-            let path_comp = cu::check!(path_iter.next(), 
-                "unexpected: walk entry path is shorter than root")?;
-            cu::ensure!(root_comp == path_comp,
-                "unexpected: walk entry path is not in root")?;
+        let root_iter = root_norm
+            .components()
+            .filter(|x| !matches!(x, Component::CurDir));
+        let mut path_iter = path_norm
+            .components()
+            .filter(|x| !matches!(x, Component::CurDir));
+        for root_comp in root_iter {
+            let path_comp = cu::check!(
+                path_iter.next(),
+                "unexpected: walk entry path is shorter than root"
+            )?;
+            cu::ensure!(
+                root_comp == path_comp,
+                "unexpected: walk entry path is not in root"
+            )?;
         }
         let Some(next) = path_iter.next() else {
             // is root
@@ -478,5 +504,4 @@ impl WalkEntry {
             self.root.display()
         )
     }
-
 }

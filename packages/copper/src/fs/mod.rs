@@ -17,4 +17,3 @@ pub use walk2::*;
 pub mod bin;
 
 pub use filetime::FileTime as Time;
-

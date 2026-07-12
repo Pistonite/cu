@@ -2,23 +2,25 @@ use pistonite_cu as cu;
 
 #[cu::cli]
 fn main(_: cu::cli::Flags) -> cu::Result<()> {
-    let mut src = cu::fs::walk("src")?;
+    let src = cu::fs::walk("src")?;
     cu::cli::set_thread_name("walk");
-    while let Some(entry) = src.next() {
+    for entry in src {
         let entry = entry?;
         cu::info!(
-            "{} {} {}",
-            entry.depth,
+            "{} {} {:?}",
+            entry.depth(),
             entry.path().display(),
-            entry.rel_path().display(),
+            entry.rel_path()?
         )
     }
 
     cu::cli::set_thread_name("glob");
-    let glob = cu::fs::glob_from("..", "./**/*.rs")?;
-    for entry in glob {
+    let mut glob = cu::fs::walker("..");
+    glob.glob_includes(["**/*.rs"])?;
+
+    for entry in glob.walk()? {
         let entry = entry?;
-        cu::info!("{}", entry.display());
+        cu::info!("{entry:?}");
     }
 
     Ok(())

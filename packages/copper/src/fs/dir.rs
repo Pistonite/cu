@@ -338,11 +338,17 @@ fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
         let rel_path = cu::check!(entry.rel_path()?, "failed to get relative path for entry")?;
         if !entry.is_dir() {
             let Some(file_name) = entry.file_name() else {
-                cu::trace!("skipping file with no file name: '{}'", entry.path().display());
+                cu::trace!(
+                    "skipping file with no file name: '{}'",
+                    entry.path().display()
+                );
                 continue;
             };
             let containing = if entry.depth() > 1 {
-                let parent = cu::check!(rel_path.parent(), "failed to get relative path of containing directory for entry")?;
+                let parent = cu::check!(
+                    rel_path.parent(),
+                    "failed to get relative path of containing directory for entry"
+                )?;
                 to.join(parent)
             } else {
                 to.to_path_buf()

@@ -1,4 +1,4 @@
-//! Fixture tests for [`cu::fs::walk2`].
+//! Fixture tests for `cu::fs::walk`.
 //!
 //! Each test builds a stub directory tree in its own uniquely-named temp
 //! directory (under `CARGO_TARGET_TMPDIR`) so tests can run in parallel, and
@@ -9,8 +9,8 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use pistonite_cu as cu;
 use cu::pre::*;
+use pistonite_cu as cu;
 
 /// A temp directory that is recursively removed when dropped.
 struct Fixture {
@@ -195,7 +195,7 @@ fn ignore_hidden_true() -> cu::Result<()> {
 fn glob_includes_txt() -> cu::Result<()> {
     let fx = make_fixture("glob_includes_txt")?;
     let mut b = cu::fs::walker(fx.root());
-    b.glob_includes(["*.txt"].into_iter())?;
+    b.glob_includes(["*.txt"])?;
     let got = collect(b.walk()?)?;
 
     assert!(got.contains("a.txt"));
@@ -216,7 +216,7 @@ fn glob_includes_txt() -> cu::Result<()> {
 fn glob_excludes_log() -> cu::Result<()> {
     let fx = make_fixture("glob_excludes_log")?;
     let mut b = cu::fs::walker(fx.root());
-    b.glob_excludes(["*.log"].into_iter())?;
+    b.glob_excludes(["*.log"])?;
     let got = collect(b.walk()?)?;
 
     assert!(!got.contains("b.log"), "*.log should be excluded: {got:?}");
@@ -230,7 +230,7 @@ fn glob_includes_brace_alternation() -> cu::Result<()> {
     let fx = make_fixture("glob_includes_brace_alternation")?;
     let mut b = cu::fs::walker(fx.root());
     // brace alternation: include both .txt and .log, but not .rs
-    b.glob_includes(["*.{txt,log}"].into_iter())?;
+    b.glob_includes(["*.{txt,log}"])?;
     let got = collect(b.walk()?)?;
 
     assert!(got.contains("a.txt"), "txt should be included: {got:?}");
@@ -245,7 +245,7 @@ fn glob_includes_multiple_patterns() -> cu::Result<()> {
     let fx = make_fixture("glob_includes_multiple_patterns")?;
     let mut b = cu::fs::walker(fx.root());
     // multiple include patterns are OR-ed together
-    b.glob_includes(["*.rs", "*.log"].into_iter())?;
+    b.glob_includes(["*.rs", "*.log"])?;
     let got = collect(b.walk()?)?;
 
     assert!(got.contains("sub/d.rs"), "{got:?}");
@@ -259,7 +259,7 @@ fn glob_excludes_brace_alternation() -> cu::Result<()> {
     let fx = make_fixture("glob_excludes_brace_alternation")?;
     let mut b = cu::fs::walker(fx.root());
     // brace alternation in an exclude: drop both .log and .rs
-    b.glob_excludes(["*.{log,rs}"].into_iter())?;
+    b.glob_excludes(["*.{log,rs}"])?;
     let got = collect(b.walk()?)?;
 
     assert!(!got.contains("b.log"), "log should be excluded: {got:?}");
