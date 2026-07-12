@@ -1,51 +1,3 @@
-//! Recursive directory walking.
-//!
-//! A thin, opinionated wrapper around the [`ignore`](https://docs.rs/ignore)
-//! crate that exposes a simpler builder API for the most common cases.
-//!
-//! Use [`walk`] for a quick recursive walk with sensible defaults, or [`walker`]
-//! to configure the walk through a [`WalkBuilder`] before running it.
-//!
-//! # Defaults
-//! Out of the box (see [`walk`]) the walker:
-//! - **includes** hidden files (dotfiles),
-//! - does **not** read `.gitignore` or other ignore/VCS files,
-//! - does **not** follow symbolic links,
-//! - applies **no** glob include/exclude filters,
-//! - yields **files only** — directory entries are skipped.
-//!
-//! Every one of these can be changed through [`WalkBuilder`].
-//!
-//! # Examples
-//!
-//! Walk the current directory and print every file:
-//! ```rust,no_run
-//! # use pistonite_cu as cu;
-//! fn print_files() -> cu::Result<()> {
-//!     for entry in cu::fs::walk(".")? {
-//!         let entry = entry?;
-//!         cu::info!("{}", entry.path().display());
-//!     }
-//!     Ok(())
-//! }
-//! ```
-//!
-//! Configure the walk with the builder — respect `.gitignore`, follow symlinks,
-//! and only include Rust and TOML files (note brace alternation is supported):
-//! ```rust,no_run
-//! # use pistonite_cu as cu;
-//! fn print_sources() -> cu::Result<()> {
-//!     let mut builder = cu::fs::walker("src");
-//!     builder.git(true).follow_links(true);
-//!     builder.glob_includes(["**/*.{rs,toml}"].into_iter())?;
-//!     for entry in builder.walk()? {
-//!         let entry = entry?;
-//!         cu::info!("{}", entry.path().display());
-//!     }
-//!     Ok(())
-//! }
-//! ```
-
 use std::ffi::OsStr;
 use std::fs::{FileType, Metadata};
 use std::path::{Component, Path, PathBuf};
@@ -56,22 +8,21 @@ use ignore::{DirEntry as IgnoreDirEntry, Walk as IgnoreWalk, WalkBuilder as Igno
 
 use crate::pre::*;
 
-/// Create a [`WalkBuilder`] rooted at `root` to configure a walk.
+/// Create a walker to walk `root` recursively.
 ///
-/// Use this when you need to change the defaults (glob filters, gitignore,
-/// following links, etc.); otherwise reach for [`walk`].
+/// See [`WalkBuilder`] for configurations. [`cu::fs::walk`] can be used directly for the default
+/// configuration.
 ///
 /// ```rust,no_run
 /// # use pistonite_cu as cu;
-/// fn walk_dirs_too() -> cu::Result<()> {
-///     let mut builder = cu::fs::walker(".");
-///     builder.include_dir_entries(true);
-///     for entry in builder.walk()? {
-///         let entry = entry?;
-///         cu::info!("{} (dir: {})", entry.path().display(), entry.is_dir());
-///     }
-///     Ok(())
+/// # fn walk_dirs_too() -> cu::Result<()> {
+/// let mut builder = cu::fs::walker(".");
+/// builder.include_dir_entries(true);
+/// for entry in builder.walk()? {
+///     let entry = entry?;
+///     cu::info!("{} (dir: {})", entry.path().display(), entry.is_dir());
 /// }
+/// # Ok(()) }
 /// ```
 #[inline(always)]
 pub fn walker(root: impl AsRef<Path>) -> WalkBuilder {
@@ -87,19 +38,18 @@ pub fn walker(root: impl AsRef<Path>) -> WalkBuilder {
 /// - does not apply any glob include/exclude filters,
 /// - yields files only (directory entries are skipped).
 ///
-/// Use [`walker`] to change any of these. The returned [`Walk`] is an iterator
-/// of [`WalkEntry`] results.
+/// To change the configuration, use [`cu::fs::walker`]
 ///
 /// ```rust,no_run
 /// # use pistonite_cu as cu;
-/// fn count_files() -> cu::Result<usize> {
-///     let mut count = 0;
-///     for entry in cu::fs::walk(".")? {
-///         let _entry = entry?;
-///         count += 1;
-///     }
-///     Ok(count)
+/// # fn count_files() -> cu::Result<usize> {
+/// let mut count = 0;
+/// for entry in cu::fs::walk(".")? {
+///     let _entry = entry?;
+///     count += 1;
 /// }
+/// cu::info!("number of files: {count}");
+/// # Ok(count) }
 /// ```
 #[inline(always)]
 pub fn walk(root: impl AsRef<Path>) -> cu::Result<Walk> {
@@ -109,25 +59,7 @@ pub fn walk(root: impl AsRef<Path>) -> cu::Result<Walk> {
 /// Builder for a directory [`Walk`], providing a simpler API over the
 /// `ignore` crate for the most common cases.
 ///
-/// Create one with [`walker`], configure it with the methods below, then call
-/// [`walk`](WalkBuilder::walk) to produce the [`Walk`] iterator. Configuration
-/// methods return `&mut Self` (or `cu::Result<&mut Self>` for the fallible glob
-/// setters) so they can be chained.
-///
-/// ```rust,no_run
-/// # use pistonite_cu as cu;
-/// fn configured() -> cu::Result<()> {
-///     let mut builder = cu::fs::walker(".");
-///     builder.ignore_hidden(true).include_dir_entries(true);
-///     for entry in builder.walk()? {
-///         let entry = entry?;
-///         cu::info!("{}", entry.path().display());
-///     }
-///     Ok(())
-/// }
-/// ```
-///
-/// See [`walker`].
+/// Created with [`cu::fs::walker`].
 pub struct WalkBuilder {
     inner: IgnoreWalkBuilder,
     overrides: OverrideBuilder,
@@ -166,17 +98,21 @@ impl WalkBuilder {
     /// `{a,b}` brace alternation. Once any include pattern is added, only paths
     /// matching at least one include (and no exclude) are yielded.
     ///
+    /// ## Caution
+    /// If the glob pattern starts with `./`, the dot is removed instead of matching
+    /// literal `./`. Patterns starting with `../` still
+    /// matches the literal `../` (meaning the root must start with `../` to produce any match)
+    ///
     /// ```rust,no_run
     /// # use pistonite_cu as cu;
-    /// fn only_sources() -> cu::Result<()> {
-    ///     let mut builder = cu::fs::walker(".");
-    ///     // include Rust and TOML files anywhere in the tree
-    ///     builder.glob_includes(["**/*.{rs,toml}"].into_iter())?;
-    ///     for entry in builder.walk()? {
-    ///         cu::info!("{}", entry?.path().display());
-    ///     }
-    ///     Ok(())
+    /// # fn only_sources() -> cu::Result<()> {
+    /// let mut walker = cu::fs::walker(".");
+    /// // include Rust and TOML files anywhere in the tree
+    /// walker.glob_includes(["**/*.{rs,toml}"])?;
+    /// for entry in walker.walk()? {
+    ///     cu::info!("{}", entry?.path().display());
     /// }
+    /// # Ok(()) }
     /// ```
     pub fn glob_includes(
         &mut self,
@@ -184,10 +120,18 @@ impl WalkBuilder {
     ) -> crate::Result<&mut Self> {
         for g in globs {
             let g = g.as_ref();
-            crate::check!(
-                self.overrides.add(g),
-                "failed to add glob include pattern: '{g}'"
-            )?;
+            if g.starts_with("./") || g.starts_with(".\\") {
+                let g2 = &g[1..];
+                crate::check!(
+                    self.overrides.add(g2),
+                    "failed to add glob include pattern: '{g2}' (resolved from '{g}')"
+                )?;
+            } else {
+                crate::check!(
+                    self.overrides.add(g),
+                    "failed to add glob include pattern: '{g}'"
+                )?;
+            }
             self.has_overrides = true;
         }
         Ok(self)
@@ -195,20 +139,20 @@ impl WalkBuilder {
 
     /// Add glob patterns to exclude. By default nothing is excluded.
     ///
-    /// Patterns use the same gitignore-style syntax as
-    /// [`glob_includes`](Self::glob_includes), including `{a,b}` brace
-    /// alternation. Excludes take precedence over includes.
+    /// ## Caution
+    /// If the glob pattern starts with `./`, the dot is removed instead of matching
+    /// literal `./`. Patterns starting with `../` still
+    /// matches the literal `../` (meaning the root must start with `../` to produce any match)
     ///
     /// ```rust,no_run
     /// # use pistonite_cu as cu;
-    /// fn skip_logs_and_tmp() -> cu::Result<()> {
-    ///     let mut builder = cu::fs::walker(".");
-    ///     builder.glob_excludes(["**/*.{log,tmp}"].into_iter())?;
-    ///     for entry in builder.walk()? {
-    ///         cu::info!("{}", entry?.path().display());
-    ///     }
-    ///     Ok(())
+    /// # fn skip_logs_and_tmp() -> cu::Result<()> {
+    /// let mut builder = cu::fs::walker(".");
+    /// builder.glob_excludes(["**/*.{log,tmp}"])?;
+    /// for entry in builder.walk()? {
+    ///     cu::info!("{}", entry?.path().display());
     /// }
+    /// # Ok(()) }
     /// ```
     pub fn glob_excludes(
         &mut self,
@@ -218,11 +162,20 @@ impl WalkBuilder {
         s.push('!');
         for g in globs {
             let g = g.as_ref();
-            s.push_str(g);
-            crate::check!(
-                self.overrides.add(&s),
-                "failed to add glob exclude pattern: '{s}'"
-            )?;
+            if g.starts_with("./") || g.starts_with(".\\") {
+                let g2 = &g[1..];
+                s.push_str(g2);
+                crate::check!(
+                    self.overrides.add(&s),
+                    "failed to add glob exclude pattern: '{g2}' (resolved from '{g}')"
+                )?;
+            } else {
+                s.push_str(g);
+                crate::check!(
+                    self.overrides.add(&s),
+                    "failed to add glob exclude pattern: '{g}'"
+                )?;
+            }
             s.truncate(1);
             self.has_overrides = true;
         }
@@ -255,7 +208,7 @@ impl WalkBuilder {
         self
     }
 
-    /// Skip hidden files (dotfiles). Default is `false` (hidden files are
+    /// Skip hidden files. Default is `false` (i.e. hidden files are
     /// included).
     #[inline(always)]
     pub fn ignore_hidden(&mut self, yes: bool) -> &mut Self {
@@ -264,10 +217,7 @@ impl WalkBuilder {
     }
 
     /// Follow symbolic links. Default is `false`.
-    ///
-    /// When enabled, symlinked directories are descended into. Following a
-    /// dangling (broken) symlink surfaces an error from the [`Walk`] iterator
-    /// rather than being silently skipped.
+    #[inline(always)]
     pub fn follow_links(&mut self, yes: bool) -> &mut Self {
         self.inner.follow_links(yes);
         self

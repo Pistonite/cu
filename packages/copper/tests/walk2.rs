@@ -216,12 +216,27 @@ fn glob_includes_txt() -> cu::Result<()> {
 fn glob_excludes_log() -> cu::Result<()> {
     let fx = make_fixture("glob_excludes_log")?;
     let mut b = cu::fs::walker(fx.root());
-    b.glob_excludes(["*.log"])?;
+    b.glob_excludes(["./*.log"])?;
     let got = collect(b.walk()?)?;
 
     assert!(!got.contains("b.log"), "*.log should be excluded: {got:?}");
-    assert!(got.contains("a.txt"));
+    assert!(got.contains("a.txt"), "{got:?}");
     assert!(got.contains("sub/d.rs"));
+    Ok(())
+}
+
+#[test]
+fn glob_includes_brace_alternation_root() -> cu::Result<()> {
+    let fx = make_fixture("glob_includes_brace_alternation_root")?;
+    let mut b = cu::fs::walker(fx.root());
+    // brace alternation: include both .txt and .log, but not .rs
+    b.glob_includes(["./*.{txt,log}"])?;
+    let got = collect(b.walk()?)?;
+
+    assert!(got.contains("a.txt"), "txt should be included: {got:?}");
+    assert!(got.contains("b.log"), "log should be included: {got:?}");
+    assert!(!got.contains("sub/c.txt"));
+    assert!(!got.contains("sub/d.rs"), "rs should be excluded: {got:?}");
     Ok(())
 }
 
@@ -230,7 +245,7 @@ fn glob_includes_brace_alternation() -> cu::Result<()> {
     let fx = make_fixture("glob_includes_brace_alternation")?;
     let mut b = cu::fs::walker(fx.root());
     // brace alternation: include both .txt and .log, but not .rs
-    b.glob_includes(["*.{txt,log}"])?;
+    b.glob_includes(["./**/*.{txt,log}", "./*.{txt,log}"])?;
     let got = collect(b.walk()?)?;
 
     assert!(got.contains("a.txt"), "txt should be included: {got:?}");
