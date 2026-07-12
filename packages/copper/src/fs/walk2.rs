@@ -308,12 +308,15 @@ impl Walk {
                         break (entry, t);
                     }
                     if t.is_dir() {
-                        crate::trace!("walk: skipping directory: '{}'", entry.path().display());
+                        crate::trace!(
+                            "walk: not emitting entry for directory: '{}'",
+                            entry.path().display()
+                        );
                         continue;
                     }
                     if t.is_symlink() && entry.path().is_dir() {
                         crate::trace!(
-                            "walk: skipping symlinked directory: '{}'",
+                            "walk: not emitting entry for symlinked directory: '{}'",
                             entry.path().display()
                         );
                         continue;
