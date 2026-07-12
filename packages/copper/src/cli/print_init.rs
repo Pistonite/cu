@@ -186,7 +186,14 @@ pub trait LogConfig {
 pub struct DefaultLogConfig;
 impl LogConfig for DefaultLogConfig {
     fn process(&self, record: &lv::LogRecord) -> (lv::Lv, bool) {
+        // downgrade logs from dependencies to trace
+        if let Some(m) = record.module_path() {
+            if m.starts_with("ignore") {
+                return (lv::T, true);
+            }
+        }
+
         let level: lv::Lv = record.level().into();
-        (record.level().into(), level == lv::T)
+        (level, level == lv::T)
     }
 }

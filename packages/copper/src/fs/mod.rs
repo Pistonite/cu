@@ -12,10 +12,8 @@ mod read;
 pub use read::*;
 mod write;
 pub use write::*;
-mod walk;
-pub use walk::*;
-mod glob;
-pub use glob::*;
+mod walk2;
+pub use walk2::*;
 pub mod bin;
 
 pub use filetime::FileTime as Time;
