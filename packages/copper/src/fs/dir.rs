@@ -331,24 +331,34 @@ fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
 
     // cache paths that are known to be directories in `to`
     let mut dir_cache = BTreeSet::new();
-    let mut walk = crate::fs::walk(from)?;
-    while let Some(entry) = walk.next() {
+    let mut walker = crate::fs::walker(from);
+    walker.include_dir_entries(true);
+    for entry in walker.walk()? {
         let entry = entry?;
+        let rel_path = cu::check!(entry.rel_path()?, "failed to get relative path for entry")?;
         if !entry.is_dir() {
+            let Some(file_name) = entry.file_name() else {
+                cu::trace!("skipping file with no file name: '{}'", entry.path().display());
+                continue;
+            };
+            let containing = if entry.depth() > 1 {
+                let parent = cu::check!(rel_path.parent(), "failed to get relative path of containing directory for entry")?;
+                to.join(parent)
+            } else {
+                to.to_path_buf()
+            };
+            let target = containing.join(file_name);
             // ensure parent directories exists
-            if !dir_cache.contains(entry.rel_containing) {
-                let dir_path = to.join(entry.rel_containing);
-                make_dir_impl(&dir_path)?;
-                dir_cache.insert(dir_path);
+            if !dir_cache.contains(&containing) {
+                make_dir_impl(&containing)?;
+                dir_cache.insert(containing);
             }
             // copy the file
-            crate::fs::copy(
-                entry.path(),
-                to.join(entry.rel_containing).join(&entry.file_name),
-            )?;
+            crate::fs::copy(entry.path(), target)?;
         } else {
-            let dir_path = to.join(entry.rel_containing);
-            make_dir_impl(&dir_path)?;
+            let target_path = to.join(rel_path);
+            make_dir_impl(&target_path)?;
+            dir_cache.insert(target_path);
         }
     }
 

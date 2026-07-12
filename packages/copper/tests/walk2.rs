@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 
 use pistonite_cu as cu;
 use cu::pre::*;
-use pistonite_cu::fs::walk2::{Walk, walk, walker};
 
 /// A temp directory that is recursively removed when dropped.
 struct Fixture {
@@ -107,7 +106,7 @@ fn norm(p: &Path) -> String {
 ///
 /// The root entry (`rel_path() == None`, only emitted with dir entries enabled)
 /// is represented as `"."`.
-fn collect(w: Walk) -> cu::Result<BTreeSet<String>> {
+fn collect(w: cu::fs::Walk) -> cu::Result<BTreeSet<String>> {
     let mut set = BTreeSet::new();
     for entry in w {
         let entry = entry?;
@@ -132,7 +131,7 @@ fn set(items: &[&str]) -> BTreeSet<String> {
 #[test]
 fn default_returns_files_only() -> cu::Result<()> {
     let fx = make_fixture("default_returns_files_only")?;
-    let got = collect(walk(fx.root())?)?;
+    let got = collect(cu::fs::walk(fx.root())?)?;
     // Every regular file, hidden included; no directories, and (on unix) no
     // symlink entries leak in.
     let expected = set(&[
@@ -154,7 +153,7 @@ fn default_returns_files_only() -> cu::Result<()> {
 #[test]
 fn include_dir_entries_true() -> cu::Result<()> {
     let fx = make_fixture("include_dir_entries_true")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.include_dir_entries(true);
     let got = collect(b.walk()?)?;
 
@@ -172,7 +171,7 @@ fn include_dir_entries_true() -> cu::Result<()> {
 #[test]
 fn ignore_hidden_true() -> cu::Result<()> {
     let fx = make_fixture("ignore_hidden_true")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.ignore_hidden(true);
     let got = collect(b.walk()?)?;
 
@@ -195,7 +194,7 @@ fn ignore_hidden_true() -> cu::Result<()> {
 #[test]
 fn glob_includes_txt() -> cu::Result<()> {
     let fx = make_fixture("glob_includes_txt")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.glob_includes(["*.txt"].into_iter())?;
     let got = collect(b.walk()?)?;
 
@@ -216,7 +215,7 @@ fn glob_includes_txt() -> cu::Result<()> {
 #[test]
 fn glob_excludes_log() -> cu::Result<()> {
     let fx = make_fixture("glob_excludes_log")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.glob_excludes(["*.log"].into_iter())?;
     let got = collect(b.walk()?)?;
 
@@ -229,7 +228,7 @@ fn glob_excludes_log() -> cu::Result<()> {
 #[test]
 fn glob_includes_brace_alternation() -> cu::Result<()> {
     let fx = make_fixture("glob_includes_brace_alternation")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     // brace alternation: include both .txt and .log, but not .rs
     b.glob_includes(["*.{txt,log}"].into_iter())?;
     let got = collect(b.walk()?)?;
@@ -244,7 +243,7 @@ fn glob_includes_brace_alternation() -> cu::Result<()> {
 #[test]
 fn glob_includes_multiple_patterns() -> cu::Result<()> {
     let fx = make_fixture("glob_includes_multiple_patterns")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     // multiple include patterns are OR-ed together
     b.glob_includes(["*.rs", "*.log"].into_iter())?;
     let got = collect(b.walk()?)?;
@@ -258,7 +257,7 @@ fn glob_includes_multiple_patterns() -> cu::Result<()> {
 #[test]
 fn glob_excludes_brace_alternation() -> cu::Result<()> {
     let fx = make_fixture("glob_excludes_brace_alternation")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     // brace alternation in an exclude: drop both .log and .rs
     b.glob_excludes(["*.{log,rs}"].into_iter())?;
     let got = collect(b.walk()?)?;
@@ -273,7 +272,7 @@ fn glob_excludes_brace_alternation() -> cu::Result<()> {
 #[test]
 fn git_true_respects_gitignore() -> cu::Result<()> {
     let fx = make_fixture("git_true_respects_gitignore")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.git(true);
     let got = collect(b.walk()?)?;
 
@@ -293,7 +292,7 @@ fn git_true_respects_gitignore() -> cu::Result<()> {
 #[test]
 fn custom_ignore_filename() -> cu::Result<()> {
     let fx = make_fixture("custom_ignore_filename")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.add_ignore_filename(".customignore");
     let got = collect(b.walk()?)?;
 
@@ -309,7 +308,7 @@ fn custom_ignore_filename() -> cu::Result<()> {
 #[test]
 fn entry_metadata_depth_relpath() -> cu::Result<()> {
     let fx = make_fixture("entry_metadata_depth_relpath")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.include_dir_entries(true);
 
     let mut saw_root = false;
@@ -367,7 +366,7 @@ fn entry_metadata_depth_relpath() -> cu::Result<()> {
 #[test]
 fn symlink_to_file_skipped_by_default() -> cu::Result<()> {
     let fx = make_fixture("symlink_to_file_skipped_by_default")?;
-    let got = collect(walk(fx.root())?)?;
+    let got = collect(cu::fs::walk(fx.root())?)?;
 
     // symlink-to-file is not a plain file, so it is skipped by default
     assert!(
@@ -390,7 +389,7 @@ fn symlink_to_file_skipped_by_default() -> cu::Result<()> {
 #[test]
 fn symlink_entries_with_include_dir_entries() -> cu::Result<()> {
     let fx = make_fixture("symlink_entries_with_include_dir_entries")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.include_dir_entries(true);
     let got = collect(b.walk()?)?;
 
@@ -415,7 +414,7 @@ fn symlink_entries_with_include_dir_entries() -> cu::Result<()> {
 #[test]
 fn follow_links_descends_symlinked_dir() -> cu::Result<()> {
     let fx = make_fixture("follow_links_descends_symlinked_dir")?;
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.follow_links(true);
     let got = collect(b.walk()?)?;
 
@@ -436,7 +435,7 @@ fn broken_symlink_without_follow_does_not_error() -> cu::Result<()> {
 
     // Without following, the entry is read via symlink_metadata, so a dangling
     // target is fine: the walk completes without yielding an error.
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.include_dir_entries(true);
     let got = collect(b.walk()?)?;
     assert!(
@@ -445,7 +444,7 @@ fn broken_symlink_without_follow_does_not_error() -> cu::Result<()> {
     );
 
     // default walk (dir entries off) skips it as a non-file, also without error.
-    let files = collect(walk(fx.root())?)?;
+    let files = collect(cu::fs::walk(fx.root())?)?;
     assert!(
         !files.contains("link_broken"),
         "broken link is not a file: {files:?}"
@@ -461,7 +460,7 @@ fn broken_symlink_with_follow_surfaces_error() -> cu::Result<()> {
 
     // With follow_links, resolving the dangling target fails, and the walk
     // reports it as an error rather than silently skipping.
-    let mut b = walker(fx.root());
+    let mut b = cu::fs::walker(fx.root());
     b.include_dir_entries(true).follow_links(true);
     let saw_error = b.walk()?.any(|entry| entry.is_err());
     assert!(
