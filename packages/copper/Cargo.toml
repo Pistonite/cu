@@ -40,6 +40,7 @@ filetime = { version = "0.2.29", optional = true}
 glob = { version = "0.3.3", optional = true }
 fast-glob = { version = "1.0.1", optional = true }
 ignore = { version = "0.4.28", optional = true }
+smallvec = { version = "1.15.2", optional = true }
 spin = {version = "0.12.1", optional = true} # for PIO
 
 # serde
@@ -98,7 +99,7 @@ process = [ # enable spawning child processes
 ]
 fs = [ # enable file system and path util
     "dep:which", "dep:pathdiff", "dep:dunce", "dep:filetime", "dep:glob",
-    "tokio?/fs", "dep:ignore", "dep:fast-glob"
+    "tokio?/fs", "dep:ignore", "dep:fast-glob", "dep:smallvec"
 ]
 
 # Enable parsing utils

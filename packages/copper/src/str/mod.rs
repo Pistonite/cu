@@ -14,10 +14,6 @@ pub use osstring::{OsStrExtension, OsStrExtensionOwned};
 mod path;
 #[cfg(feature = "fs")]
 pub use path::PathExtension;
-#[cfg(feature = "fs")]
-mod glob;
-#[cfg(feature = "fs")]
-pub use glob::GlobPattern;
 
 // path macro just depends on the std path functions and does not require fs
 mod path_macro;
