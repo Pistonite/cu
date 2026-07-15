@@ -263,13 +263,12 @@ impl WalkBuilder {
 ///
 /// ```rust,no_run
 /// # use pistonite_cu as cu;
-/// fn list() -> cu::Result<()> {
-///     for entry in cu::fs::walk(".")? {
-///         let entry = entry?;
-///         cu::info!("depth {}: {}", entry.depth(), entry.path().display());
-///     }
-///     Ok(())
+/// # fn list() -> cu::Result<()> {
+/// for entry in cu::fs::walk(".")? {
+///     let entry = entry?;
+///     cu::info!("depth {}: {}", entry.depth(), entry.path().display());
 /// }
+/// # Ok(()) }
 /// ```
 pub struct Walk {
     inner: IgnoreWalk,
@@ -294,6 +293,10 @@ impl Walk {
         let (entry, file_type) = loop {
             let entry = crate::some!(self.inner.next());
             let entry = crate::check!(entry, "walk: failed to read the next entry")?;
+            if entry.depth() == 0 {
+                // skip root node
+                continue;
+            }
             match entry.file_type() {
                 None => {
                     // stdin
@@ -377,17 +380,14 @@ impl WalkEntry {
     ///
     /// ```rust,no_run
     /// # use pistonite_cu as cu;
-    /// fn print_relative() -> cu::Result<()> {
-    ///     for entry in cu::fs::walk("src")? {
-    ///         let entry = entry?;
-    ///         if let Some(rel) = entry.rel_path()? {
-    ///             cu::info!("{}", rel.display());
-    ///         }
-    ///     }
-    ///     Ok(())
+    /// # fn print_relative() -> cu::Result<()> {
+    /// for entry in cu::fs::walk("src")? {
+    ///     let entry = entry?;
+    ///     cu::info!("{}", entry.rel_path()?.display());
     /// }
+    /// # Ok(()) }
     /// ```
-    pub fn rel_path(&self) -> cu::Result<Option<PathBuf>> {
+    pub fn rel_path(&self) -> cu::Result<PathBuf> {
         // ensure root is a prefix of inner path
         let root_norm = self.root.normalize()?;
         // note we cannot normalize the path after join since it might be a symlink
@@ -409,13 +409,12 @@ impl WalkEntry {
             )?;
         }
         let Some(next) = path_iter.next() else {
-            // is root
-            return Ok(None);
+            cu::bail!("unexpected: walk entry path is same as root");
         };
         let mut p = PathBuf::new();
         p.push(next);
         p.extend(path_iter);
-        Ok(Some(p))
+        Ok(p)
     }
 
     /// Get the file type

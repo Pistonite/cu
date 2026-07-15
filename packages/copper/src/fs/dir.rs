@@ -329,13 +329,18 @@ fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
         crate::bail!("target exists and is not a directory");
     }
 
+    cu::check!(
+        make_dir_impl(to),
+        "rec_copy: failed to create target directory"
+    )?;
+
     // cache paths that are known to be directories in `to`
     let mut dir_cache = BTreeSet::new();
     let mut walker = crate::fs::walker(from);
     walker.include_dir_entries(true);
     for entry in walker.walk()? {
         let entry = entry?;
-        let rel_path = cu::check!(entry.rel_path()?, "failed to get relative path for entry")?;
+        let rel_path = entry.rel_path()?;
         if !entry.is_dir() {
             let Some(file_name) = entry.file_name() else {
                 cu::trace!(

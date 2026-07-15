@@ -110,14 +110,8 @@ fn collect(w: cu::fs::Walk) -> cu::Result<BTreeSet<String>> {
     let mut set = BTreeSet::new();
     for entry in w {
         let entry = entry?;
-        match entry.rel_path()? {
-            Some(p) => {
-                set.insert(norm(&p));
-            }
-            None => {
-                set.insert(".".to_string());
-            }
-        }
+        let rel_path = entry.rel_path()?;
+        set.insert(norm(&rel_path));
     }
     Ok(set)
 }
@@ -163,8 +157,7 @@ fn include_dir_entries_true() -> cu::Result<()> {
     }
     // ...alongside the files...
     assert!(got.contains("sub/c.txt"));
-    // ...and the root entry (rel_path == None).
-    assert!(got.contains("."), "expected root entry in {got:?}");
+    assert!(!got.contains("."));
     Ok(())
 }
 
@@ -326,49 +319,38 @@ fn entry_metadata_depth_relpath() -> cu::Result<()> {
     let mut b = cu::fs::walker(fx.root());
     b.include_dir_entries(true);
 
-    let mut saw_root = false;
     let mut saw_top_file = false;
     let mut saw_nested_file = false;
     let mut saw_dir = false;
 
     for entry in b.walk()? {
         let entry = entry?;
-        match entry.rel_path()? {
-            None => {
-                // the root entry
-                assert_eq!(entry.depth(), 0, "root depth should be 0");
+        assert!(entry.depth() > 0, "should not emit root entry");
+        let rel = norm(&entry.rel_path()?);
+        // rel_path must never carry a leading "./"
+        assert!(!rel.starts_with("./"), "rel_path has leading ./: {rel}");
+        match rel.as_str() {
+            "a.txt" => {
+                assert_eq!(entry.depth(), 1);
+                assert!(entry.is_file());
+                assert_eq!(entry.file_name().unwrap(), "a.txt");
+                entry.metadata()?;
+                saw_top_file = true;
+            }
+            "sub/nested/e.txt" => {
+                assert_eq!(entry.depth(), 3, "nested file should be depth 3");
+                assert!(entry.is_file());
+                saw_nested_file = true;
+            }
+            "sub" => {
+                assert_eq!(entry.depth(), 1);
                 assert!(entry.is_dir());
-                saw_root = true;
+                saw_dir = true;
             }
-            Some(rel) => {
-                let rel = norm(&rel);
-                // rel_path must never carry a leading "./"
-                assert!(!rel.starts_with("./"), "rel_path has leading ./: {rel}");
-                match rel.as_str() {
-                    "a.txt" => {
-                        assert_eq!(entry.depth(), 1);
-                        assert!(entry.is_file());
-                        assert_eq!(entry.file_name().unwrap(), "a.txt");
-                        entry.metadata()?;
-                        saw_top_file = true;
-                    }
-                    "sub/nested/e.txt" => {
-                        assert_eq!(entry.depth(), 3, "nested file should be depth 3");
-                        assert!(entry.is_file());
-                        saw_nested_file = true;
-                    }
-                    "sub" => {
-                        assert_eq!(entry.depth(), 1);
-                        assert!(entry.is_dir());
-                        saw_dir = true;
-                    }
-                    _ => {}
-                }
-            }
+            _ => {}
         }
     }
 
-    assert!(saw_root, "did not observe root entry");
     assert!(saw_top_file, "did not observe a.txt");
     assert!(saw_nested_file, "did not observe sub/nested/e.txt");
     assert!(saw_dir, "did not observe sub dir");
