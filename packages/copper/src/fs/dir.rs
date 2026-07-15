@@ -329,6 +329,11 @@ fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
         crate::bail!("target exists and is not a directory");
     }
 
+    cu::check!(
+        make_dir_impl(to),
+        "rec_copy: failed to create target directory"
+    )?;
+
     // cache paths that are known to be directories in `to`
     let mut dir_cache = BTreeSet::new();
     let mut walker = crate::fs::walker(from);
@@ -337,11 +342,6 @@ fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
         let entry = entry?;
         let rel_path = entry.rel_path()?;
         if !entry.is_dir() {
-            let rel_path = cu::check!(
-                rel_path,
-                "unexpected: failed to get relative path of file entry: '{}'",
-                entry.path().display()
-            )?;
             let Some(file_name) = entry.file_name() else {
                 cu::trace!(
                     "skipping file with no file name: '{}'",
@@ -367,10 +367,7 @@ fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
             // copy the file
             crate::fs::copy(entry.path(), target)?;
         } else {
-            let target_path = match rel_path {
-                Some(rel_path) => to.join(rel_path),
-                None => to.to_path_buf(),
-            };
+            let target_path = to.join(rel_path);
             make_dir_impl(&target_path)?;
             dir_cache.insert(target_path);
         }
