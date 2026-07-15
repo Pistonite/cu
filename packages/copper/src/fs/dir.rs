@@ -335,8 +335,13 @@ fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
     walker.include_dir_entries(true);
     for entry in walker.walk()? {
         let entry = entry?;
-        let rel_path = cu::check!(entry.rel_path()?, "failed to get relative path for entry")?;
+        let rel_path = entry.rel_path()?;
         if !entry.is_dir() {
+            let rel_path = cu::check!(
+                rel_path,
+                "unexpected: failed to get relative path of file entry: '{}'",
+                entry.path().display()
+            )?;
             let Some(file_name) = entry.file_name() else {
                 cu::trace!(
                     "skipping file with no file name: '{}'",
@@ -362,7 +367,10 @@ fn rec_copy_inefficiently_impl(from: &Path, to: &Path) -> crate::Result<()> {
             // copy the file
             crate::fs::copy(entry.path(), target)?;
         } else {
-            let target_path = to.join(rel_path);
+            let target_path = match rel_path {
+                Some(rel_path) => to.join(rel_path),
+                None => to.to_path_buf(),
+            };
             make_dir_impl(&target_path)?;
             dir_cache.insert(target_path);
         }
