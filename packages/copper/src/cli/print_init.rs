@@ -30,10 +30,42 @@ pub fn level(lv: &str) {
     );
 }
 
-/// Set global print options. This is usually called from clap args
+/// Set global CLI options
+///
+/// **You do not need to call this if using the `#[cu::cli]` macro**.
+/// This is useful to initialize logging without using a cu-compatible command line args,
+/// say for a program that should not use clap to parse its arguments.
+///
+/// ```rust,no_run
+/// # use pistonite_cu as cu;
+/// use std::sync::Arc;
+///
+/// fn main() {
+///     cu::cli::init_options(
+///         cu::lv::Color::Auto,
+///         cu::lv::Print::Normal,
+///         None,
+///         Arc::new(cu::cli::DefaultLogConfig)
+///     );
+///
+///     cu::hint!("hello!");
+///
+///     cu::cli::reset_color();
+/// }
+/// ```
 ///
 /// If prompt option is `None`, it will be `Interactive` unless env var `CI` is `true` or `1`, in which case it becomes `No`.
 /// Prompt option is ignored unless `prompt` feature is enabled
+///
+/// ## Difference to `#[cu::cli]` macro
+/// - The main function is not wrapped, meaning any `cu::Result` you got you need to display it
+///   yourself to the user.
+/// - Need to call [`cu::cli::reset_color`] manually to reset color.
+/// - RUST_BACKTRACE is not enabled automatically in trace level. To enable it you can
+///   check `lv::T::enabled()` after calling `init_options` and use `unsafe { std::env::set_var(...)
+///   }`
+/// - `finished in XX.XXs` time is not printed
+#[doc(alias = "init_cli")]
 pub fn init_options(
     color: lv::Color,
     level: lv::Print,

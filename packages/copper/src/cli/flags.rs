@@ -325,7 +325,10 @@ fn handle_result(start: Instant, result: crate::Result<()>) -> std::process::Exi
     }
 }
 
-fn reset_color() {
+/// Reset terminal color
+///
+/// **You do not need to call this if using the `#[cu::cli]` macro**.
+pub fn reset_color() {
     use std::io::IsTerminal as _;
     use std::io::Write as _;
     let mut stdout = std::io::stdout();
