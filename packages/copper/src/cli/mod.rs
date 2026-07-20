@@ -138,10 +138,10 @@ mod flags;
 #[cfg(all(feature = "coroutine", feature = "cli"))]
 pub use flags::__co_run;
 #[cfg(feature = "cli")]
-pub use flags::{__run, Flags, print_help, try_parse};
+pub use flags::{__run, Flags, print_help, reset_color, try_parse};
 
 mod print_init;
-pub use print_init::{DefaultLogConfig, LogConfig, level};
+pub use print_init::{DefaultLogConfig, LogConfig, init_options, level};
 mod macros;
 pub use macros::__print_with_level;
 
