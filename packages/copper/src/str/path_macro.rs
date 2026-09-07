@@ -111,11 +111,11 @@ macro_rules! path {
         $crate::__path_internal!(x / $($rest_segs)*)
     }};
     (( $first:expr ) / $($rest_segs:tt)* ) => {{
-        let mut x: ::std::path::PathBuf = { $first };
+        let mut x: ::std::path::PathBuf = $first;
         $crate::__path_internal!(x / $($rest_segs)*)
     }};
     ( & ( $first:expr ) / $($rest_segs:tt)* ) => {{
-        let x: &::std::path::Path = {$first}.as_ref();
+        let x: &::std::path::Path = ($first).as_ref();
         let mut x = x.to_path_buf();
         $crate::__path_internal!(x / $($rest_segs)*)
     }};
@@ -174,7 +174,7 @@ macro_rules! __path_internal {
     }};
     ($first:ident / $second:literal / ( $third:expr ) / $($rest_segs:tt)* ) => {{
         $first.push($second);
-        let x: &::std::path::Path = {$third}.as_ref();
+        let x: &::std::path::Path = ($third).as_ref();
         $first.push(x);
         $crate::__path_internal!($first / $($rest_segs)* )
     }};
@@ -200,7 +200,7 @@ macro_rules! __path_internal {
     ($first:ident / $second:ident / ( $third:expr ) / $($rest_segs:tt)* ) => {{
         let x: &::std::path::Path = $second.as_ref();
         $first.push(x);
-        let x: &::std::path::Path = {$third}.as_ref();
+        let x: &::std::path::Path = ($third).as_ref();
         $first.push(x);
         $crate::__path_internal!($first / $($rest_segs)* )
     }};
@@ -213,7 +213,7 @@ macro_rules! __path_internal {
     }};
     // expression muchering (1 at a time)
     ($first:ident / ( $second:expr ) / $($rest_segs:tt)* ) => {{
-        let x: &::std::path::Path = {$second}.as_ref();
+        let x: &::std::path::Path = ($second).as_ref();
         $first.push(x);
         $crate::__path_internal!($first / $($rest_segs)* )
     }};
@@ -228,17 +228,17 @@ macro_rules! __path_internal {
 
     ($first:ident / $second:literal / $third:expr) => {{
         $first.push($second);
-        let x: &::std::path::Path = {$third}.as_ref();
+        let x: &::std::path::Path = ($third).as_ref();
         $first.push(x); $first
     }};
     ($first:ident / $second:ident / $third:expr) => {{
         let x: &::std::path::Path = $second.as_ref();
         $first.push(x);
-        let x: &::std::path::Path = {$third}.as_ref();
+        let x: &::std::path::Path = ($third).as_ref();
         $first.push(x); $first
     }};
     ($first:ident / $second:expr) => {{
-        let x: &::std::path::Path = {$second}.as_ref();
+        let x: &::std::path::Path = ($second).as_ref();
         $first.push(x); $first
     }};
 
@@ -367,5 +367,22 @@ mod tests {
             crate::path!("a" / b / (c.as_str()) / "d" / e / (f.as_str()) / "g" / h / i.as_str());
         assert_eq!(p, nine_expected());
         let _ = (b, e, h);
+    }
+
+    #[test]
+    fn no_temporary() {
+        let aaa = String::from("aaa");
+        let bbb = String::from("bbb");
+        struct Foo {
+            bar: String,
+        }
+        let foo = Foo {
+            bar: String::from("bar"),
+        };
+        let p = crate::path!(&aaa / "k" / bbb / foo.bar);
+        let expected = PathBuf::from("aaa").join("k").join("bbb").join("bar");
+        assert_eq!(p, expected);
+        let p = crate::path!((aaa.into()) / "k" / bbb / foo.bar);
+        assert_eq!(p, expected);
     }
 }
