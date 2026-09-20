@@ -30,6 +30,8 @@ pub(crate) struct Printer {
     colors: ansi::Colors,
 
     print_task: PrintingThreadHandle,
+    /// Target for regular print messages
+    print_target: Target,
     /// Target for showing animation (bars and prompts)
     /// If None, bar animation will not be printed, and prompts
     /// will still be printed to stderr
@@ -68,6 +70,7 @@ impl Printer {
             colors,
 
             print_task: Default::default(),
+            print_target: Target::Stdout,
             anime_target,
             bars: Default::default(),
             #[cfg(feature = "prompt")]
@@ -77,6 +80,14 @@ impl Printer {
             buffered: String::new(),
         }
     }
+
+    pub(crate) fn set_print_target(&mut self, target: Target) {
+        self.print_target = target;
+    }
+    pub(crate) fn set_animation_target(&mut self, target: Option<Target>) {
+        self.anime_target = target;
+    }
+
     #[cfg(feature = "prompt")]
     pub(crate) fn show_prompt(
         &mut self,
@@ -169,58 +180,18 @@ impl Printer {
 
     /// Format and print the message
     pub(crate) fn print_message(&mut self, lv: lv::Lv, message: &str) {
-        let mut lines = message.lines();
-        let text_color = match lv {
-            lv::Lv::Off => return,
-            lv::Lv::Error => self.colors.red,
-            lv::Lv::Hint => self.colors.yellow,
-            lv::Lv::Print => self.colors.reset,
-            lv::Lv::Warn => self.colors.yellow,
-            lv::Lv::Info => self.colors.reset,
-            lv::Lv::Debug => self.colors.cyan,
-            lv::Lv::Trace => self.colors.magenta,
+        let Some(payload) = PrintPayload::new_level_message(lv, &self.colors, message) else {
+            return;
         };
-        self.format_buffer.reset(self.colors.gray, text_color);
-        match lv {
-            lv::Lv::Off => unreachable!(),
-            lv::Lv::Error => {
-                self.format_buffer.push_control(self.colors.red);
-                self.format_buffer.push('E', 1);
-                self.format_buffer.push(']', 1);
-            }
-            lv::Lv::Hint => {
-                self.format_buffer.push_control(self.colors.cyan);
-                self.format_buffer.push('H', 1);
-                self.format_buffer.push_control(self.colors.gray);
-                self.format_buffer.push(']', 1);
-            }
-            lv::Lv::Print => {
-                self.format_buffer.push_control(self.colors.gray);
-                self.format_buffer.push(':', 1);
-                self.format_buffer.push(':', 1);
-            }
-            lv::Lv::Warn => {
-                self.format_buffer.push_control(self.colors.yellow);
-                self.format_buffer.push('W', 1);
-                self.format_buffer.push(']', 1);
-            }
-            lv::Lv::Info => {
-                self.format_buffer.push_control(self.colors.green);
-                self.format_buffer.push('I', 1);
-                self.format_buffer.push_control(self.colors.gray);
-                self.format_buffer.push(']', 1);
-            }
-            lv::Lv::Debug => {
-                self.format_buffer.push_control(self.colors.gray);
-                self.format_buffer.push('D', 1);
-                self.format_buffer.push(']', 1);
-            }
-            lv::Lv::Trace => {
-                self.format_buffer.push_control(self.colors.magenta);
-                self.format_buffer.push('*', 1);
-                self.format_buffer.push(']', 1);
-            }
-        }
+        self.print_payload(payload);
+    }
+    pub(crate) fn print_payload(&mut self, payload: PrintPayload<'_>) {
+        self.format_buffer
+            .reset(self.colors.gray, payload.text_control);
+        self.format_buffer.push_control(payload.level_char_control);
+        self.format_buffer.push(payload.level_char, 1);
+        self.format_buffer.push_control(payload.sep_char_control);
+        self.format_buffer.push(payload.sep_char, 1);
         THREAD_NAME.with_borrow(|x| {
             if let Some(x) = x {
                 self.format_buffer.push_control(self.colors.magenta);
@@ -229,7 +200,8 @@ impl Printer {
                 self.format_buffer.push(']', 1);
             }
         });
-        self.format_buffer.push_control(text_color);
+        self.format_buffer.push_control(payload.text_control);
+        let mut lines = payload.message.lines();
         if let Some(line) = lines.next() {
             self.format_buffer.push(' ', 1);
             self.format_buffer.push_str(line);
@@ -244,16 +216,43 @@ impl Printer {
     fn print_format_buffer(&mut self) {
         if !self.print_task.active() {
             use std::io::Write;
-            let _ = write!(self.stdout, "{}", self.format_buffer.as_str());
-            let _ = self.stdout.flush();
+            match self.print_target {
+                Target::Stdout => {
+                    let _ = write!(
+                        self.stdout,
+                        "{}{}",
+                        self.format_buffer.as_str(),
+                        self.colors.reset
+                    );
+                    let _ = self.stdout.flush();
+                }
+                Target::Stderr => {
+                    let _ = write!(
+                        self.stderr,
+                        "{}{}",
+                        self.format_buffer.as_str(),
+                        self.colors.reset
+                    );
+                    let _ = self.stderr.flush();
+                }
+            }
         } else {
             self.buffered.push_str(self.format_buffer.as_str());
+            self.buffered.push_str(self.colors.reset);
         }
     }
-    fn flush_buffered_to_stdout(&mut self) {
+    fn flush_buffered_to_print_target(&mut self) {
         use std::io::Write as _;
-        let _ = write!(self.stdout, "{}", self.buffered);
-        let _ = self.stdout.flush();
+        match self.print_target {
+            Target::Stdout => {
+                let _ = write!(self.stdout, "{}", self.buffered);
+                let _ = self.stdout.flush();
+            }
+            Target::Stderr => {
+                let _ = write!(self.stderr, "{}", self.buffered);
+                let _ = self.stderr.flush();
+            }
+        }
         self.buffered.clear();
     }
 
@@ -274,6 +273,83 @@ impl Printer {
             return None;
         }
         self.print_task.take()
+    }
+}
+
+pub(crate) struct PrintPayload<'a> {
+    pub level_char_control: &'static str,
+    pub level_char: char,
+    pub sep_char_control: &'static str,
+    pub sep_char: char,
+    pub text_control: &'static str,
+    pub message: &'a str,
+}
+impl<'a> PrintPayload<'a> {
+    pub fn new_level_message(
+        level: lv::Lv,
+        colors: &ansi::Colors,
+        message: &'a str,
+    ) -> Option<Self> {
+        let payload = match level {
+            lv::Lv::Off => return None,
+            lv::Lv::Error => Self {
+                level_char_control: colors.red,
+                level_char: 'E',
+                sep_char_control: "",
+                sep_char: ']',
+                text_control: colors.red,
+                message,
+            },
+            lv::Lv::Hint => Self {
+                level_char_control: colors.cyan,
+                level_char: 'H',
+                sep_char_control: colors.gray,
+                sep_char: ']',
+                text_control: colors.yellow,
+                message,
+            },
+            lv::Lv::Print => Self {
+                level_char_control: colors.gray,
+                level_char: ':',
+                sep_char_control: "",
+                sep_char: ':',
+                text_control: colors.reset,
+                message,
+            },
+            lv::Lv::Warn => Self {
+                level_char_control: colors.yellow,
+                level_char: 'W',
+                sep_char_control: "",
+                sep_char: ']',
+                text_control: colors.yellow,
+                message,
+            },
+            lv::Lv::Info => Self {
+                level_char_control: colors.green,
+                level_char: 'I',
+                sep_char_control: colors.gray,
+                sep_char: ']',
+                text_control: colors.reset,
+                message,
+            },
+            lv::Lv::Debug => Self {
+                level_char_control: colors.gray,
+                level_char: 'D',
+                sep_char_control: "",
+                sep_char: ']',
+                text_control: colors.cyan,
+                message,
+            },
+            lv::Lv::Trace => Self {
+                level_char_control: colors.magenta,
+                level_char: '*',
+                sep_char_control: "",
+                sep_char: ']',
+                text_control: colors.magenta,
+                message,
+            },
+        };
+        Some(payload)
     }
 }
 
@@ -388,7 +464,7 @@ impl PrintingThread {
                 // with the prompt
                 if printer.anime_target.is_none() {
                     if !printer.buffered.is_empty() {
-                        printer.flush_buffered_to_stdout();
+                        printer.flush_buffered_to_print_target();
                     }
                     // still print the prompt to stderr, but don't print control characters
                     let _ = write!(printer.stderr, "{}", task.prompt);
@@ -479,7 +555,7 @@ impl PrintingThread {
             self.format_bars(printer);
             self.print_buffer_to_anime_target(printer);
         } else {
-            printer.flush_buffered_to_stdout();
+            printer.flush_buffered_to_print_target();
         }
         let bars_empty = printer.bars.is_empty();
         #[cfg(feature = "prompt")]
@@ -583,25 +659,23 @@ impl PrintingThread {
 
     /// Flush the printer buffered messages
     fn flush_buffered(&mut self, printer: &mut Printer) {
-        match printer.anime_target {
-            // if the animation target is also stdout,
-            // it's important that we take the buffered messages
-            // into our own buffer, so we don't immediately
-            // flush stdout. this prevents flushing partial output,
-            // which cause the progress animation to flicker
-            Some(Target::Stdout) => {
-                self.buffer.push_str(&printer.buffered);
-                printer.buffered.clear();
-            }
-            _ => {
-                printer.flush_buffered_to_stdout();
-            }
+        // if the animation target is the same as the print target
+        // it's important that we take the buffered messages
+        // into our own buffer, so we don't immediately
+        // flush stdout. this prevents flushing partial output,
+        // which cause the progress animation to flicker
+        if printer.anime_target == Some(printer.print_target) {
+            self.buffer.push_str(&printer.buffered);
+            printer.buffered.clear();
+            return;
         }
+        printer.flush_buffered_to_print_target();
     }
 }
 
+/// Target for printing output
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Target {
+pub enum Target {
     /// Print to Stdout
     Stdout,
     /// Print to Stderr
@@ -620,5 +694,49 @@ fn read_prompt(task: &PromptTask) -> cu::Result<Option<cu::ZString>> {
     match result {
         None | Some(None) => Ok(None),
         Some(Some(x)) => Ok(Some(x)),
+    }
+}
+
+/// Set the target for printing messages
+///
+/// This is useful if `stdout` needs to emit structured messages for other tools.
+/// Then you can programmatically change everything to emit to `stderr`.
+/// Note this will only affect messages printed after the call.
+///
+/// By default, all print messages go to `stdout`.
+///
+/// See also [`cu::cli::animate_to`]
+///
+/// ```rust
+/// # use pistonite_cu as cu;
+/// cu::cli::print_to(cu::cli::Target::Stderr);
+/// ```
+pub fn print_to(target: Target) {
+    if let Ok(mut printer) = PRINTER.lock() {
+        if let Some(printer) = printer.as_mut() {
+            printer.set_print_target(target);
+        }
+    }
+}
+
+/// Set the target for animation messages (prompts and bars)
+///
+/// By default, animation messages emit to `stdout` if `stdout` is terminal,
+/// and `stderr` if `stderr` is terminal. Otherwise, animation messages are
+/// not emitted. You can turn off animation messages by passing in `None`.
+/// Note this will only affect messages printed after the call.
+///
+/// See also [`cu::cli::print_to`]
+///
+/// ```rust
+/// # use pistonite_cu as cu;
+/// // force animation to go to stderr even if stdout is terminal
+/// cu::cli::animate_to(Some(cu::cli::Target::Stderr));
+/// ```
+pub fn animate_to(target: Option<Target>) {
+    if let Ok(mut printer) = PRINTER.lock() {
+        if let Some(printer) = printer.as_mut() {
+            printer.set_animation_target(target);
+        }
     }
 }

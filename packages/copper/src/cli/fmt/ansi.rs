@@ -38,13 +38,13 @@ pub(crate) const fn colors(use_color: bool) -> Colors {
 /// Iterator of (char, width)
 pub(crate) fn with_width(x: std::str::Chars<'_>) -> AnsiWidthIter<'_> {
     AnsiWidthIter {
-        is_escaping: false,
+        state: AnsiEscapeState::None,
         chars: x,
     }
 }
 
 pub(crate) struct AnsiWidthIter<'a> {
-    is_escaping: bool,
+    state: AnsiEscapeState,
     chars: std::str::Chars<'a>,
 }
 
@@ -52,18 +52,57 @@ impl<'a> Iterator for AnsiWidthIter<'a> {
     type Item = (char, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
+        use unicode_width::UnicodeWidthChar;
         let c = self.chars.next()?;
-        let width = if self.is_escaping {
-            if is_esc_end(c) {
-                self.is_escaping = false;
+        let width = match self.state {
+            AnsiEscapeState::None => {
+                if c == '\x1b' {
+                    self.state = AnsiEscapeState::SawEsc;
+                    0
+                } else {
+                    c.width_cjk().unwrap_or(0)
+                }
             }
-            0
-        } else if c == '\x1b' {
-            self.is_escaping = true;
-            0
-        } else {
-            use unicode_width::UnicodeWidthChar;
-            c.width_cjk().unwrap_or(0)
+            AnsiEscapeState::SawEsc => match c {
+                '[' => {
+                    self.state = AnsiEscapeState::EscapingControl;
+                    0
+                }
+                ']' => {
+                    self.state = AnsiEscapeState::EscapingOsCommand;
+                    0
+                }
+                _ => {
+                    self.state = AnsiEscapeState::None;
+                    c.width_cjk().unwrap_or(0)
+                }
+            },
+            AnsiEscapeState::EscapingControl => {
+                if is_esc_end(c) {
+                    self.state = AnsiEscapeState::None;
+                }
+                0
+            }
+            AnsiEscapeState::EscapingOsCommand => {
+                match c {
+                    '\x1b' => {
+                        self.state = AnsiEscapeState::EscapingOsCommandSawEsc;
+                    }
+                    '\x07' => {
+                        self.state = AnsiEscapeState::None;
+                    }
+                    _ => {}
+                }
+                0
+            }
+            AnsiEscapeState::EscapingOsCommandSawEsc => {
+                if c == '\\' {
+                    self.state = AnsiEscapeState::None;
+                } else {
+                    self.state = AnsiEscapeState::EscapingOsCommand;
+                }
+                0
+            }
         };
 
         Some((c, width))
@@ -72,5 +111,13 @@ impl<'a> Iterator for AnsiWidthIter<'a> {
 
 pub(crate) fn is_esc_end(c: char) -> bool {
     // we only do very basic check right now
-    c < u8::MAX as char && b"mAKGJBCDEFHSTfhlin".contains(&(c as u8))
+    c < u8::MAX as char && b"mAKGJBCDEFHSTfhlin\\\x07".contains(&(c as u8))
+}
+
+enum AnsiEscapeState {
+    None,
+    SawEsc,
+    EscapingControl,
+    EscapingOsCommand,
+    EscapingOsCommandSawEsc,
 }
