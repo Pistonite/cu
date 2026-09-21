@@ -228,18 +228,19 @@ macro_rules! __path_internal {
 
     ($first:ident / $second:literal / $third:expr) => {{
         $first.push($second);
-        let x: &::std::path::Path = ($third).as_ref();
-        $first.push(x); $first
+        fn cast(x: &::std::path::Path) -> &::std::path::Path { x }
+        $first.push(cast($third.as_ref()));
+        $first
     }};
     ($first:ident / $second:ident / $third:expr) => {{
         let x: &::std::path::Path = $second.as_ref();
         $first.push(x);
-        let x: &::std::path::Path = ($third).as_ref();
-        $first.push(x); $first
+        fn cast(x: &::std::path::Path) -> &::std::path::Path { x }
+        $first.push(cast($third.as_ref())); $first
     }};
     ($first:ident / $second:expr) => {{
-        let x: &::std::path::Path = ($second).as_ref();
-        $first.push(x); $first
+        fn cast(x: &::std::path::Path) -> &::std::path::Path { x }
+        $first.push(cast($second.as_ref())); $first
     }};
 
 }
@@ -382,7 +383,10 @@ mod tests {
         let p = crate::path!(&aaa / "k" / bbb / foo.bar);
         let expected = PathBuf::from("aaa").join("k").join("bbb").join("bar");
         assert_eq!(p, expected);
-        let p = crate::path!((aaa.into()) / "k" / bbb / foo.bar);
+        let p = crate::path!((aaa.clone().into()) / "k" / bbb / foo.bar);
+        assert_eq!(p, expected);
+        let p = crate::path!((aaa.into()) / "k" / bbb / format!("biz{}biz", foo.bar));
+        let expected = PathBuf::from("aaa").join("k").join("bbb").join("bizbarbiz");
         assert_eq!(p, expected);
     }
 }
