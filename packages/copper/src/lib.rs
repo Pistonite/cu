@@ -82,6 +82,8 @@ extern crate self as cu;
 
 // --- Basic stuff (no feature needed) ---
 pub mod str;
+#[cfg(feature = "regex")]
+pub use str::Regex;
 pub use str::{ByteFormat, ZString};
 
 mod env_var;

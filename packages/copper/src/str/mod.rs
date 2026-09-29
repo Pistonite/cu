@@ -17,3 +17,8 @@ pub use path::PathExtension;
 
 // path macro just depends on the std path functions and does not require fs
 mod path_macro;
+
+#[cfg(feature = "regex")]
+mod regex;
+#[cfg(feature = "regex")]
+pub use regex::Regex;

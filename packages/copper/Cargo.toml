@@ -1,6 +1,6 @@
 [package]
 name = "pistonite-cu"
-version = "0.9.5"
+version = "0.9.6"
 edition = "2024"
 description = "Battery-included common utils to speed up development of rust tools"
 repository = "https://github.com/Pistonite/cu"
@@ -64,6 +64,7 @@ features = [ "macros", "rt-multi-thread", "time" ]
 [features]
 default = []
 full = [
+    "regex",
     "cli",
     "coroutine-heavy",
     "prompt",
@@ -73,6 +74,9 @@ full = [
     "toml",
     "derive",
 ]
+
+# --- Extra bits of utils ---
+regex = ["dep:regex"]
 
 # --- Command Line Interface ---
 print = ["dep:oneshot", "dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width", "dep:ctrlc"]

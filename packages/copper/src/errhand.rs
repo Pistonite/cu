@@ -21,7 +21,9 @@ pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail};
 /// - `anyhow::Ok`     is `cu::Ok`
 ///
 /// Here are custom utilities from `cu` that integrates with `anyhow`
-/// - `cu::check!` wraps `.with_context()`
+/// - `cu::check!` wraps `.with_context()`. This is the general-purpose way to add context
+///   to errors that can happen at runtime even when the program is correct, such as
+///   invalid user input or system errors (e.g. file does not exist)
 ///    ```rust
 ///    # use pistonite_cu as cu;
 ///    use cu::pre::*;
@@ -45,9 +47,12 @@ pub use anyhow::{Context, Error, Ok, Result, anyhow as fmterr, bail};
 /// - [`cu::unimplemented!`](macro@crate::unimplemented)
 ///   and [`cu::unreachable!`](macro@crate::unreachable)
 ///   that are similar to the std macros, but instead of `panic!`, they will `bail!`
-/// - [`cu::ensure!`](macro@crate::ensure) is unlike `anyhow::ensure`, that
+/// - [`cu::ensure!`](macro@crate::ensure) is an assert-like check for invariants that
+///   should almost never fail if the program is correct (i.e. a debugging aid, like `assert!`,
+///   but returns an error instead of panicking). Unlike `anyhow::ensure`,
 ///   it evaluates to a `Result<()>` instead of generates a return.
 ///   It also does not automatically generate debug information.
+///   Do not use it to validate user input or check for system errors - use `check!` or `bail!` for those.
 /// - [`cu::some!`] checks an `Option` and returns `Ok(None)` if the option is `None`.
 ///
 /// Here are other `anyhow` re-exports that are less commonly used
@@ -197,7 +202,14 @@ macro_rules! unreachable {
     }}
 }
 
-/// Check if an expression is `true`
+/// Check if an expression is `true`, as an assertion
+///
+/// This is meant to be assert-like: the condition is an invariant that should
+/// almost never fail if everything is correct, so a failure indicates a bug
+/// (i.e. it's a debugging aid, like `assert!`, but returns an error instead of panicking).
+/// For errors that are expected to happen at runtime, such as invalid user input
+/// or system errors (e.g. file does not exist), use [`cu::check!`](macro@crate::check)
+/// or `cu::bail!` with a descriptive message instead.
 ///
 /// Unlike `anyhow::ensure`, if the condition fail, this will generate an `Error`
 /// instead of returning an error directly, so you need to add a `?`.
