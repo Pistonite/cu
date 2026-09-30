@@ -42,6 +42,27 @@ impl std::fmt::Debug for Regex {
         write!(f, "Regex({})", self.inner)
     }
 }
+impl PartialEq for Regex {
+    fn eq(&self, other: &Self) -> bool {
+        self.lit == other.lit
+    }
+}
+impl Eq for Regex {}
+impl PartialOrd for Regex {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Regex {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.lit.cmp(&other.lit)
+    }
+}
+impl std::hash::Hash for Regex {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.lit.hash(state);
+    }
+}
 impl Regex {
     /// Get the string that this regex was created from
     pub fn to_str(&self) -> &str {
