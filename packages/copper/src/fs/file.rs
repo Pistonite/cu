@@ -19,7 +19,6 @@ pub fn current_exe() -> crate::Result<PathBuf> {
 
 /// Copy a file from one to another.
 ///
-/// If copy failed, it will attempt to fallback to using read and write.
 /// Directories will be created for the target location if not already exists.
 ///
 /// if from and to is the pointing to the same, it might be truncated.
@@ -42,7 +41,6 @@ fn copy_impl(from: &Path, to: &Path) -> crate::Result<u64> {
         Ok(v) => return Ok(v),
         Err(e) => e,
     };
-    // we know the fallback will also fail in these cases
     if !from.exists() {
         crate::rethrow!(
             copy_error,
@@ -59,43 +57,36 @@ fn copy_impl(from: &Path, to: &Path) -> crate::Result<u64> {
             to.display()
         );
     }
-    // try the fallback
-    crate::trace!(
-        "copy failed, attempting fallback, from='{}' to='{}'",
+    if copy_error.kind() == std::io::ErrorKind::NotFound {
+        // ensure parent dir exists and try again
+        if let Ok(parent) = to.parent_abs()
+            && !parent.exists()
+        {
+            crate::trace!(
+                "retrying with parent creation: copy from='{}' to='{}'",
+                from.display(),
+                to.display()
+            );
+            crate::check!(
+                super::make_dir(&parent),
+                "could not automatically create parent directory for '{}'",
+                to.display()
+            )?;
+            // try again
+            return crate::check!(
+                std::fs::copy(from, to),
+                "failed to copy file from '{}' to '{}'",
+                from.display(),
+                to.display()
+            );
+        }
+    }
+    crate::rethrow!(
+        copy_error,
+        "failed to copy file from '{}' to '{}'",
         from.display(),
         to.display()
     );
-    let bytes = match super::read(from) {
-        Err(e) => {
-            crate::trace!(
-                "fallback copy failed when reading '{}': {e:?}",
-                from.display()
-            );
-            crate::rethrow!(
-                copy_error,
-                "failed to copy file from '{}' to '{}'",
-                from.display(),
-                to.display()
-            );
-        }
-        Ok(x) => x,
-    };
-    let size = bytes.len() as u64;
-    match super::write(to, bytes) {
-        Err(e) => {
-            crate::trace!(
-                "fallback copy failed when writing '{}': {e:?}",
-                to.display()
-            );
-            crate::rethrow!(
-                copy_error,
-                "failed to copy file from '{}' to '{}'",
-                from.display(),
-                to.display()
-            );
-        }
-        Ok(_) => Ok(size),
-    }
 }
 
 /// Get the modified time for a file.
