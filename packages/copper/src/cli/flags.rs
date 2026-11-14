@@ -220,10 +220,12 @@ fn parse_args<T: Parser>() -> T {
 /// Try to parse arguments from an iterator and print the error/help
 /// on failure.
 ///
+/// If `print_error` is false, help will still be printed if clap's default help command/flag is enabled
+///
 /// Whether the output has color depends on the main CLI `--color` option.
 /// This is useful for implementing custom command parser within
 /// an application.
-pub fn try_parse<T: Parser, I: IntoIterator>(iter: I) -> Option<T>
+pub fn try_parse<T: Parser, I: IntoIterator>(iter: I, print_error: bool) -> Option<T>
 where
     I::Item: Into<OsString> + Clone,
 {
@@ -236,8 +238,10 @@ where
         Err(e) => {
             let mut command = get_colored_command::<T>(use_color);
             let error = e.format(&mut command);
-            if let Err(e) = error.print() {
-                crate::warn!("arg parse error failed to print: {e:?}");
+            if print_error {
+                if let Err(e) = error.print() {
+                    crate::warn!("arg parse error failed to print: {e:?}");
+                }
             }
             None
         }

@@ -1,7 +1,6 @@
 use std::process::Stdio;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use spin::mutex::SpinMutex;
 use tokio::process::{Child as TokioChild, ChildStderr, ChildStdout, Command as TokioCommand};
 
 use crate::cli::{ProgressBar, ProgressBarBuilder};
@@ -67,7 +66,7 @@ pub fn spinner(name: impl Into<String>) -> Spinner {
     Spinner {
         config: Arc::new(SpinnerInner {
             lv: Atomic::new_u8(Lv::Off as u8),
-            bar: SpinMutex::new(Err(crate::progress(name))),
+            bar: Mutex::new(Err(crate::progress(name))),
         }),
     }
 }
@@ -100,7 +99,7 @@ impl Spinner {
         self,
         f: F,
     ) -> Self {
-        let mut bar = self.config.bar.lock();
+        let mut bar = self.config.bar.lock().expect("failed to lock");
         if let Err(builder) = bar.clone() {
             *bar = Err(f(builder));
         }
@@ -111,9 +110,7 @@ impl Spinner {
 struct SpinnerInner {
     lv: Atomic<u8, Lv>,
     // the bar spawned when calling take() for the first time,
-    // using a spin lock because it should be VERY rare that
-    // we get contention
-    bar: SpinMutex<Result<Arc<ProgressBar>, ProgressBarBuilder>>,
+    bar: Mutex<Result<Arc<ProgressBar>, ProgressBarBuilder>>,
 }
 pub struct SpinnerTask {
     lv: Lv,
@@ -149,7 +146,7 @@ impl ChildOutConfig for Spinner {
             String::new()
         };
         let bar = {
-            let mut bar_arc = self.config.bar.lock();
+            let mut bar_arc = self.config.bar.lock().expect("failed to lock");
             match bar_arc.as_mut() {
                 // if already created, then just use the bar (i.e. if created
                 // by the same spinner configured for multiple outputs

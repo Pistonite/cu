@@ -152,4 +152,4 @@ pub type ProgressHandle = std::sync::Arc<ProgressBar>;
 ///     cu::progress!(bar, "doing {i}th step");
 /// }
 /// ```
-*/
+ */
