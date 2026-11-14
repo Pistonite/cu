@@ -38,7 +38,6 @@ which = {version = "8.0.6", optional = true }
 pathdiff = {version = "0.2.3", optional=true}
 filetime = { version = "0.2.29", optional = true}
 ignore = { version = "0.4.34", optional = true }
-spin = {version = "0.12.3", optional = true} # for PIO
 
 # serde
 serde = { version = "1.0.229", features = ["derive"], optional = true }
@@ -50,7 +49,7 @@ toml = { version = "1.2.1", optional = true }
 derive_more = { version = "2.1.1", features = ["full"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.191"
+libc = { version = "0.2.191", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_Console", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System_SystemServices"] }
@@ -79,9 +78,9 @@ full = [
 regex = ["dep:regex"]
 
 # --- Command Line Interface ---
-print = ["dep:oneshot", "dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width", "dep:ctrlc"]
+print = ["dep:regex", "dep:env_filter", "dep:terminal_size", "dep:unicode-width", "dep:ctrlc"]
 cli = ["dep:clap", "print"]
-prompt = ["print"]
+prompt = ["print", "dep:libc", "dep:oneshot"]
 
 # --- Coroutine ---
 coroutine = [
@@ -95,7 +94,6 @@ coroutine-heavy = ["coroutine"] # enable heavy coroutine drived by multi-threade
 # --- File System ---
 process = [ # enable spawning child processes
     "coroutine", "fs",
-    "dep:spin",
     "tokio/process",
 ]
 fs = [ # enable file system and path util
